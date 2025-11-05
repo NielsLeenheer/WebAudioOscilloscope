@@ -74,51 +74,71 @@
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
 
-        // Convert data to screen coordinates
+        // Convert data to screen coordinates with slight jitter
         const points = [];
         for (let i = 0; i < leftData.length; i++) {
+            // Add slight random jitter to simulate analog instability
+            const jitterAmount = 0.5; // pixels
+            const jitterX = (Math.random() - 0.5) * jitterAmount;
+            const jitterY = (Math.random() - 0.5) * jitterAmount;
+
             points.push({
-                x: centerX + leftData[i] * scale,
-                y: centerY - rightData[i] * scale
+                x: centerX + leftData[i] * scale + jitterX,
+                y: centerY - rightData[i] * scale + jitterY
             });
         }
 
-        // Draw segments with opacity based on distance (beam speed)
+        // Draw segments with Bézier curves for beam inertia effect
+        ctx.beginPath();
+        if (points.length > 0) {
+            ctx.moveTo(points[0].x, points[0].y);
+        }
+
         for (let i = 0; i < points.length - 1; i++) {
             const p1 = points[i];
             const p2 = points[i + 1];
 
-            // Calculate distance between points
+            // Calculate distance and direction
             const dx = p2.x - p1.x;
             const dy = p2.y - p1.y;
             const distance = Math.sqrt(dx * dx + dy * dy);
 
             // Map distance to opacity with exponential falloff
-            // Shorter distance = slower beam = brighter
-            // Longer distance = faster beam = much dimmer
-
-            // Use exponential curve for more aggressive dimming
-            const distanceThreshold = 10; // Distance at which dimming starts
+            const distanceThreshold = 10;
             let opacity;
 
             if (distance <= distanceThreshold) {
-                // Close points: full brightness
                 opacity = 1.0;
             } else {
-                // Far points: exponential falloff
                 const excessDistance = distance - distanceThreshold;
-                // Exponential decay: e^(-distance/k) where k controls falloff rate
-                const falloffRate = 8; // Lower = faster dimming
+                const falloffRate = 8;
                 opacity = Math.exp(-excessDistance / falloffRate);
-                // Clamp to minimum visibility
                 opacity = Math.max(opacity, 0.02);
             }
 
             ctx.strokeStyle = `rgba(76, 175, 80, ${opacity})`;
-            ctx.beginPath();
-            ctx.moveTo(p1.x, p1.y);
-            ctx.lineTo(p2.x, p2.y);
-            ctx.stroke();
+
+            // Use Bézier curve for beam inertia effect on fast movements
+            if (distance > 5) {
+                // Calculate control point for overshoot effect
+                // The beam "struggles" to change direction quickly
+                const overshootFactor = Math.min(distance / 50, 0.3); // Scale with distance
+
+                // Control point overshoots in the direction of movement
+                const controlX = p1.x + dx * (0.5 + overshootFactor);
+                const controlY = p1.y + dy * (0.5 + overshootFactor);
+
+                ctx.beginPath();
+                ctx.moveTo(p1.x, p1.y);
+                ctx.quadraticCurveTo(controlX, controlY, p2.x, p2.y);
+                ctx.stroke();
+            } else {
+                // For slow movements, use straight lines
+                ctx.beginPath();
+                ctx.moveTo(p1.x, p1.y);
+                ctx.lineTo(p2.x, p2.y);
+                ctx.stroke();
+            }
         }
     }
 
