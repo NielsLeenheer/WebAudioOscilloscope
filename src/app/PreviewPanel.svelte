@@ -16,12 +16,12 @@
     let velocityY = 0;
 
     // Physics parameters (adjustable)
-    let forceMultiplier = $state(0.10);
-    let damping = $state(0.066);
-    let mass = $state(0.66);
-    let persistence = $state(0.05); // Afterglow/fade effect (0=instant fade, 1=long trail)
-    let signalNoise = $state(0); // Random noise added to audio signal (0-1)
-    let beamPower = $state(0.5); // Beam power (affects opacity: high power = dim, low power = bright)
+    let forceMultiplier = $state(0.22);
+    let damping = $state(0.44);
+    let mass = $state(0.11);
+    let persistence = $state(0.330); // Afterglow/fade effect (0=instant fade, 1=long trail)
+    let signalNoise = $state(0.004); // Random noise added to audio signal (0-1)
+    let beamPower = $state(0.5); // Beam power (affects opacity: high power = bright, low power = dim)
 
     onMount(() => {
         ctx = canvas.getContext('2d');
@@ -88,9 +88,9 @@
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
 
-        // Calculate opacity based on beam power (inverse relationship)
-        // High power = low opacity (0.2), low power = high opacity (1.0)
-        const beamOpacity = 1.0 - (beamPower * 0.8);
+        // Calculate opacity based on beam power
+        // High power = high opacity (1.0), low power = low opacity (0.2)
+        const beamOpacity = 0.2 + (beamPower * 0.8);
 
         // Process each data point with physics simulation
         ctx.strokeStyle = `rgba(76, 175, 80, ${beamOpacity})`;
