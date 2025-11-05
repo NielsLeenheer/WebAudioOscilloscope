@@ -18,6 +18,11 @@
     let velocityX = 0;
     let velocityY = 0;
 
+    // Physics parameters (adjustable)
+    let forceMultiplier = $state(0.15);
+    let damping = $state(0.85);
+    let mass = $state(1.0);
+
     onMount(() => {
         ctx = canvas.getContext('2d');
         if (isPlaying) {
@@ -191,11 +196,6 @@
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
 
-        // Physics parameters
-        const forceMultiplier = 0.15;  // How strongly the beam is pulled to target
-        const damping = 0.85;           // Velocity damping (0-1, lower = more damping)
-        const mass = 1.0;               // Beam "mass" (affects acceleration)
-
         // Apply uniform jitter to readings
         let frameJitterX = 0;
         let frameJitterY = 0;
@@ -320,6 +320,24 @@
             Overshoot
         </label>
     </div>
+
+    {#if usePhysicsMode}
+    <div class="sliders">
+        <div class="slider-control">
+            <label>Force: {forceMultiplier.toFixed(2)}</label>
+            <input type="range" min="0.01" max="0.5" step="0.01" bind:value={forceMultiplier} />
+        </div>
+        <div class="slider-control">
+            <label>Damping: {damping.toFixed(2)}</label>
+            <input type="range" min="0.5" max="0.99" step="0.01" bind:value={damping} />
+        </div>
+        <div class="slider-control">
+            <label>Mass: {mass.toFixed(1)}</label>
+            <input type="range" min="0.1" max="5.0" step="0.1" bind:value={mass} />
+        </div>
+    </div>
+    {/if}
+
     <p class="hint">This shows the X/Y oscilloscope visualization</p>
 </div>
 
@@ -382,6 +400,57 @@
 
     .controls input[type="checkbox"]:disabled {
         cursor: not-allowed;
+    }
+
+    .sliders {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        margin: 15px 0;
+        padding: 15px;
+        background: #1a1a1a;
+        border-radius: 4px;
+    }
+
+    .slider-control {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+    }
+
+    .slider-control label {
+        color: #4CAF50;
+        font-family: system-ui;
+        font-size: 12px;
+        font-weight: 600;
+    }
+
+    .slider-control input[type="range"] {
+        width: 100%;
+        height: 4px;
+        background: #333;
+        border-radius: 2px;
+        outline: none;
+        -webkit-appearance: none;
+    }
+
+    .slider-control input[type="range"]::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 16px;
+        height: 16px;
+        background: #4CAF50;
+        border-radius: 50%;
+        cursor: pointer;
+    }
+
+    .slider-control input[type="range"]::-moz-range-thumb {
+        width: 16px;
+        height: 16px;
+        background: #4CAF50;
+        border-radius: 50%;
+        cursor: pointer;
+        border: none;
     }
 
     .hint {
