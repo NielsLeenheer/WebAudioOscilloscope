@@ -88,14 +88,15 @@
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
 
-        // Calculate opacity based on beam power
+        // Base opacity from beam power
         // High power = high opacity (1.0), low power = low opacity (0.2)
-        const beamOpacity = 0.2 + (beamPower * 0.8);
+        const basePower = 0.2 + (beamPower * 0.8);
 
         // Process each data point with physics simulation
-        ctx.strokeStyle = `rgba(76, 175, 80, ${beamOpacity})`;
         ctx.beginPath();
         let isFirstPoint = true;
+        let prevX = 0;
+        let prevY = 0;
 
         for (let i = 0; i < leftData.length; i++) {
             // Add noise to audio signal if enabled
@@ -135,15 +136,42 @@
             const screenX = centerX + beamX;
             const screenY = centerY + beamY;
 
-            if (isFirstPoint) {
-                ctx.moveTo(screenX, screenY);
-                isFirstPoint = false;
-            } else {
-                ctx.lineTo(screenX, screenY);
-            }
-        }
+            // Calculate velocity-based opacity (fast beam = dimmer)
+            if (!isFirstPoint) {
+                const dx = screenX - prevX;
+                const dy = screenY - prevY;
+                const speed = Math.sqrt(dx * dx + dy * dy);
 
-        ctx.stroke();
+                // Apply exponential falloff based on speed
+                // Slow movement (speed < 10) = full brightness
+                // Fast movement = exponentially dimmer
+                const speedThreshold = 10;
+                let velocityOpacity;
+
+                if (speed <= speedThreshold) {
+                    velocityOpacity = 1.0;
+                } else {
+                    const excessSpeed = speed - speedThreshold;
+                    const falloffRate = 8;
+                    velocityOpacity = Math.exp(-excessSpeed / falloffRate);
+                    velocityOpacity = Math.max(velocityOpacity, 0.02);
+                }
+
+                // Combine base power with velocity-based dimming
+                const finalOpacity = basePower * velocityOpacity;
+                ctx.strokeStyle = `rgba(76, 175, 80, ${finalOpacity})`;
+
+                // Draw line segment
+                ctx.beginPath();
+                ctx.moveTo(prevX, prevY);
+                ctx.lineTo(screenX, screenY);
+                ctx.stroke();
+            }
+
+            prevX = screenX;
+            prevY = screenY;
+            isFirstPoint = false;
+        }
     }
 
     function drawGrid() {
