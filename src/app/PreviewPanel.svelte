@@ -8,8 +8,9 @@
     let animationId = null;
     let leftData = null;
     let rightData = null;
+    let worker = null;
 
-    // Physics simulation state
+    // Physics simulation state (tracked but calculated in worker)
     let beamX = 0;
     let beamY = 0;
     let velocityX = 0;
@@ -25,6 +26,24 @@
 
     onMount(() => {
         ctx = canvas.getContext('2d');
+
+        // Initialize Web Worker for physics calculations
+        worker = new Worker(new URL('../workers/physics-worker.js', import.meta.url), { type: 'module' });
+
+        // Handle messages from worker
+        worker.onmessage = (e) => {
+            const { points, beamState } = e.data;
+
+            // Update physics state
+            beamX = beamState.beamX;
+            beamY = beamState.beamY;
+            velocityX = beamState.velocityX;
+            velocityY = beamState.velocityY;
+
+            // Draw the points
+            drawPoints(points);
+        };
+
         if (isPlaying) {
             startVisualization();
         }
@@ -32,6 +51,10 @@
 
     onDestroy(() => {
         stopVisualization();
+        if (worker) {
+            worker.terminate();
+            worker = null;
+        }
     });
 
     function startVisualization() {
@@ -79,98 +102,44 @@
         // Draw grid
         drawGrid();
 
-        // Draw with physics simulation
+        // Send data to worker for physics calculation
         const centerX = canvas.width / 2;
         const centerY = canvas.height / 2;
         const scale = Math.min(canvas.width, canvas.height) / 2.5;
+        const basePower = 0.2 + (beamPower * 0.8);
 
+        if (worker) {
+            worker.postMessage({
+                leftData: Array.from(leftData),
+                rightData: Array.from(rightData),
+                centerX,
+                centerY,
+                scale,
+                forceMultiplier,
+                damping,
+                mass,
+                signalNoise,
+                basePower,
+                reset: false
+            });
+        }
+    }
+
+    function drawPoints(points) {
         ctx.lineWidth = 1.5;
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
 
-        // Base opacity from beam power
-        // High power = high opacity (1.0), low power = low opacity (0.2)
-        const basePower = 0.2 + (beamPower * 0.8);
+        // Draw each line segment
+        for (let i = 1; i < points.length; i++) {
+            const p1 = points[i - 1];
+            const p2 = points[i];
 
-        // Process each data point with physics simulation
-        ctx.beginPath();
-        let isFirstPoint = true;
-        let prevX = 0;
-        let prevY = 0;
-
-        for (let i = 0; i < leftData.length; i++) {
-            // Add noise to audio signal if enabled
-            let leftSignal = leftData[i];
-            let rightSignal = rightData[i];
-
-            if (signalNoise > 0) {
-                leftSignal += (Math.random() - 0.5) * signalNoise;
-                rightSignal += (Math.random() - 0.5) * signalNoise;
-            }
-
-            // Target position from audio data (with noise)
-            const targetX = leftSignal * scale;
-            const targetY = -rightSignal * scale;
-
-            // Calculate force (like a spring pulling beam to target)
-            const forceX = (targetX - beamX) * forceMultiplier;
-            const forceY = (targetY - beamY) * forceMultiplier;
-
-            // Calculate acceleration (F = ma, so a = F/m)
-            const accelX = forceX / mass;
-            const accelY = forceY / mass;
-
-            // Update velocity
-            velocityX += accelX;
-            velocityY += accelY;
-
-            // Apply damping (friction/air resistance)
-            velocityX *= damping;
-            velocityY *= damping;
-
-            // Update position
-            beamX += velocityX;
-            beamY += velocityY;
-
-            // Convert to screen coordinates
-            const screenX = centerX + beamX;
-            const screenY = centerY + beamY;
-
-            // Calculate velocity-based opacity (fast beam = dimmer)
-            if (!isFirstPoint) {
-                const dx = screenX - prevX;
-                const dy = screenY - prevY;
-                const speed = Math.sqrt(dx * dx + dy * dy);
-
-                // Apply exponential falloff based on speed
-                // Slow movement (speed < 10) = full brightness
-                // Fast movement = exponentially dimmer
-                const speedThreshold = 10;
-                let velocityOpacity;
-
-                if (speed <= speedThreshold) {
-                    velocityOpacity = 1.0;
-                } else {
-                    const excessSpeed = speed - speedThreshold;
-                    const falloffRate = 8;
-                    velocityOpacity = Math.exp(-excessSpeed / falloffRate);
-                    velocityOpacity = Math.max(velocityOpacity, 0.02);
-                }
-
-                // Combine base power with velocity-based dimming
-                const finalOpacity = basePower * velocityOpacity;
-                ctx.strokeStyle = `rgba(76, 175, 80, ${finalOpacity})`;
-
-                // Draw line segment
-                ctx.beginPath();
-                ctx.moveTo(prevX, prevY);
-                ctx.lineTo(screenX, screenY);
-                ctx.stroke();
-            }
-
-            prevX = screenX;
-            prevY = screenY;
-            isFirstPoint = false;
+            ctx.strokeStyle = `rgba(76, 175, 80, ${p2.opacity})`;
+            ctx.beginPath();
+            ctx.moveTo(p1.x, p1.y);
+            ctx.lineTo(p2.x, p2.y);
+            ctx.stroke();
         }
     }
 
@@ -206,6 +175,22 @@
             if (ctx) {
                 ctx.fillStyle = '#000';
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
+            }
+            // Reset physics state in worker
+            if (worker) {
+                worker.postMessage({
+                    leftData: [],
+                    rightData: [],
+                    centerX: 0,
+                    centerY: 0,
+                    scale: 0,
+                    forceMultiplier: 0,
+                    damping: 0,
+                    mass: 1,
+                    signalNoise: 0,
+                    basePower: 0,
+                    reset: true
+                });
             }
             beamX = 0;
             beamY = 0;
