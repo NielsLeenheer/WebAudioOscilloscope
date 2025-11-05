@@ -65,30 +65,50 @@
         // Draw grid
         drawGrid();
 
-        // Draw the X/Y plot (oscilloscope mode)
-        ctx.strokeStyle = '#4CAF50';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-
+        // Draw the X/Y plot (oscilloscope mode) with variable opacity based on beam speed
         const centerX = canvas.width / 2;
         const centerY = canvas.height / 2;
         const scale = Math.min(canvas.width, canvas.height) / 2.5;
 
-        let isFirstPoint = true;
+        ctx.lineWidth = 2;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
 
+        // Convert data to screen coordinates
+        const points = [];
         for (let i = 0; i < leftData.length; i++) {
-            const x = centerX + leftData[i] * scale;
-            const y = centerY - rightData[i] * scale;
-
-            if (isFirstPoint) {
-                ctx.moveTo(x, y);
-                isFirstPoint = false;
-            } else {
-                ctx.lineTo(x, y);
-            }
+            points.push({
+                x: centerX + leftData[i] * scale,
+                y: centerY - rightData[i] * scale
+            });
         }
 
-        ctx.stroke();
+        // Draw segments with opacity based on distance (beam speed)
+        for (let i = 0; i < points.length - 1; i++) {
+            const p1 = points[i];
+            const p2 = points[i + 1];
+
+            // Calculate distance between points
+            const dx = p2.x - p1.x;
+            const dy = p2.y - p1.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+
+            // Map distance to opacity
+            // Shorter distance = slower beam = brighter
+            // Longer distance = faster beam = dimmer
+            // Normalize distance: typical pixel distances range from 0-20 pixels
+            const maxDistance = 30; // Threshold for dim trail
+            const normalizedDistance = Math.min(distance / maxDistance, 1);
+
+            // Invert so short distance = high opacity
+            const opacity = 1 - (normalizedDistance * 0.85); // Keep minimum 0.15 opacity
+
+            ctx.strokeStyle = `rgba(76, 175, 80, ${opacity})`;
+            ctx.beginPath();
+            ctx.moveTo(p1.x, p1.y);
+            ctx.lineTo(p2.x, p2.y);
+            ctx.stroke();
+        }
     }
 
     function drawGrid() {
