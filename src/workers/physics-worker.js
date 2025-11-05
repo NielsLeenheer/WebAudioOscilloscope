@@ -6,6 +6,12 @@ let velocityY = 0;
 let offscreenCanvas = null;
 let ctx = null;
 
+// FPS tracking
+let lastFrameTime = performance.now();
+let fps = 0;
+let frameCount = 0;
+let fpsUpdateTime = performance.now();
+
 self.onmessage = function(e) {
     const { type, data } = e.data;
 
@@ -133,6 +139,28 @@ self.onmessage = function(e) {
             prevX = screenX;
             prevY = screenY;
         }
+
+        // Calculate FPS
+        const currentTime = performance.now();
+        frameCount++;
+
+        // Update FPS every 500ms
+        if (currentTime - fpsUpdateTime >= 500) {
+            fps = Math.round((frameCount * 1000) / (currentTime - fpsUpdateTime));
+            frameCount = 0;
+            fpsUpdateTime = currentTime;
+        }
+
+        // Draw FPS indicator
+        ctx.fillStyle = '#4CAF50';
+        ctx.font = '14px monospace';
+        ctx.textAlign = 'right';
+        ctx.fillText(`${fps} FPS`, canvasWidth - 10, 20);
+
+        lastFrameTime = currentTime;
+
+        // Send ready message back to main thread
+        self.postMessage({ type: 'ready' });
     }
 };
 

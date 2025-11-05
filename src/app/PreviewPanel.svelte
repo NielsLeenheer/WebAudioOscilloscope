@@ -8,6 +8,7 @@
     let leftData = null;
     let rightData = null;
     let worker = null;
+    let workerBusy = false;
 
     // Physics parameters (adjustable)
     let forceMultiplier = $state(0.22);
@@ -21,6 +22,13 @@
     onMount(() => {
         // Initialize Web Worker with OffscreenCanvas
         worker = new Worker(new URL('../workers/physics-worker.js', import.meta.url), { type: 'module' });
+
+        // Listen for messages from worker
+        worker.onmessage = (e) => {
+            if (e.data.type === 'ready') {
+                workerBusy = false;
+            }
+        };
 
         // Transfer canvas control to worker
         const offscreen = canvas.transferControlToOffscreen();
@@ -71,6 +79,11 @@
 
         animationId = requestAnimationFrame(draw);
 
+        // Skip this frame if worker is still busy processing previous frame
+        if (workerBusy) {
+            return;
+        }
+
         const analysers = audioEngine.getAnalysers();
         if (!analysers.left || !analysers.right) {
             return;
@@ -87,6 +100,7 @@
         const basePower = 0.2 + (beamPower * 0.8);
 
         if (worker) {
+            workerBusy = true;
             worker.postMessage({
                 type: 'render',
                 data: {
