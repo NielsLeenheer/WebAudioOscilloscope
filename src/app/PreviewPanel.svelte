@@ -88,31 +88,27 @@
             });
         }
 
-        // Calculate maximum distance to determine overshoot threshold
+        // Calculate distances and find maximum for threshold
+        const distances = [];
         let maxDistance = 0;
         for (let i = 0; i < points.length - 1; i++) {
             const dx = points[i + 1].x - points[i].x;
             const dy = points[i + 1].y - points[i].y;
             const dist = Math.sqrt(dx * dx + dy * dy);
+            distances.push(dist);
             maxDistance = Math.max(maxDistance, dist);
         }
 
         const overshootThreshold = maxDistance * 0.25;
 
-        // Draw segments with Bézier curves for beam inertia effect
-        ctx.beginPath();
-        if (points.length > 0) {
-            ctx.moveTo(points[0].x, points[0].y);
-        }
-
+        // Draw segments with beam inertia effect
         for (let i = 0; i < points.length - 1; i++) {
             const p1 = points[i];
             const p2 = points[i + 1];
 
-            // Calculate distance and direction
             const dx = p2.x - p1.x;
             const dy = p2.y - p1.y;
-            const distance = Math.sqrt(dx * dx + dy * dy);
+            const distance = distances[i];
 
             // Map distance to opacity with exponential falloff
             const distanceThreshold = 10;
@@ -128,27 +124,31 @@
             }
 
             ctx.strokeStyle = `rgba(76, 175, 80, ${opacity})`;
+            ctx.lineWidth = 1.5;
 
-            // Use Bézier curve for beam inertia overshoot on fast movements only
-            if (distance > overshootThreshold) {
-                // The beam overshoots in the direction of travel due to inertia
-                // Control point is beyond p2, creating a "swing through" effect
-                const overshootAmount = distance * 0.8; // Much larger overshoot
+            // Check if PREVIOUS movement was fast (causes overshoot on THIS segment)
+            const prevDistance = i > 0 ? distances[i - 1] : 0;
 
-                // Direction of travel (normalized)
-                const dirX = dx / distance;
-                const dirY = dy / distance;
+            if (prevDistance > overshootThreshold && i > 0) {
+                // Previous movement was fast, so this segment has overshoot
+                // The beam wants to continue in the previous direction before turning to p2
+                const p0 = points[i - 1];
 
-                // Control point overshoots beyond p2 in the direction of travel
-                const controlX = p2.x + dirX * overshootAmount;
-                const controlY = p2.y + dirY * overshootAmount;
+                // Previous direction vector
+                const prevDx = p1.x - p0.x;
+                const prevDy = p1.y - p0.y;
+
+                // Control point continues in previous direction from p1
+                const overshootAmount = prevDistance * 0.5;
+                const controlX = p1.x + prevDx * 0.5;
+                const controlY = p1.y + prevDy * 0.5;
 
                 ctx.beginPath();
                 ctx.moveTo(p1.x, p1.y);
                 ctx.quadraticCurveTo(controlX, controlY, p2.x, p2.y);
                 ctx.stroke();
             } else {
-                // For slow movements, use straight lines
+                // Normal movement, use straight line
                 ctx.beginPath();
                 ctx.moveTo(p1.x, p1.y);
                 ctx.lineTo(p2.x, p2.y);
