@@ -14,10 +14,10 @@
     let forceMultiplier = $state(0.22);
     let damping = $state(0.44);
     let mass = $state(0.11);
-    let persistence = $state(0.330); // Afterglow/fade effect (0=instant fade, 1=long trail)
-    let signalNoise = $state(0.004); // Random noise added to audio signal (0-1)
-    let beamPower = $state(0.5); // Beam power (affects opacity: high power = bright, low power = dim)
-    let velocityDimming = $state(0.85); // How much fast movements dim (0=no dimming, 1=maximum dimming)
+    let persistence = $state(0.030); // Afterglow/fade effect (0=instant fade, 1=long trail)
+    let signalNoise = $state(0.015); // Random noise added to audio signal (0-1)
+    let beamPower = $state(0.50); // Beam power (affects opacity: high power = bright, low power = dim)
+    let velocityDimming = $state(0.90); // How much fast movements dim (0=no dimming, 1=maximum dimming)
 
     onMount(() => {
         // Initialize Web Worker with OffscreenCanvas
