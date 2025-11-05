@@ -6,10 +6,9 @@
 
     let svgPath = $state('');
     let numSamples = $state(200);
-    let autoCenter = $state(true);
     let selectedExample = $state('star'); // Default to first item
-    let lastLoadedPath = $state(''); // Track the last path loaded from examples
     let showApplyButton = $state(false);
+    let isLoadingExample = false; // Flag to prevent showing button during example load
 
     function drawSVGPath() {
         if (!isPlaying) return;
@@ -22,13 +21,19 @@
         }
 
         try {
-            const points = parseSVGPath(pathData, numSamples, autoCenter);
+            const points = parseSVGPath(pathData, numSamples, true); // Always auto-center
             audioEngine.createWaveform(points);
-            lastLoadedPath = pathData; // Update last loaded path
             showApplyButton = false; // Hide button after applying
         } catch (error) {
             alert('Error parsing SVG path: ' + error.message);
             console.error(error);
+        }
+    }
+
+    function handleTextareaInput(event) {
+        // Only show button if we're not currently loading an example
+        if (!isLoadingExample) {
+            showApplyButton = true;
         }
     }
 
@@ -38,8 +43,8 @@
             const pathData = svgExamples[selectedExample];
 
             if (pathData) {
+                isLoadingExample = true; // Set flag before updating
                 svgPath = pathData;
-                lastLoadedPath = pathData;
 
                 // Adjust sample points based on complexity
                 if (complexShapes.includes(selectedExample)) {
@@ -48,18 +53,14 @@
                     numSamples = 200;
                 }
 
+                showApplyButton = false;
                 drawSVGPath();
-            }
-        }
-    });
 
-    // Watch for manual edits to textarea
-    $effect(() => {
-        // Show button if path has been manually edited
-        if (svgPath && svgPath.trim() !== lastLoadedPath.trim()) {
-            showApplyButton = true;
-        } else {
-            showApplyButton = false;
+                // Reset flag after a short delay
+                setTimeout(() => {
+                    isLoadingExample = false;
+                }, 100);
+            }
         }
     });
 </script>
@@ -80,6 +81,7 @@
     </select>
     <textarea
         bind:value={svgPath}
+        oninput={handleTextareaInput}
         rows="4"
         style="margin-top: 10px;"
         placeholder="Paste SVG path data here, e.g.:
@@ -91,17 +93,9 @@ M 0,0 L 50,50 L 0,100 L -50,50 Z"
     {#if showApplyButton}
         <button onclick={() => drawSVGPath()} style="margin-top: 10px;">Apply Custom Path</button>
     {/if}
-    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px;">
-        <div>
-            <label for="svgSamples">Sample Points:</label>
-            <input type="number" id="svgSamples" bind:value={numSamples} min="50" max="1000" step="50">
-        </div>
-        <div style="display: flex; align-items: center;">
-            <label style="display: flex; align-items: center; margin: 0;">
-                <input type="checkbox" bind:checked={autoCenter} style="margin-right: 8px; width: auto;">
-                Auto-center & scale
-            </label>
-        </div>
+    <div style="margin-top: 10px;">
+        <label for="svgSamples">Sample Points:</label>
+        <input type="number" id="svgSamples" bind:value={numSamples} min="50" max="1000" step="50">
     </div>
     <div class="value-display" style="margin-top: 10px;">
         💡 Tip: Export paths from Inkscape, Illustrator, or use online SVG editors. Complex paths work best with more sample points.
