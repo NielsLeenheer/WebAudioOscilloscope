@@ -6,6 +6,7 @@
     import DrawControls from './DrawControls.svelte';
     import SVGControls from './SVGControls.svelte';
     import Settings from './Settings.svelte';
+    import PreviewPanel from './PreviewPanel.svelte';
 
     import instructionsIcon from '../assets/icons/instructions.svg?raw';
     import shapesIcon from '../assets/icons/shapes.svg?raw';
@@ -17,6 +18,7 @@
     let { audioEngine, isPlaying } = $props();
 
     let activeTab = $state('instructions');
+    let showPreview = $state(false);
 </script>
 
 <div class="tabs-wrapper">
@@ -57,6 +59,10 @@
             Settings
         </label>
     </nav>
+
+    <button id="preview" onclick={() => showPreview = !showPreview} class:active={showPreview}>
+        Preview
+    </button>
 </div>
 
 <div class="tab-content" class:active={activeTab === 'instructions'}>
@@ -83,12 +89,52 @@
     <Settings {audioEngine} />
 </div>
 
+{#if showPreview}
+<div class="preview-wrapper">
+    <PreviewPanel {audioEngine} {isPlaying} />
+</div>
+{/if}
+
 <style>
     .tabs-wrapper {
         display: flex;
         flex-wrap: wrap;
         align-content: start;
+        align-items: center;
         padding-left: 10px;
+    }
+
+    button#preview {
+        background-color: #fff;
+        color: #333;
+        margin: 15px 0 0 10px;
+        border: none;
+        border-radius: 6px;
+        height: 32px;
+        padding: 0 12px;
+        font-family: system-ui;
+        font-size: 10pt;
+        font-weight: 600;
+        cursor: pointer;
+        display: flex;
+        place-items: center;
+        user-select: none;
+    }
+
+    button#preview.active {
+        background-color: #d5d5d5;
+    }
+
+    button#preview:hover:not(:disabled) {
+        background: #f5f5f5;
+    }
+
+    button#preview.active:hover {
+        background: #c8c8c8;
+    }
+
+    .preview-wrapper {
+        padding: 0 20px;
     }
 
     nav {
