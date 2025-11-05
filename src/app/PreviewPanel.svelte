@@ -19,10 +19,11 @@
     let velocityY = 0;
 
     // Physics parameters (adjustable)
-    let forceMultiplier = $state(0.11);
+    let forceMultiplier = $state(0.10);
     let damping = $state(0.5);
-    let mass = $state(0.1);
+    let mass = $state(0.66);
     let persistence = $state(0.1); // Afterglow/fade effect (0=instant fade, 1=long trail)
+    let pointJitter = $state(0); // Per-point random jitter in pixels
 
     onMount(() => {
         ctx = canvas.getContext('2d');
@@ -236,9 +237,17 @@
             beamX += velocityX;
             beamY += velocityY;
 
+            // Apply per-point jitter
+            let pJitterX = 0;
+            let pJitterY = 0;
+            if (pointJitter > 0) {
+                pJitterX = (Math.random() - 0.5) * pointJitter;
+                pJitterY = (Math.random() - 0.5) * pointJitter;
+            }
+
             // Convert to screen coordinates
-            const screenX = centerX + beamX + frameJitterX;
-            const screenY = centerY + beamY + frameJitterY;
+            const screenX = centerX + beamX + frameJitterX + pJitterX;
+            const screenY = centerY + beamY + frameJitterY + pJitterY;
 
             if (isFirstPoint) {
                 ctx.moveTo(screenX, screenY);
@@ -330,7 +339,7 @@
         </div>
         <div class="slider-control">
             <label>Damping: {damping.toFixed(2)}</label>
-            <input type="range" min="0.5" max="0.99" step="0.01" bind:value={damping} />
+            <input type="range" min="0.1" max="0.99" step="0.01" bind:value={damping} />
         </div>
         <div class="slider-control">
             <label>Mass: {mass.toFixed(2)}</label>
@@ -339,6 +348,10 @@
         <div class="slider-control">
             <label>Persistence: {persistence.toFixed(2)}</label>
             <input type="range" min="0.0" max="0.5" step="0.01" bind:value={persistence} />
+        </div>
+        <div class="slider-control">
+            <label>Point Jitter: {pointJitter.toFixed(1)}px</label>
+            <input type="range" min="0" max="10" step="0.1" bind:value={pointJitter} />
         </div>
     </div>
     {/if}
