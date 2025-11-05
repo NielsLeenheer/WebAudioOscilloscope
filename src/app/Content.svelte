@@ -32,3 +32,13 @@
 <div class="tab-content" class:active={activeTab === 'settings'}>
     <Settings {audioEngine} />
 </div>
+
+<style>
+    .tab-content {
+        display: none;
+    }
+
+    .tab-content.active {
+        display: block;
+    }
+</style>

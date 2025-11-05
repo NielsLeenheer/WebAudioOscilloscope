@@ -8,7 +8,7 @@
     import pathsIcon from '../assets/icons/paths.svg?raw';
     import settingsIcon from '../assets/icons/settings.svg?raw';
 
-    let { activeTab, showPreview } = $props();
+    let { activeTab = $bindable(), showPreview = $bindable() } = $props();
 </script>
 
 <div class="navigation">
@@ -50,7 +50,7 @@
         </label>
     </nav>
 
-    <button id="preview" onclick={() => showPreview = !showPreview} class:active={showPreview}>
+    <button id="preview" onclick={() => { showPreview = !showPreview }} class:active={showPreview}>
         Preview
     </button>
 </div>
