@@ -78,7 +78,7 @@
         const points = [];
         for (let i = 0; i < leftData.length; i++) {
             // Add slight random jitter to simulate analog instability
-            const jitterAmount = 4; // pixels
+            const jitterAmount = 6; // pixels
             const jitterX = (Math.random() - 0.5) * jitterAmount;
             const jitterY = (Math.random() - 0.5) * jitterAmount;
 
@@ -87,6 +87,17 @@
                 y: centerY - rightData[i] * scale + jitterY
             });
         }
+
+        // Calculate maximum distance to determine overshoot threshold
+        let maxDistance = 0;
+        for (let i = 0; i < points.length - 1; i++) {
+            const dx = points[i + 1].x - points[i].x;
+            const dy = points[i + 1].y - points[i].y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            maxDistance = Math.max(maxDistance, dist);
+        }
+
+        const overshootThreshold = maxDistance * 0.25;
 
         // Draw segments with Bézier curves for beam inertia effect
         ctx.beginPath();
@@ -118,22 +129,19 @@
 
             ctx.strokeStyle = `rgba(76, 175, 80, ${opacity})`;
 
-            // Use Bézier curve for beam inertia effect on fast movements
-            if (distance > 3) {
-                // Calculate control point for overshoot effect
-                // The beam "struggles" to change direction quickly and swings out
-                const overshootAmount = Math.min(distance * 0.4, 30); // Scale with distance
+            // Use Bézier curve for beam inertia overshoot on fast movements only
+            if (distance > overshootThreshold) {
+                // The beam overshoots in the direction of travel due to inertia
+                // Control point is beyond p2, creating a "swing through" effect
+                const overshootAmount = distance * 0.8; // Much larger overshoot
 
-                // Calculate perpendicular direction for the swing
-                const perpX = -dy / distance; // Perpendicular to movement direction
-                const perpY = dx / distance;
+                // Direction of travel (normalized)
+                const dirX = dx / distance;
+                const dirY = dy / distance;
 
-                // Add random side for the swing (left or right of travel direction)
-                const swingSide = Math.random() < 0.5 ? 1 : -1;
-
-                // Control point is midway between points, offset perpendicular to create curve
-                const controlX = (p1.x + p2.x) / 2 + perpX * overshootAmount * swingSide;
-                const controlY = (p1.y + p2.y) / 2 + perpY * overshootAmount * swingSide;
+                // Control point overshoots beyond p2 in the direction of travel
+                const controlX = p2.x + dirX * overshootAmount;
+                const controlY = p2.y + dirY * overshootAmount;
 
                 ctx.beginPath();
                 ctx.moveTo(p1.x, p1.y);
