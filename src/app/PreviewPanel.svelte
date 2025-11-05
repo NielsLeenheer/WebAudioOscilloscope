@@ -140,7 +140,6 @@
 </script>
 
 <div class="preview-panel">
-    <h3>Preview</h3>
     <div class="canvas-container">
         <canvas
             bind:this={canvas}
@@ -178,24 +177,14 @@
             <input type="range" min="0" max="1" step="0.01" bind:value={velocityDimming} />
         </div>
     </div>
-
-    <p class="hint">This shows the X/Y oscilloscope visualization</p>
 </div>
 
 <style>
     .preview-panel {
         background: #2d2d2d;
-        padding: 20px;
         border-radius: 6px;
         border: 1px solid #444;
         margin: 20px 20px 20px 0;
-    }
-
-    h3 {
-        margin: 0 0 15px 0;
-        color: #4CAF50;
-        font-family: system-ui;
-        font-size: 18px;
     }
 
     .canvas-container {
@@ -204,7 +193,6 @@
         align-items: center;
         background: #000;
         border-radius: 4px;
-        padding: 10px;
     }
 
     canvas {
@@ -217,7 +205,6 @@
         display: flex;
         flex-direction: column;
         gap: 10px;
-        margin: 15px 0;
         padding: 15px;
         background: #1a1a1a;
         border-radius: 4px;
@@ -262,13 +249,5 @@
         border-radius: 50%;
         cursor: pointer;
         border: none;
-    }
-
-    .hint {
-        margin: 10px 0 0 0;
-        color: #888;
-        font-size: 12px;
-        font-family: system-ui;
-        text-align: center;
     }
 </style>
