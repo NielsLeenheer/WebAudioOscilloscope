@@ -4,17 +4,10 @@
     let { audioEngine, isPlaying } = $props();
 
     let canvas;
-    let ctx;
     let animationId = null;
     let leftData = null;
     let rightData = null;
     let worker = null;
-
-    // Physics simulation state (tracked but calculated in worker)
-    let beamX = 0;
-    let beamY = 0;
-    let velocityX = 0;
-    let velocityY = 0;
 
     // Physics parameters (adjustable)
     let forceMultiplier = $state(0.22);
@@ -25,24 +18,15 @@
     let beamPower = $state(0.5); // Beam power (affects opacity: high power = bright, low power = dim)
 
     onMount(() => {
-        ctx = canvas.getContext('2d');
-
-        // Initialize Web Worker for physics calculations
+        // Initialize Web Worker with OffscreenCanvas
         worker = new Worker(new URL('../workers/physics-worker.js', import.meta.url), { type: 'module' });
 
-        // Handle messages from worker
-        worker.onmessage = (e) => {
-            const { points, beamState } = e.data;
-
-            // Update physics state
-            beamX = beamState.beamX;
-            beamY = beamState.beamY;
-            velocityX = beamState.velocityX;
-            velocityY = beamState.velocityY;
-
-            // Draw the points
-            drawPoints(points);
-        };
+        // Transfer canvas control to worker
+        const offscreen = canvas.transferControlToOffscreen();
+        worker.postMessage({
+            type: 'init',
+            data: { canvas: offscreen }
+        }, [offscreen]);
 
         if (isPlaying) {
             startVisualization();
@@ -95,74 +79,32 @@
         analysers.left.getFloatTimeDomainData(leftData);
         analysers.right.getFloatTimeDomainData(rightData);
 
-        // Clear canvas with adjustable fade effect for persistence
-        ctx.fillStyle = `rgba(0, 0, 0, ${1 - persistence})`;
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-        // Draw grid
-        drawGrid();
-
-        // Send data to worker for physics calculation
-        const centerX = canvas.width / 2;
-        const centerY = canvas.height / 2;
-        const scale = Math.min(canvas.width, canvas.height) / 2.5;
+        // Send data to worker for physics calculation AND rendering
+        const centerX = 400 / 2;
+        const centerY = 400 / 2;
+        const scale = Math.min(400, 400) / 2.5;
         const basePower = 0.2 + (beamPower * 0.8);
 
         if (worker) {
             worker.postMessage({
-                leftData: Array.from(leftData),
-                rightData: Array.from(rightData),
-                centerX,
-                centerY,
-                scale,
-                forceMultiplier,
-                damping,
-                mass,
-                signalNoise,
-                basePower,
-                reset: false
+                type: 'render',
+                data: {
+                    leftData: Array.from(leftData),
+                    rightData: Array.from(rightData),
+                    centerX,
+                    centerY,
+                    scale,
+                    forceMultiplier,
+                    damping,
+                    mass,
+                    signalNoise,
+                    basePower,
+                    persistence,
+                    canvasWidth: 400,
+                    canvasHeight: 400
+                }
             });
         }
-    }
-
-    function drawPoints(points) {
-        ctx.lineWidth = 1.5;
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
-
-        // Draw each line segment
-        for (let i = 1; i < points.length; i++) {
-            const p1 = points[i - 1];
-            const p2 = points[i];
-
-            ctx.strokeStyle = `rgba(76, 175, 80, ${p2.opacity})`;
-            ctx.beginPath();
-            ctx.moveTo(p1.x, p1.y);
-            ctx.lineTo(p2.x, p2.y);
-            ctx.stroke();
-        }
-    }
-
-    function drawGrid() {
-        ctx.strokeStyle = '#333';
-        ctx.lineWidth = 1;
-
-        const centerX = canvas.width / 2;
-        const centerY = canvas.height / 2;
-
-        // Draw center crosshair
-        ctx.beginPath();
-        ctx.moveTo(0, centerY);
-        ctx.lineTo(canvas.width, centerY);
-        ctx.moveTo(centerX, 0);
-        ctx.lineTo(centerX, canvas.height);
-        ctx.stroke();
-
-        // Draw circle guide
-        const radius = Math.min(canvas.width, canvas.height) / 2.5;
-        ctx.beginPath();
-        ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
-        ctx.stroke();
     }
 
     // React to isPlaying changes
@@ -171,31 +113,12 @@
             startVisualization();
         } else {
             stopVisualization();
-            // Clear canvas and reset physics state when stopped
-            if (ctx) {
-                ctx.fillStyle = '#000';
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
-            }
             // Reset physics state in worker
             if (worker) {
                 worker.postMessage({
-                    leftData: [],
-                    rightData: [],
-                    centerX: 0,
-                    centerY: 0,
-                    scale: 0,
-                    forceMultiplier: 0,
-                    damping: 0,
-                    mass: 1,
-                    signalNoise: 0,
-                    basePower: 0,
-                    reset: true
+                    type: 'reset'
                 });
             }
-            beamX = 0;
-            beamY = 0;
-            velocityX = 0;
-            velocityY = 0;
         }
     });
 </script>
