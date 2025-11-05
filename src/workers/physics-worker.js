@@ -37,6 +37,7 @@ self.onmessage = function(e) {
             signalNoise,
             basePower,
             persistence,
+            velocityDimming,
             canvasWidth,
             canvasHeight
         } = data;
@@ -102,17 +103,21 @@ self.onmessage = function(e) {
                 const dy = screenY - prevY;
                 const speed = Math.sqrt(dx * dx + dy * dy);
 
-                // Apply exponential falloff based on speed
-                const speedThreshold = 10;
-                let velocityOpacity;
+                // Apply gradual exponential falloff based on speed
+                let velocityOpacity = 1.0;
 
-                if (speed <= speedThreshold) {
-                    velocityOpacity = 1.0;
-                } else {
-                    const excessSpeed = speed - speedThreshold;
-                    const falloffRate = 8;
-                    velocityOpacity = Math.exp(-excessSpeed / falloffRate);
-                    velocityOpacity = Math.max(velocityOpacity, 0.02);
+                if (velocityDimming > 0 && speed > 0) {
+                    // More gradual falloff: starts dimming gradually from speed=0
+                    // velocityDimming scales the effect (0=no dimming, 1=max dimming)
+                    const falloffRate = 20; // Higher = more gradual transition
+                    const dimFactor = Math.exp(-speed / falloffRate);
+
+                    // Blend between no dimming (1.0) and dimmed based on velocityDimming
+                    velocityOpacity = 1.0 - velocityDimming * (1.0 - dimFactor);
+
+                    // Set minimum opacity based on dimming amount
+                    const minOpacity = 0.02 * velocityDimming;
+                    velocityOpacity = Math.max(velocityOpacity, minOpacity);
                 }
 
                 const finalOpacity = basePower * velocityOpacity;
