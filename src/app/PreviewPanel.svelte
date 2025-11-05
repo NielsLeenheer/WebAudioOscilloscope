@@ -8,9 +8,6 @@
     let animationId = null;
     let leftData = null;
     let rightData = null;
-    let enableJitter = $state(true);
-    let enableOvershoot = $state(true);
-    let usePhysicsMode = $state(false);
 
     // Physics simulation state
     let beamX = 0;
@@ -24,7 +21,7 @@
     let mass = $state(0.66);
     let persistence = $state(0.05); // Afterglow/fade effect (0=instant fade, 1=long trail)
     let signalNoise = $state(0); // Random noise added to audio signal (0-1)
-    let pointJitter = $state(0); // Per-point random jitter in pixels
+    let beamPower = $state(0.5); // Beam power (affects opacity: high power = dim, low power = bright)
 
     onMount(() => {
         ctx = canvas.getContext('2d');
@@ -82,16 +79,7 @@
         // Draw grid
         drawGrid();
 
-        if (usePhysicsMode) {
-            drawPhysicsMode();
-        } else {
-            drawSimpleMode();
-        }
-    }
-
-    function drawSimpleMode() {
-
-        // Draw the X/Y plot (oscilloscope mode) with variable opacity based on beam speed
+        // Draw with physics simulation
         const centerX = canvas.width / 2;
         const centerY = canvas.height / 2;
         const scale = Math.min(canvas.width, canvas.height) / 2.5;
@@ -100,116 +88,12 @@
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
 
-        // Apply uniform jitter to entire frame (not per point)
-        let frameJitterX = 0;
-        let frameJitterY = 0;
-
-        if (enableJitter) {
-            // Apply jitter to the entire frame, not individual points
-            // This prevents thick lines while still showing instability
-            const jitterAmount = 2; // pixels
-            frameJitterX = (Math.random() - 0.5) * jitterAmount;
-            frameJitterY = (Math.random() - 0.5) * jitterAmount;
-        }
-
-        // Convert data to screen coordinates
-        const points = [];
-        for (let i = 0; i < leftData.length; i++) {
-            points.push({
-                x: centerX + leftData[i] * scale + frameJitterX,
-                y: centerY - rightData[i] * scale + frameJitterY
-            });
-        }
-
-        // Calculate distances and find maximum for threshold
-        const distances = [];
-        let maxDistance = 0;
-        for (let i = 0; i < points.length - 1; i++) {
-            const dx = points[i + 1].x - points[i].x;
-            const dy = points[i + 1].y - points[i].y;
-            const dist = Math.sqrt(dx * dx + dy * dy);
-            distances.push(dist);
-            maxDistance = Math.max(maxDistance, dist);
-        }
-
-        const overshootThreshold = maxDistance * 0.25;
-
-        // Draw segments with beam inertia effect
-        for (let i = 0; i < points.length - 1; i++) {
-            const p1 = points[i];
-            const p2 = points[i + 1];
-
-            const dx = p2.x - p1.x;
-            const dy = p2.y - p1.y;
-            const distance = distances[i];
-
-            // Map distance to opacity with exponential falloff
-            const distanceThreshold = 10;
-            let opacity;
-
-            if (distance <= distanceThreshold) {
-                opacity = 1.0;
-            } else {
-                const excessDistance = distance - distanceThreshold;
-                const falloffRate = 8;
-                opacity = Math.exp(-excessDistance / falloffRate);
-                opacity = Math.max(opacity, 0.02);
-            }
-
-            ctx.strokeStyle = `rgba(76, 175, 80, ${opacity})`;
-
-            // Check if PREVIOUS movement was fast (causes overshoot on THIS segment)
-            const prevDistance = i > 0 ? distances[i - 1] : 0;
-            const shouldOvershoot = enableOvershoot && prevDistance > overshootThreshold && i > 0;
-
-            if (shouldOvershoot) {
-                // Previous movement was fast, so this segment has overshoot
-                // The beam wants to continue in the previous direction before turning to p2
-                const p0 = points[i - 1];
-
-                // Previous direction vector
-                const prevDx = p1.x - p0.x;
-                const prevDy = p1.y - p0.y;
-
-                // Control point continues in previous direction from p1
-                const overshootAmount = prevDistance * 0.5;
-                const controlX = p1.x + prevDx * 0.5;
-                const controlY = p1.y + prevDy * 0.5;
-
-                ctx.beginPath();
-                ctx.moveTo(p1.x, p1.y);
-                ctx.quadraticCurveTo(controlX, controlY, p2.x, p2.y);
-                ctx.stroke();
-            } else {
-                // Normal movement, use straight line
-                ctx.beginPath();
-                ctx.moveTo(p1.x, p1.y);
-                ctx.lineTo(p2.x, p2.y);
-                ctx.stroke();
-            }
-        }
-    }
-
-    function drawPhysicsMode() {
-        const centerX = canvas.width / 2;
-        const centerY = canvas.height / 2;
-        const scale = Math.min(canvas.width, canvas.height) / 2.5;
-
-        ctx.lineWidth = 1.5;
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
-
-        // Apply uniform jitter to readings
-        let frameJitterX = 0;
-        let frameJitterY = 0;
-        if (enableJitter) {
-            const jitterAmount = 2;
-            frameJitterX = (Math.random() - 0.5) * jitterAmount;
-            frameJitterY = (Math.random() - 0.5) * jitterAmount;
-        }
+        // Calculate opacity based on beam power (inverse relationship)
+        // High power = low opacity (0.2), low power = high opacity (1.0)
+        const beamOpacity = 1.0 - (beamPower * 0.8);
 
         // Process each data point with physics simulation
-        ctx.strokeStyle = 'rgba(76, 175, 80, 0.8)';
+        ctx.strokeStyle = `rgba(76, 175, 80, ${beamOpacity})`;
         ctx.beginPath();
         let isFirstPoint = true;
 
@@ -247,17 +131,9 @@
             beamX += velocityX;
             beamY += velocityY;
 
-            // Apply per-point jitter
-            let pJitterX = 0;
-            let pJitterY = 0;
-            if (pointJitter > 0) {
-                pJitterX = (Math.random() - 0.5) * pointJitter;
-                pJitterY = (Math.random() - 0.5) * pointJitter;
-            }
-
             // Convert to screen coordinates
-            const screenX = centerX + beamX + frameJitterX + pJitterX;
-            const screenY = centerY + beamY + frameJitterY + pJitterY;
+            const screenX = centerX + beamX;
+            const screenY = centerY + beamY;
 
             if (isFirstPoint) {
                 ctx.moveTo(screenX, screenY);
@@ -298,17 +174,11 @@
             startVisualization();
         } else {
             stopVisualization();
-            // Clear canvas when stopped
+            // Clear canvas and reset physics state when stopped
             if (ctx) {
                 ctx.fillStyle = '#000';
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
             }
-        }
-    });
-
-    // Reset physics state when switching modes
-    $effect(() => {
-        if (usePhysicsMode) {
             beamX = 0;
             beamY = 0;
             velocityX = 0;
@@ -326,22 +196,6 @@
             height="400"
         ></canvas>
     </div>
-    <div class="controls">
-        <label>
-            <input type="checkbox" bind:checked={usePhysicsMode} />
-            Physics Mode
-        </label>
-        <label>
-            <input type="checkbox" bind:checked={enableJitter} />
-            Jitter
-        </label>
-        <label class:disabled={usePhysicsMode}>
-            <input type="checkbox" bind:checked={enableOvershoot} disabled={usePhysicsMode} />
-            Overshoot
-        </label>
-    </div>
-
-    {#if usePhysicsMode}
     <div class="sliders">
         <div class="slider-control">
             <label>Force: {forceMultiplier.toFixed(2)}</label>
@@ -364,11 +218,10 @@
             <input type="range" min="0" max="0.2" step="0.001" bind:value={signalNoise} />
         </div>
         <div class="slider-control">
-            <label>Point Jitter: {pointJitter.toFixed(1)}px</label>
-            <input type="range" min="0" max="10" step="0.1" bind:value={pointJitter} />
+            <label>Beam Power: {beamPower.toFixed(2)}</label>
+            <input type="range" min="0" max="1" step="0.01" bind:value={beamPower} />
         </div>
     </div>
-    {/if}
 
     <p class="hint">This shows the X/Y oscilloscope visualization</p>
 </div>
@@ -402,36 +255,6 @@
         display: block;
         background: #000;
         border-radius: 4px;
-    }
-
-    .controls {
-        display: flex;
-        gap: 15px;
-        margin: 10px 0;
-        justify-content: center;
-    }
-
-    .controls label {
-        display: flex;
-        align-items: center;
-        gap: 5px;
-        color: #4CAF50;
-        font-family: system-ui;
-        font-size: 14px;
-        cursor: pointer;
-    }
-
-    .controls label.disabled {
-        opacity: 0.5;
-        cursor: not-allowed;
-    }
-
-    .controls input[type="checkbox"] {
-        cursor: pointer;
-    }
-
-    .controls input[type="checkbox"]:disabled {
-        cursor: not-allowed;
     }
 
     .sliders {
