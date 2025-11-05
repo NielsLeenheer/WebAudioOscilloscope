@@ -38,7 +38,7 @@ button {
   display: flex;
   place-items: center;
   height: 32px;
-  margin: 15px 15px 0 0;
+  margin: 0;
   padding: 0px 12px;
   user-select: none;
   cursor: pointer;

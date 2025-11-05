@@ -116,7 +116,6 @@
         border-radius: 6px;
         height: 32px;
         padding: 0 12px;
-        margin: 0;
         font-family: system-ui;
         font-size: 10pt;
         font-weight: 600;
