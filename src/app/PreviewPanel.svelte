@@ -20,9 +20,10 @@
 
     // Physics parameters (adjustable)
     let forceMultiplier = $state(0.10);
-    let damping = $state(0.5);
+    let damping = $state(0.066);
     let mass = $state(0.66);
     let persistence = $state(0.05); // Afterglow/fade effect (0=instant fade, 1=long trail)
+    let signalNoise = $state(0); // Random noise added to audio signal (0-1)
     let pointJitter = $state(0); // Per-point random jitter in pixels
 
     onMount(() => {
@@ -213,9 +214,18 @@
         let isFirstPoint = true;
 
         for (let i = 0; i < leftData.length; i++) {
-            // Target position from audio data
-            const targetX = leftData[i] * scale;
-            const targetY = -rightData[i] * scale;
+            // Add noise to audio signal if enabled
+            let leftSignal = leftData[i];
+            let rightSignal = rightData[i];
+
+            if (signalNoise > 0) {
+                leftSignal += (Math.random() - 0.5) * signalNoise;
+                rightSignal += (Math.random() - 0.5) * signalNoise;
+            }
+
+            // Target position from audio data (with noise)
+            const targetX = leftSignal * scale;
+            const targetY = -rightSignal * scale;
 
             // Calculate force (like a spring pulling beam to target)
             const forceX = (targetX - beamX) * forceMultiplier;
@@ -348,6 +358,10 @@
         <div class="slider-control">
             <label>Persistence: {persistence.toFixed(3)}</label>
             <input type="range" min="0.0" max="0.95" step="0.005" bind:value={persistence} />
+        </div>
+        <div class="slider-control">
+            <label>Signal Noise: {signalNoise.toFixed(3)}</label>
+            <input type="range" min="0" max="0.2" step="0.001" bind:value={signalNoise} />
         </div>
         <div class="slider-control">
             <label>Point Jitter: {pointJitter.toFixed(1)}px</label>
