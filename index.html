@@ -112,7 +112,6 @@
             cursor: pointer;
             font-size: 14px;
             border-radius: 5px 5px 0 0;
-            transition: background 0.3s;
         }
         .tab:hover {
             background: #454545;
@@ -127,45 +126,67 @@
         .tab-content.active {
             display: block;
         }
+        .status-dot {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-left: 10px;
+            vertical-align: middle;
+        }
+        .status-dot.active {
+            background: #4CAF50;
+            box-shadow: 0 0 8px #4CAF50;
+        }
+        .status-dot.inactive {
+            background: #f44336;
+            box-shadow: 0 0 8px #f44336;
+        }
+        .header-controls {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 20px 0;
+        }
     </style>
 </head>
 <body>
-    <h1>🎨 Oscilloscope X/Y Drawing</h1>
-    
     <div class="container">
-        <div class="info">
-            <strong>Setup Instructions:</strong>
-            <ol>
-                <li>Connect your computer's audio output to the oscilloscope</li>
-                <li>Left channel → X input (CH1)</li>
-                <li>Right channel → Y input (CH2)</li>
-                <li>Set oscilloscope to X/Y mode</li>
-                <li>Adjust time/div and volt/div for best view</li>
-            </ol>
-        </div>
-
-        <div class="warning">
-            ⚠️ <strong>Warning:</strong> Start with low volume and adjust gradually. Protect your hearing and equipment!
-        </div>
-
-        <div id="status" class="status inactive">
-            Audio Context: Inactive
-        </div>
-
-        <div class="control-group">
+        <div class="header-controls">
             <button id="startBtn" onclick="startAudio()">Start Audio</button>
             <button id="stopBtn" onclick="stopAudio()" disabled>Stop Audio</button>
+            <span id="statusDot" class="status-dot inactive"></span>
         </div>
 
         <div class="tabs">
-            <button class="tab active" onclick="switchTab('shapes')">Shapes</button>
+            <button class="tab active" onclick="switchTab('instructions')">Instructions</button>
+            <button class="tab" onclick="switchTab('shapes')">Shapes</button>
             <button class="tab" onclick="switchTab('clock')">Clock</button>
             <button class="tab" onclick="switchTab('draw')">Draw</button>
             <button class="tab" onclick="switchTab('svg')">SVG Paths</button>
             <button class="tab" onclick="switchTab('settings')">Settings</button>
         </div>
 
-        <div id="shapes-tab" class="tab-content active">
+        <div id="instructions-tab" class="tab-content active">
+            <h1 style="color: #4CAF50; text-align: center; margin-top: 20px;">🎨 Web Audio Oscilloscope</h1>
+
+            <div class="info">
+                <strong>Setup Instructions:</strong>
+                <ol>
+                    <li>Connect your computer's audio output to the oscilloscope</li>
+                    <li>Left channel → X input (CH1)</li>
+                    <li>Right channel → Y input (CH2)</li>
+                    <li>Set oscilloscope to X/Y mode</li>
+                    <li>Adjust time/div and volt/div for best view</li>
+                </ol>
+            </div>
+
+            <div class="warning">
+                ⚠️ <strong>Warning:</strong> Start with low volume and adjust gradually. Protect your hearing and equipment!
+            </div>
+        </div>
+
+        <div id="shapes-tab" class="tab-content">
             <div class="control-group">
                 <label>Select Shape:</label>
                 <div class="shapes-grid">
@@ -400,8 +421,7 @@
             
             document.getElementById('startBtn').disabled = true;
             document.getElementById('stopBtn').disabled = false;
-            document.getElementById('status').className = 'status active';
-            document.getElementById('status').textContent = 'Audio Context: Active';
+            document.getElementById('statusDot').className = 'status-dot active';
             isPlaying = true;
         }
 
@@ -423,8 +443,7 @@
             
             document.getElementById('startBtn').disabled = false;
             document.getElementById('stopBtn').disabled = true;
-            document.getElementById('status').className = 'status inactive';
-            document.getElementById('status').textContent = 'Audio Context: Inactive';
+            document.getElementById('statusDot').className = 'status-dot inactive';
             isPlaying = false;
         }
 
