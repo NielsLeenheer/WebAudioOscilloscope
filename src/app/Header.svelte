@@ -3,7 +3,7 @@
     import audioIcon from '../assets/icons/audio.svg?raw';
     import audioPlayingGif from '../assets/audio-playing.gif';
 
-    let { isPlaying, start, stop } = $props();
+    let { isPlaying, start, stop, showPreview, togglePreview } = $props();
 </script>
 
 <header>
@@ -22,6 +22,10 @@
     {#if isPlaying}
     <img src={audioPlayingGif} alt="Audio playing" class="audio-playing" />
     {/if}
+
+    <button id="preview" onclick={() => togglePreview()} class:active={showPreview}>
+        Preview
+    </button>
 </header>
 
 <style>
@@ -44,6 +48,17 @@
     button#stop {
         background-color: #ffcdd2;
         color: #c62828;
+    }
+
+    button#preview {
+        margin-left: auto;
+        margin-right: 15px;
+        background-color: #fff;
+        color: #333;
+    }
+
+    button#preview.active {
+        background-color: #d5d5d5;
     }
 
     .audio-playing {

@@ -7,6 +7,8 @@ export class AudioEngine {
         this.rightGain = null;
         this.masterGain = null;
         this.merger = null;
+        this.leftAnalyser = null;
+        this.rightAnalyser = null;
         this.baseFrequency = 100;
         this.currentRotation = 0;
         this.isPlaying = false;
@@ -23,15 +25,30 @@ export class AudioEngine {
             this.masterGain = this.audioContext.createGain();
             this.masterGain.gain.value = 0.3; // Initial volume at 30%
 
+            // Create analyser nodes for preview
+            this.leftAnalyser = this.audioContext.createAnalyser();
+            this.rightAnalyser = this.audioContext.createAnalyser();
+            this.leftAnalyser.fftSize = 2048;
+            this.rightAnalyser.fftSize = 2048;
+
             // Create channel merger for stereo output
             this.merger = this.audioContext.createChannelMerger(2);
 
-            // Connect: left/right gains → merger → master gain → destination
-            this.leftGain.connect(this.merger, 0, 0);   // Left channel
-            this.rightGain.connect(this.merger, 0, 1);  // Right channel
+            // Connect: left/right gains → analysers → merger → master gain → destination
+            this.leftGain.connect(this.leftAnalyser);
+            this.rightGain.connect(this.rightAnalyser);
+            this.leftAnalyser.connect(this.merger, 0, 0);   // Left channel
+            this.rightAnalyser.connect(this.merger, 0, 1);  // Right channel
             this.merger.connect(this.masterGain);
             this.masterGain.connect(this.audioContext.destination);
         }
+    }
+
+    getAnalysers() {
+        return {
+            left: this.leftAnalyser,
+            right: this.rightAnalyser
+        };
     }
 
     start() {

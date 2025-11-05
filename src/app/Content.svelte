@@ -88,9 +88,7 @@
         display: flex;
         flex-wrap: wrap;
         align-content: start;
-        justify-content: end;
-        margin-left: auto;
-        padding-right: 10px;
+        padding-left: 10px;
     }
 
     nav {
