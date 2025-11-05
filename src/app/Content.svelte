@@ -1,4 +1,5 @@
 <script>
+    import Instructions from './Instructions.svelte';
     import ShapeControls from './ShapeControls.svelte';
     import ClockControls from './ClockControls.svelte';
     import DrawControls from './DrawControls.svelte';
@@ -7,29 +8,13 @@
 
     let { audioEngine, isPlaying } = $props();
 
-    let activeTab = $state('shapes');
+    let activeTab = $state('instructions');
 </script>
 
-<div class="info">
-    <strong>Setup Instructions:</strong>
-    <ol>
-        <li>Connect your computer's audio output to the oscilloscope</li>
-        <li>Left channel → X input (CH1)</li>
-        <li>Right channel → Y input (CH2)</li>
-        <li>Set oscilloscope to X/Y mode</li>
-        <li>Adjust time/div and volt/div for best view</li>
-    </ol>
-</div>
-
-<div class="warning">
-    ⚠️ <strong>Warning:</strong> Start with low volume and adjust gradually. Protect your hearing and equipment!
-</div>
-
-<div class="status" class:active={isPlaying} class:inactive={!isPlaying}>
-    Audio Context: {isPlaying ? 'Active' : 'Inactive'}
-</div>
-
 <div class="tabs">
+    <button class="tab" class:active={activeTab === 'instructions'} onclick={() => activeTab = 'instructions'}>
+        Instructions
+    </button>
     <button class="tab" class:active={activeTab === 'shapes'} onclick={() => activeTab = 'shapes'}>
         Shapes
     </button>
@@ -45,6 +30,10 @@
     <button class="tab" class:active={activeTab === 'settings'} onclick={() => activeTab = 'settings'}>
         Settings
     </button>
+</div>
+
+<div class="tab-content" class:active={activeTab === 'instructions'}>
+    <Instructions />
 </div>
 
 <div class="tab-content" class:active={activeTab === 'shapes'}>

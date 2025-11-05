@@ -3,8 +3,6 @@
 </script>
 
 <header>
-    <h1 style="margin: auto 0; font-size: 18px; color: #333; font-family: system-ui;">Web Audio Oscilloscope</h1>
-
     {#if !isPlaying}
     <button id="start" onclick={() => start()} style="background-color: #bbdefb; color: #1976d2;">
         Start Audio
@@ -14,18 +12,30 @@
         Stop Audio
     </button>
     {/if}
+
+    <div class="status-dot" class:active={isPlaying}></div>
 </header>
 
 <style>
-    h1 {
-        margin: auto 0;
-        font-size: 18px;
-        color: #333;
-        font-family: system-ui;
+    header {
+        display: flex;
+        align-items: center;
     }
 
     button#start,
     button#stop {
-        margin-right: 15px;
+        margin-right: 12px;
+    }
+
+    .status-dot {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        background-color: #f44336;
+        margin: auto 0 auto 0;
+    }
+
+    .status-dot.active {
+        background-color: #4caf50;
     }
 </style>
