@@ -19,9 +19,10 @@
     let velocityY = 0;
 
     // Physics parameters (adjustable)
-    let forceMultiplier = $state(0.15);
-    let damping = $state(0.85);
-    let mass = $state(1.0);
+    let forceMultiplier = $state(0.11);
+    let damping = $state(0.5);
+    let mass = $state(0.1);
+    let persistence = $state(0.1); // Afterglow/fade effect (0=instant fade, 1=long trail)
 
     onMount(() => {
         ctx = canvas.getContext('2d');
@@ -72,8 +73,8 @@
         analysers.left.getFloatTimeDomainData(leftData);
         analysers.right.getFloatTimeDomainData(rightData);
 
-        // Clear canvas with a slight fade effect for persistence
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
+        // Clear canvas with adjustable fade effect for persistence
+        ctx.fillStyle = `rgba(0, 0, 0, ${1 - persistence})`;
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
         // Draw grid
@@ -332,8 +333,12 @@
             <input type="range" min="0.5" max="0.99" step="0.01" bind:value={damping} />
         </div>
         <div class="slider-control">
-            <label>Mass: {mass.toFixed(1)}</label>
-            <input type="range" min="0.1" max="5.0" step="0.1" bind:value={mass} />
+            <label>Mass: {mass.toFixed(2)}</label>
+            <input type="range" min="0.01" max="5.0" step="0.01" bind:value={mass} />
+        </div>
+        <div class="slider-control">
+            <label>Persistence: {persistence.toFixed(2)}</label>
+            <input type="range" min="0.0" max="0.5" step="0.01" bind:value={persistence} />
         </div>
     </div>
     {/if}
