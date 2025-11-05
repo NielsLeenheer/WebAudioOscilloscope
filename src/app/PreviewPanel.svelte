@@ -93,15 +93,26 @@
             const dy = p2.y - p1.y;
             const distance = Math.sqrt(dx * dx + dy * dy);
 
-            // Map distance to opacity
+            // Map distance to opacity with exponential falloff
             // Shorter distance = slower beam = brighter
-            // Longer distance = faster beam = dimmer
-            // Normalize distance: typical pixel distances range from 0-20 pixels
-            const maxDistance = 30; // Threshold for dim trail
-            const normalizedDistance = Math.min(distance / maxDistance, 1);
+            // Longer distance = faster beam = much dimmer
 
-            // Invert so short distance = high opacity
-            const opacity = 1 - (normalizedDistance * 0.85); // Keep minimum 0.15 opacity
+            // Use exponential curve for more aggressive dimming
+            const distanceThreshold = 10; // Distance at which dimming starts
+            let opacity;
+
+            if (distance <= distanceThreshold) {
+                // Close points: full brightness
+                opacity = 1.0;
+            } else {
+                // Far points: exponential falloff
+                const excessDistance = distance - distanceThreshold;
+                // Exponential decay: e^(-distance/k) where k controls falloff rate
+                const falloffRate = 8; // Lower = faster dimming
+                opacity = Math.exp(-excessDistance / falloffRate);
+                // Clamp to minimum visibility
+                opacity = Math.max(opacity, 0.02);
+            }
 
             ctx.strokeStyle = `rgba(76, 175, 80, ${opacity})`;
             ctx.beginPath();
