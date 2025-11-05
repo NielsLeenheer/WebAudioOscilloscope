@@ -76,22 +76,24 @@
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
 
-        // Convert data to screen coordinates with optional jitter
+        // Apply uniform jitter to entire frame (not per point)
+        let frameJitterX = 0;
+        let frameJitterY = 0;
+
+        if (enableJitter) {
+            // Apply jitter to the entire frame, not individual points
+            // This prevents thick lines while still showing instability
+            const jitterAmount = 2; // pixels
+            frameJitterX = (Math.random() - 0.5) * jitterAmount;
+            frameJitterY = (Math.random() - 0.5) * jitterAmount;
+        }
+
+        // Convert data to screen coordinates
         const points = [];
         for (let i = 0; i < leftData.length; i++) {
-            let jitterX = 0;
-            let jitterY = 0;
-
-            if (enableJitter) {
-                // Add slight random jitter to simulate analog instability
-                const jitterAmount = 6; // pixels
-                jitterX = (Math.random() - 0.5) * jitterAmount;
-                jitterY = (Math.random() - 0.5) * jitterAmount;
-            }
-
             points.push({
-                x: centerX + leftData[i] * scale + jitterX,
-                y: centerY - rightData[i] * scale + jitterY
+                x: centerX + leftData[i] * scale + frameJitterX,
+                y: centerY - rightData[i] * scale + frameJitterY
             });
         }
 
