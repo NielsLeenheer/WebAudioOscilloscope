@@ -22,7 +22,7 @@
     let forceMultiplier = $state(0.10);
     let damping = $state(0.5);
     let mass = $state(0.66);
-    let persistence = $state(0.1); // Afterglow/fade effect (0=instant fade, 1=long trail)
+    let persistence = $state(0.05); // Afterglow/fade effect (0=instant fade, 1=long trail)
     let pointJitter = $state(0); // Per-point random jitter in pixels
 
     onMount(() => {
@@ -346,8 +346,8 @@
             <input type="range" min="0.01" max="5.0" step="0.01" bind:value={mass} />
         </div>
         <div class="slider-control">
-            <label>Persistence: {persistence.toFixed(2)}</label>
-            <input type="range" min="0.0" max="0.5" step="0.01" bind:value={persistence} />
+            <label>Persistence: {persistence.toFixed(3)}</label>
+            <input type="range" min="0.0" max="0.95" step="0.005" bind:value={persistence} />
         </div>
         <div class="slider-control">
             <label>Point Jitter: {pointJitter.toFixed(1)}px</label>
