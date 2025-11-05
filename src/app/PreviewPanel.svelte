@@ -10,6 +10,13 @@
     let rightData = null;
     let enableJitter = $state(true);
     let enableOvershoot = $state(true);
+    let usePhysicsMode = $state(false);
+
+    // Physics simulation state
+    let beamX = 0;
+    let beamY = 0;
+    let velocityX = 0;
+    let velocityY = 0;
 
     onMount(() => {
         ctx = canvas.getContext('2d');
@@ -66,6 +73,15 @@
 
         // Draw grid
         drawGrid();
+
+        if (usePhysicsMode) {
+            drawPhysicsMode();
+        } else {
+            drawSimpleMode();
+        }
+    }
+
+    function drawSimpleMode() {
 
         // Draw the X/Y plot (oscilloscope mode) with variable opacity based on beam speed
         const centerX = canvas.width / 2;
@@ -166,6 +182,74 @@
         }
     }
 
+    function drawPhysicsMode() {
+        const centerX = canvas.width / 2;
+        const centerY = canvas.height / 2;
+        const scale = Math.min(canvas.width, canvas.height) / 2.5;
+
+        ctx.lineWidth = 1.5;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+
+        // Physics parameters
+        const forceMultiplier = 0.15;  // How strongly the beam is pulled to target
+        const damping = 0.85;           // Velocity damping (0-1, lower = more damping)
+        const mass = 1.0;               // Beam "mass" (affects acceleration)
+
+        // Apply uniform jitter to readings
+        let frameJitterX = 0;
+        let frameJitterY = 0;
+        if (enableJitter) {
+            const jitterAmount = 2;
+            frameJitterX = (Math.random() - 0.5) * jitterAmount;
+            frameJitterY = (Math.random() - 0.5) * jitterAmount;
+        }
+
+        // Process each data point with physics simulation
+        ctx.strokeStyle = 'rgba(76, 175, 80, 0.8)';
+        ctx.beginPath();
+        let isFirstPoint = true;
+
+        for (let i = 0; i < leftData.length; i++) {
+            // Target position from audio data
+            const targetX = leftData[i] * scale;
+            const targetY = -rightData[i] * scale;
+
+            // Calculate force (like a spring pulling beam to target)
+            const forceX = (targetX - beamX) * forceMultiplier;
+            const forceY = (targetY - beamY) * forceMultiplier;
+
+            // Calculate acceleration (F = ma, so a = F/m)
+            const accelX = forceX / mass;
+            const accelY = forceY / mass;
+
+            // Update velocity
+            velocityX += accelX;
+            velocityY += accelY;
+
+            // Apply damping (friction/air resistance)
+            velocityX *= damping;
+            velocityY *= damping;
+
+            // Update position
+            beamX += velocityX;
+            beamY += velocityY;
+
+            // Convert to screen coordinates
+            const screenX = centerX + beamX + frameJitterX;
+            const screenY = centerY + beamY + frameJitterY;
+
+            if (isFirstPoint) {
+                ctx.moveTo(screenX, screenY);
+                isFirstPoint = false;
+            } else {
+                ctx.lineTo(screenX, screenY);
+            }
+        }
+
+        ctx.stroke();
+    }
+
     function drawGrid() {
         ctx.strokeStyle = '#333';
         ctx.lineWidth = 1;
@@ -201,6 +285,16 @@
             }
         }
     });
+
+    // Reset physics state when switching modes
+    $effect(() => {
+        if (usePhysicsMode) {
+            beamX = 0;
+            beamY = 0;
+            velocityX = 0;
+            velocityY = 0;
+        }
+    });
 </script>
 
 <div class="preview-panel">
@@ -214,11 +308,15 @@
     </div>
     <div class="controls">
         <label>
+            <input type="checkbox" bind:checked={usePhysicsMode} />
+            Physics Mode
+        </label>
+        <label>
             <input type="checkbox" bind:checked={enableJitter} />
             Jitter
         </label>
-        <label>
-            <input type="checkbox" bind:checked={enableOvershoot} />
+        <label class:disabled={usePhysicsMode}>
+            <input type="checkbox" bind:checked={enableOvershoot} disabled={usePhysicsMode} />
             Overshoot
         </label>
     </div>
@@ -273,8 +371,17 @@
         cursor: pointer;
     }
 
+    .controls label.disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
     .controls input[type="checkbox"] {
         cursor: pointer;
+    }
+
+    .controls input[type="checkbox"]:disabled {
+        cursor: not-allowed;
     }
 
     .hint {
