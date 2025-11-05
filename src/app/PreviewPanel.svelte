@@ -8,6 +8,8 @@
     let animationId = null;
     let leftData = null;
     let rightData = null;
+    let enableJitter = $state(true);
+    let enableOvershoot = $state(true);
 
     onMount(() => {
         ctx = canvas.getContext('2d');
@@ -70,17 +72,22 @@
         const centerY = canvas.height / 2;
         const scale = Math.min(canvas.width, canvas.height) / 2.5;
 
-        ctx.lineWidth = 2;
+        ctx.lineWidth = 1.5;
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
 
-        // Convert data to screen coordinates with slight jitter
+        // Convert data to screen coordinates with optional jitter
         const points = [];
         for (let i = 0; i < leftData.length; i++) {
-            // Add slight random jitter to simulate analog instability
-            const jitterAmount = 6; // pixels
-            const jitterX = (Math.random() - 0.5) * jitterAmount;
-            const jitterY = (Math.random() - 0.5) * jitterAmount;
+            let jitterX = 0;
+            let jitterY = 0;
+
+            if (enableJitter) {
+                // Add slight random jitter to simulate analog instability
+                const jitterAmount = 6; // pixels
+                jitterX = (Math.random() - 0.5) * jitterAmount;
+                jitterY = (Math.random() - 0.5) * jitterAmount;
+            }
 
             points.push({
                 x: centerX + leftData[i] * scale + jitterX,
@@ -124,12 +131,12 @@
             }
 
             ctx.strokeStyle = `rgba(76, 175, 80, ${opacity})`;
-            ctx.lineWidth = 1.5;
 
             // Check if PREVIOUS movement was fast (causes overshoot on THIS segment)
             const prevDistance = i > 0 ? distances[i - 1] : 0;
+            const shouldOvershoot = enableOvershoot && prevDistance > overshootThreshold && i > 0;
 
-            if (prevDistance > overshootThreshold && i > 0) {
+            if (shouldOvershoot) {
                 // Previous movement was fast, so this segment has overshoot
                 // The beam wants to continue in the previous direction before turning to p2
                 const p0 = points[i - 1];
@@ -203,6 +210,16 @@
             height="400"
         ></canvas>
     </div>
+    <div class="controls">
+        <label>
+            <input type="checkbox" bind:checked={enableJitter} />
+            Jitter
+        </label>
+        <label>
+            <input type="checkbox" bind:checked={enableOvershoot} />
+            Overshoot
+        </label>
+    </div>
     <p class="hint">This shows the X/Y oscilloscope visualization</p>
 </div>
 
@@ -235,6 +252,27 @@
         display: block;
         background: #000;
         border-radius: 4px;
+    }
+
+    .controls {
+        display: flex;
+        gap: 15px;
+        margin: 10px 0;
+        justify-content: center;
+    }
+
+    .controls label {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        color: #4CAF50;
+        font-family: system-ui;
+        font-size: 14px;
+        cursor: pointer;
+    }
+
+    .controls input[type="checkbox"] {
+        cursor: pointer;
     }
 
     .hint {
