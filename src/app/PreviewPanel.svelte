@@ -78,7 +78,7 @@
         const points = [];
         for (let i = 0; i < leftData.length; i++) {
             // Add slight random jitter to simulate analog instability
-            const jitterAmount = 1.5; // pixels
+            const jitterAmount = 4; // pixels
             const jitterX = (Math.random() - 0.5) * jitterAmount;
             const jitterY = (Math.random() - 0.5) * jitterAmount;
 
@@ -121,12 +121,19 @@
             // Use Bézier curve for beam inertia effect on fast movements
             if (distance > 3) {
                 // Calculate control point for overshoot effect
-                // The beam "struggles" to change direction quickly
-                const overshootFactor = Math.min(distance / 20, 0.8); // Scale with distance, more aggressive
+                // The beam "struggles" to change direction quickly and swings out
+                const overshootAmount = Math.min(distance * 0.4, 30); // Scale with distance
 
-                // Control point overshoots in the direction of movement
-                const controlX = p1.x + dx * (0.5 + overshootFactor);
-                const controlY = p1.y + dy * (0.5 + overshootFactor);
+                // Calculate perpendicular direction for the swing
+                const perpX = -dy / distance; // Perpendicular to movement direction
+                const perpY = dx / distance;
+
+                // Add random side for the swing (left or right of travel direction)
+                const swingSide = Math.random() < 0.5 ? 1 : -1;
+
+                // Control point is midway between points, offset perpendicular to create curve
+                const controlX = (p1.x + p2.x) / 2 + perpX * overshootAmount * swingSide;
+                const controlY = (p1.y + p2.y) / 2 + perpY * overshootAmount * swingSide;
 
                 ctx.beginPath();
                 ctx.moveTo(p1.x, p1.y);
