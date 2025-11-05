@@ -59,6 +59,7 @@
     .navigation {
         display: flex;
         align-items: center;
+        justify-content: space-between;
         padding: 0 20px;
         background: #fafafa;
         border-bottom: 1px solid #ddd;
@@ -111,7 +112,6 @@
     button#preview {
         background-color: #fff;
         color: #333;
-        margin-left: 10px;
         border: none;
         border-radius: 6px;
         height: 32px;
