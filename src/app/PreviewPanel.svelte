@@ -78,7 +78,7 @@
         const points = [];
         for (let i = 0; i < leftData.length; i++) {
             // Add slight random jitter to simulate analog instability
-            const jitterAmount = 0.5; // pixels
+            const jitterAmount = 1.5; // pixels
             const jitterX = (Math.random() - 0.5) * jitterAmount;
             const jitterY = (Math.random() - 0.5) * jitterAmount;
 
@@ -119,10 +119,10 @@
             ctx.strokeStyle = `rgba(76, 175, 80, ${opacity})`;
 
             // Use Bézier curve for beam inertia effect on fast movements
-            if (distance > 5) {
+            if (distance > 3) {
                 // Calculate control point for overshoot effect
                 // The beam "struggles" to change direction quickly
-                const overshootFactor = Math.min(distance / 50, 0.3); // Scale with distance
+                const overshootFactor = Math.min(distance / 20, 0.8); // Scale with distance, more aggressive
 
                 // Control point overshoots in the direction of movement
                 const controlX = p1.x + dx * (0.5 + overshootFactor);
