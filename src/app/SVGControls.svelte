@@ -8,7 +8,7 @@
     let numSamples = $state(200);
     let selectedExample = $state('star'); // Default to first item
     let showApplyButton = $state(false);
-    let isLoadingExample = false; // Flag to prevent showing button during example load
+    let programmaticChange = false; // Flag to track programmatic vs user changes
 
     function drawSVGPath() {
         if (!isPlaying) return;
@@ -31,19 +31,19 @@
     }
 
     function handleTextareaInput(event) {
-        // Only show button if we're not currently loading an example
-        if (!isLoadingExample) {
+        // Only show button for actual user input (not programmatic changes)
+        if (!programmaticChange) {
             showApplyButton = true;
         }
     }
 
     // Watch for selection changes and auto-load
-    $effect(() => {
+    function handleSelectChange() {
         if (selectedExample) {
             const pathData = svgExamples[selectedExample];
 
             if (pathData) {
-                isLoadingExample = true; // Set flag before updating
+                programmaticChange = true; // Set flag before updating
                 svgPath = pathData;
 
                 // Adjust sample points based on complexity
@@ -54,19 +54,27 @@
                 }
 
                 showApplyButton = false;
-                drawSVGPath();
 
-                // Reset flag after a short delay
+                if (isPlaying) {
+                    drawSVGPath();
+                }
+
+                // Reset flag after DOM update
                 setTimeout(() => {
-                    isLoadingExample = false;
-                }, 100);
+                    programmaticChange = false;
+                }, 0);
             }
         }
+    }
+
+    // Run on mount to load initial example
+    $effect(() => {
+        handleSelectChange();
     });
 </script>
 
 <div class="control-group">
-    <select bind:value={selectedExample}>
+    <select bind:value={selectedExample} onchange={handleSelectChange}>
         <option value="star">Star</option>
         <option value="html5">HTML5 Logo</option>
         <option value="heart_svg">Heart (SVG)</option>
@@ -95,7 +103,7 @@ M 0,0 L 50,50 L 0,100 L -50,50 Z"
     {/if}
     <div style="margin-top: 10px;">
         <label for="svgSamples">Sample Points:</label>
-        <input type="number" id="svgSamples" bind:value={numSamples} min="50" max="1000" step="50">
+        <input type="number" id="svgSamples" bind:value={numSamples} min="50" max="1000" step="50" style="width: 5em;">
     </div>
     <div class="value-display" style="margin-top: 10px;">
         💡 Tip: Export paths from Inkscape, Illustrator, or use online SVG editors. Complex paths work best with more sample points.
