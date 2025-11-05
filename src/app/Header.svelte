@@ -31,9 +31,13 @@
         align-items: center;
     }
 
-    button {
+    button#start {
         background-color: #bbdefb;
         color: #1976d2;
+    }
+
+    button#start:hover {
+        background-color: #bbdefb;
     }
 
     button :global(svg) {
@@ -43,8 +47,8 @@
     }
 
     button#stop {
-        background-color: #ffcdd2;
-        color: #c62828;
+        background-color: #fff;
+        color: #000;
     }
 
     .audio-playing {
