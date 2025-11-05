@@ -7,6 +7,7 @@
     import drawIcon from '../assets/icons/draw.svg?raw';
     import pathsIcon from '../assets/icons/paths.svg?raw';
     import settingsIcon from '../assets/icons/settings.svg?raw';
+    import previewIcon from '../assets/icons/preview.svg?raw';
 
     let { activeTab = $bindable(), showPreview = $bindable() } = $props();
 </script>
@@ -51,6 +52,7 @@
     </nav>
 
     <button id="preview" onclick={() => { showPreview = !showPreview }} class:active={showPreview}>
+        <Icon data={previewIcon} />
         Preview
     </button>
 </div>
@@ -123,6 +125,12 @@
         display: flex;
         place-items: center;
         user-select: none;
+    }
+
+    button#preview :global(svg) {
+        width: 1.5em;
+        height: 1.5em;
+        margin-right: 4px;
     }
 
     button#preview.active {

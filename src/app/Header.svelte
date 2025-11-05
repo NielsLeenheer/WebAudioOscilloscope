@@ -1,6 +1,7 @@
 <script>
     import { Icon } from 'svelte-icon';
-    import audioIcon from '../assets/icons/audio.svg?raw';
+    import connectIcon from '../assets/icons/connect.svg?raw';
+    import disconnectIcon from '../assets/icons/disconnect.svg?raw';
     import audioPlayingGif from '../assets/audio-playing.gif';
 
     let { isPlaying, start, stop } = $props();
@@ -9,12 +10,12 @@
 <header>
     {#if !isPlaying}
     <button id="start" onclick={() => start()}>
-        <Icon data={audioIcon} />
+        <Icon data={connectIcon} />
         Start Audio
     </button>
     {:else}
     <button id="stop" onclick={() => stop()}>
-        <Icon data={audioIcon} />
+        <Icon data={disconnectIcon} />
         Stop Audio
     </button>
     {/if}
