@@ -99,6 +99,25 @@ self.onmessage = function(e) {
             beamX += velocityX;
             beamY += velocityY;
 
+            // Safety checks: prevent NaN/Infinity and extreme values
+            if (!isFinite(beamX) || !isFinite(beamY) || !isFinite(velocityX) || !isFinite(velocityY)) {
+                // Reset to origin if values become invalid
+                beamX = 0;
+                beamY = 0;
+                velocityX = 0;
+                velocityY = 0;
+            } else {
+                // Clamp beam position to reasonable bounds (prevent runaway)
+                const maxPosition = scale * 10; // Allow some overshoot but not too much
+                beamX = Math.max(-maxPosition, Math.min(maxPosition, beamX));
+                beamY = Math.max(-maxPosition, Math.min(maxPosition, beamY));
+
+                // Clamp velocities to prevent extreme values
+                const maxVelocity = scale * 2;
+                velocityX = Math.max(-maxVelocity, Math.min(maxVelocity, velocityX));
+                velocityY = Math.max(-maxVelocity, Math.min(maxVelocity, velocityY));
+            }
+
             // Convert to screen coordinates
             const screenX = centerX + beamX;
             const screenY = centerY + beamY;
