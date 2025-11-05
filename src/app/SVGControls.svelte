@@ -7,7 +7,8 @@
     let svgPath = $state('');
     let numSamples = $state(200);
     let autoCenter = $state(true);
-    let selectedExample = $state('');
+    let selectedExample = $state('star'); // Default to first item
+    let lastLoadedPath = $state(''); // Track the last path loaded from examples
     let showApplyButton = $state(false);
 
     function drawSVGPath() {
@@ -23,15 +24,12 @@
         try {
             const points = parseSVGPath(pathData, numSamples, autoCenter);
             audioEngine.createWaveform(points);
+            lastLoadedPath = pathData; // Update last loaded path
             showApplyButton = false; // Hide button after applying
         } catch (error) {
             alert('Error parsing SVG path: ' + error.message);
             console.error(error);
         }
-    }
-
-    function onTextareaInput() {
-        showApplyButton = true;
     }
 
     // Watch for selection changes and auto-load
@@ -41,6 +39,7 @@
 
             if (pathData) {
                 svgPath = pathData;
+                lastLoadedPath = pathData;
 
                 // Adjust sample points based on complexity
                 if (complexShapes.includes(selectedExample)) {
@@ -49,17 +48,24 @@
                     numSamples = 200;
                 }
 
-                showApplyButton = false; // Don't show button when loading from select
                 drawSVGPath();
             }
+        }
+    });
+
+    // Watch for manual edits to textarea
+    $effect(() => {
+        // Show button if path has been manually edited
+        if (svgPath && svgPath.trim() !== lastLoadedPath.trim()) {
+            showApplyButton = true;
+        } else {
+            showApplyButton = false;
         }
     });
 </script>
 
 <div class="control-group">
-    <label>SVG Path Input:</label>
     <select bind:value={selectedExample}>
-        <option value="">-- Select an example --</option>
         <option value="star">Star</option>
         <option value="html5">HTML5 Logo</option>
         <option value="heart_svg">Heart (SVG)</option>
@@ -74,7 +80,6 @@
     </select>
     <textarea
         bind:value={svgPath}
-        oninput={onTextareaInput}
         rows="4"
         style="margin-top: 10px;"
         placeholder="Paste SVG path data here, e.g.:
