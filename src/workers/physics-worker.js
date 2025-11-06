@@ -134,30 +134,60 @@ self.onmessage = function(e) {
             }
         }
 
-        // Draw path with velocity-based opacity using straight lines
-        if (points.length > 1) {
-            for (let i = 1; i < points.length; i++) {
-                const speed = speeds[i - 1] || 0;
-
-                // Calculate velocity-based opacity for this segment
-                let velocityOpacity = 1.0;
-                if (velocityDimming > 0 && speed > 0) {
-                    const falloffRate = 20;
-                    const dimFactor = Math.exp(-speed / falloffRate);
-                    velocityOpacity = 1.0 - velocityDimming * (1.0 - dimFactor);
-                    const minOpacity = 0.02 * velocityDimming;
-                    velocityOpacity = Math.max(velocityOpacity, minOpacity);
-                }
-
-                const finalOpacity = basePower * velocityOpacity;
-                ctx.strokeStyle = `rgba(76, 175, 80, ${finalOpacity})`;
-
-                // Draw straight line segment
-                ctx.beginPath();
-                ctx.moveTo(points[i - 1].x, points[i - 1].y);
-                ctx.lineTo(points[i].x, points[i].y);
-                ctx.stroke();
+        // Smooth the speeds array to avoid harsh opacity transitions
+        const smoothedSpeeds = [];
+        const smoothWindow = 3; // Smooth over 3 points
+        for (let i = 0; i < speeds.length; i++) {
+            let sum = 0;
+            let count = 0;
+            for (let j = Math.max(0, i - smoothWindow); j <= Math.min(speeds.length - 1, i + smoothWindow); j++) {
+                sum += speeds[j];
+                count++;
             }
+            smoothedSpeeds.push(sum / count);
+        }
+
+        // Draw smooth continuous path with gradual opacity changes
+        if (points.length > 2) {
+            // Start the path
+            ctx.beginPath();
+            ctx.moveTo(points[0].x, points[0].y);
+
+            // Build the smooth path using quadratic curves
+            for (let i = 1; i < points.length - 1; i++) {
+                const curr = points[i];
+                const next = points[i + 1];
+                // Use midpoint for smooth curves
+                const midX = (curr.x + next.x) / 2;
+                const midY = (curr.y + next.y) / 2;
+                ctx.quadraticCurveTo(curr.x, curr.y, midX, midY);
+            }
+
+            // Final point
+            const last = points[points.length - 1];
+            const secondLast = points[points.length - 2];
+            ctx.quadraticCurveTo(secondLast.x, secondLast.y, last.x, last.y);
+
+            // Calculate average speed for overall opacity
+            let totalSpeed = 0;
+            for (let i = 0; i < smoothedSpeeds.length; i++) {
+                totalSpeed += smoothedSpeeds[i];
+            }
+            const avgSpeed = smoothedSpeeds.length > 0 ? totalSpeed / smoothedSpeeds.length : 0;
+
+            // Apply velocity-based opacity
+            let velocityOpacity = 1.0;
+            if (velocityDimming > 0 && avgSpeed > 0) {
+                const falloffRate = 20;
+                const dimFactor = Math.exp(-avgSpeed / falloffRate);
+                velocityOpacity = 1.0 - velocityDimming * (1.0 - dimFactor);
+                const minOpacity = 0.02 * velocityDimming;
+                velocityOpacity = Math.max(velocityOpacity, minOpacity);
+            }
+
+            const finalOpacity = basePower * velocityOpacity;
+            ctx.strokeStyle = `rgba(76, 175, 80, ${finalOpacity})`;
+            ctx.stroke();
         }
 
         // Calculate FPS
