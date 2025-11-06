@@ -3,8 +3,13 @@ let beamX = 0;
 let beamY = 0;
 let velocityX = 0;
 let velocityY = 0;
+let smoothedBeamX = 0;
+let smoothedBeamY = 0;
 let offscreenCanvas = null;
 let ctx = null;
+
+// Position smoothing factor (0-1): higher = less smoothing, lower = more smoothing
+const SMOOTHING_ALPHA = 0.4;
 
 // FPS tracking
 let lastFrameTime = performance.now();
@@ -27,6 +32,8 @@ self.onmessage = function(e) {
         beamY = 0;
         velocityX = 0;
         velocityY = 0;
+        smoothedBeamX = 0;
+        smoothedBeamY = 0;
         return;
     }
 
@@ -106,6 +113,8 @@ self.onmessage = function(e) {
                 beamY = 0;
                 velocityX = 0;
                 velocityY = 0;
+                smoothedBeamX = 0;
+                smoothedBeamY = 0;
             } else {
                 // Clamp beam position to reasonable bounds (prevent runaway)
                 const maxPosition = scale * 10; // Allow some overshoot but not too much
@@ -118,9 +127,14 @@ self.onmessage = function(e) {
                 velocityY = Math.max(-maxVelocity, Math.min(maxVelocity, velocityY));
             }
 
-            // Convert to screen coordinates
-            const screenX = centerX + beamX;
-            const screenY = centerY + beamY;
+            // Apply exponential smoothing to positions
+            // This creates naturally smooth movement while preserving physics accuracy
+            smoothedBeamX = SMOOTHING_ALPHA * beamX + (1 - SMOOTHING_ALPHA) * smoothedBeamX;
+            smoothedBeamY = SMOOTHING_ALPHA * beamY + (1 - SMOOTHING_ALPHA) * smoothedBeamY;
+
+            // Convert to screen coordinates using smoothed positions
+            const screenX = centerX + smoothedBeamX;
+            const screenY = centerY + smoothedBeamY;
 
             points.push({ x: screenX, y: screenY });
 
@@ -134,58 +148,29 @@ self.onmessage = function(e) {
             }
         }
 
-        // Smooth the speeds array to avoid harsh opacity transitions
-        const smoothedSpeeds = [];
-        const smoothWindow = 3; // Smooth over 3 points
-        for (let i = 0; i < speeds.length; i++) {
-            let sum = 0;
-            let count = 0;
-            for (let j = Math.max(0, i - smoothWindow); j <= Math.min(speeds.length - 1, i + smoothWindow); j++) {
-                sum += speeds[j];
-                count++;
-            }
-            smoothedSpeeds.push(sum / count);
-        }
+        // Draw each segment with per-segment velocity-based dimming
+        // The positions are already smoothed by the physics engine, so no need for Bézier curves
+        for (let i = 0; i < points.length - 1; i++) {
+            const point = points[i];
+            const nextPoint = points[i + 1];
+            const speed = speeds[i] || 0;
 
-        // Draw smooth continuous path with gradual opacity changes
-        if (points.length > 2) {
-            // Start the path
-            ctx.beginPath();
-            ctx.moveTo(points[0].x, points[0].y);
-
-            // Build the smooth path using quadratic curves
-            for (let i = 1; i < points.length - 1; i++) {
-                const curr = points[i];
-                const next = points[i + 1];
-                // Use midpoint for smooth curves
-                const midX = (curr.x + next.x) / 2;
-                const midY = (curr.y + next.y) / 2;
-                ctx.quadraticCurveTo(curr.x, curr.y, midX, midY);
-            }
-
-            // Final point
-            const last = points[points.length - 1];
-            const secondLast = points[points.length - 2];
-            ctx.quadraticCurveTo(secondLast.x, secondLast.y, last.x, last.y);
-
-            // Calculate average speed for overall opacity
-            let totalSpeed = 0;
-            for (let i = 0; i < smoothedSpeeds.length; i++) {
-                totalSpeed += smoothedSpeeds[i];
-            }
-            const avgSpeed = smoothedSpeeds.length > 0 ? totalSpeed / smoothedSpeeds.length : 0;
-
-            // Apply velocity-based opacity
+            // Calculate velocity-based opacity for this segment
             let velocityOpacity = 1.0;
-            if (velocityDimming > 0 && avgSpeed > 0) {
+            if (velocityDimming > 0 && speed > 0) {
                 const falloffRate = 20;
-                const dimFactor = Math.exp(-avgSpeed / falloffRate);
+                const dimFactor = Math.exp(-speed / falloffRate);
                 velocityOpacity = 1.0 - velocityDimming * (1.0 - dimFactor);
                 const minOpacity = 0.02 * velocityDimming;
                 velocityOpacity = Math.max(velocityOpacity, minOpacity);
             }
 
             const finalOpacity = basePower * velocityOpacity;
+
+            // Draw this segment
+            ctx.beginPath();
+            ctx.moveTo(point.x, point.y);
+            ctx.lineTo(nextPoint.x, nextPoint.y);
             ctx.strokeStyle = `rgba(76, 175, 80, ${finalOpacity})`;
             ctx.stroke();
         }
