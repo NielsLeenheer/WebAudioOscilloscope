@@ -64,6 +64,8 @@ self.onmessage = function(e) {
 
         let prevX = null;
         let prevY = null;
+        let prevPrevX = null;
+        let prevPrevY = null;
 
         for (let i = 0; i < leftData.length; i++) {
             // Add noise to audio signal if enabled
@@ -148,13 +150,28 @@ self.onmessage = function(e) {
                 const finalOpacity = basePower * velocityOpacity;
                 ctx.strokeStyle = `rgba(76, 175, 80, ${finalOpacity})`;
 
-                // Draw line segment
+                // Draw smooth curve using quadratic Bézier
                 ctx.beginPath();
                 ctx.moveTo(prevX, prevY);
-                ctx.lineTo(screenX, screenY);
+
+                if (prevPrevX !== null && prevPrevY !== null) {
+                    // Use quadratic curve with control point at previous position
+                    // This creates a smooth curve through the points
+                    const controlX = prevX;
+                    const controlY = prevY;
+                    const endX = (prevX + screenX) / 2;
+                    const endY = (prevY + screenY) / 2;
+                    ctx.quadraticCurveTo(controlX, controlY, endX, endY);
+                } else {
+                    // First few points, just draw straight line
+                    ctx.lineTo(screenX, screenY);
+                }
+
                 ctx.stroke();
             }
 
+            prevPrevX = prevX;
+            prevPrevY = prevY;
             prevX = screenX;
             prevY = screenY;
         }
