@@ -12,7 +12,8 @@ let ctx = null;
 const SMOOTHING_ALPHA = 0.4;
 
 // Number of sub-segments to split each curve into for gradual opacity transitions
-const SUBSEGMENTS = 8;
+const MAX_SUBSEGMENTS = 8;
+const MIN_SUBSEGMENT_LENGTH = 4; // Minimum pixels per sub-segment
 
 // Ease-in-out function for smooth opacity transitions
 function easeInOutQuad(t) {
@@ -25,6 +26,24 @@ function quadraticBezierPoint(p0x, p0y, p1x, p1y, p2x, p2y, t) {
     const x = oneMinusT * oneMinusT * p0x + 2 * oneMinusT * t * p1x + t * t * p2x;
     const y = oneMinusT * oneMinusT * p0y + 2 * oneMinusT * t * p1y + t * t * p2y;
     return { x, y };
+}
+
+// Estimate the length of a quadratic Bézier curve
+function estimateBezierLength(p0x, p0y, p1x, p1y, p2x, p2y) {
+    let length = 0;
+    const samples = 10;
+    let prevPoint = { x: p0x, y: p0y };
+
+    for (let i = 1; i <= samples; i++) {
+        const t = i / samples;
+        const point = quadraticBezierPoint(p0x, p0y, p1x, p1y, p2x, p2y, t);
+        const dx = point.x - prevPoint.x;
+        const dy = point.y - prevPoint.y;
+        length += Math.sqrt(dx * dx + dy * dy);
+        prevPoint = point;
+    }
+
+    return length;
 }
 
 // Calculate velocity-based opacity for a given speed
@@ -95,7 +114,7 @@ self.onmessage = function(e) {
 
         // Calculate physics and collect all points first
         ctx.lineWidth = 1.5;
-        ctx.lineCap = 'round';
+        ctx.lineCap = 'butt'; // Use 'butt' to prevent overlapping caps at connection points
         ctx.lineJoin = 'round';
 
         const points = [];
@@ -199,6 +218,10 @@ self.onmessage = function(e) {
                 const nextMidX = (points[i].x + points[i + 1].x) / 2;
                 const nextMidY = (points[i].y + points[i + 1].y) / 2;
 
+                // Estimate curve length to determine number of sub-segments
+                const curveLength = estimateBezierLength(prevMidX, prevMidY, points[i].x, points[i].y, nextMidX, nextMidY);
+                const numSubSegments = Math.max(1, Math.min(MAX_SUBSEGMENTS, Math.floor(curveLength / MIN_SUBSEGMENT_LENGTH)));
+
                 // Get opacities for current and next point
                 const currentSpeed = speeds[i] || 0;
                 const nextSpeed = speeds[i + 1] || 0;
@@ -206,16 +229,18 @@ self.onmessage = function(e) {
                 const nextOpacity = calculateVelocityOpacity(nextSpeed, velocityDimming, basePower);
 
                 // Draw curve as multiple sub-segments with interpolated opacity
-                for (let s = 0; s < SUBSEGMENTS; s++) {
-                    const t1 = s / SUBSEGMENTS;
-                    const t2 = (s + 1) / SUBSEGMENTS;
+                for (let s = 0; s < numSubSegments; s++) {
+                    const t1 = s / numSubSegments;
+                    const t2 = (s + 1) / numSubSegments;
 
                     // Calculate points on the Bézier curve
-                    const pt1 = quadraticBezierPoint(prevMidX, prevMidY, points[i].x, points[i].y, nextMidX, nextMidY, t1);
+                    // Offset start point very slightly to avoid overlapping with previous segment's endpoint
+                    const t1Offset = s === 0 ? t1 : t1 + 0.001 / numSubSegments;
+                    const pt1 = quadraticBezierPoint(prevMidX, prevMidY, points[i].x, points[i].y, nextMidX, nextMidY, t1Offset);
                     const pt2 = quadraticBezierPoint(prevMidX, prevMidY, points[i].x, points[i].y, nextMidX, nextMidY, t2);
 
                     // Interpolate opacity with ease-in-out
-                    const easedT = easeInOutQuad(t1 + 0.5 / SUBSEGMENTS); // Use middle of sub-segment
+                    const easedT = easeInOutQuad(t1 + 0.5 / numSubSegments); // Use middle of sub-segment
                     const interpolatedOpacity = currentOpacity + (nextOpacity - currentOpacity) * easedT;
 
                     // Draw sub-segment
