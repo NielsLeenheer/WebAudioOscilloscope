@@ -148,30 +148,76 @@ self.onmessage = function(e) {
             }
         }
 
-        // Draw each segment with per-segment velocity-based dimming
-        // The positions are already smoothed by the physics engine, so no need for Bézier curves
-        for (let i = 0; i < points.length - 1; i++) {
-            const point = points[i];
-            const nextPoint = points[i + 1];
-            const speed = speeds[i] || 0;
+        // Draw each segment with per-segment velocity-based dimming using smooth curves
+        // Use quadratic Bézier curves for visual smoothness
+        if (points.length > 2) {
+            // First segment: start at first point, curve to midpoint
+            const firstMidX = (points[0].x + points[1].x) / 2;
+            const firstMidY = (points[0].y + points[1].y) / 2;
 
-            // Calculate velocity-based opacity for this segment
             let velocityOpacity = 1.0;
-            if (velocityDimming > 0 && speed > 0) {
+            if (velocityDimming > 0 && speeds[0] > 0) {
                 const falloffRate = 20;
-                const dimFactor = Math.exp(-speed / falloffRate);
+                const dimFactor = Math.exp(-speeds[0] / falloffRate);
                 velocityOpacity = 1.0 - velocityDimming * (1.0 - dimFactor);
                 const minOpacity = 0.02 * velocityDimming;
                 velocityOpacity = Math.max(velocityOpacity, minOpacity);
             }
 
-            const finalOpacity = basePower * velocityOpacity;
-
-            // Draw this segment
             ctx.beginPath();
-            ctx.moveTo(point.x, point.y);
-            ctx.lineTo(nextPoint.x, nextPoint.y);
-            ctx.strokeStyle = `rgba(76, 175, 80, ${finalOpacity})`;
+            ctx.moveTo(points[0].x, points[0].y);
+            ctx.lineTo(firstMidX, firstMidY);
+            ctx.strokeStyle = `rgba(76, 175, 80, ${basePower * velocityOpacity})`;
+            ctx.stroke();
+
+            // Middle segments: curve from midpoint to midpoint through the actual point
+            for (let i = 1; i < points.length - 1; i++) {
+                const prevMidX = (points[i - 1].x + points[i].x) / 2;
+                const prevMidY = (points[i - 1].y + points[i].y) / 2;
+                const nextMidX = (points[i].x + points[i + 1].x) / 2;
+                const nextMidY = (points[i].y + points[i + 1].y) / 2;
+
+                const speed = speeds[i] || 0;
+
+                // Calculate velocity-based opacity for this segment
+                velocityOpacity = 1.0;
+                if (velocityDimming > 0 && speed > 0) {
+                    const falloffRate = 20;
+                    const dimFactor = Math.exp(-speed / falloffRate);
+                    velocityOpacity = 1.0 - velocityDimming * (1.0 - dimFactor);
+                    const minOpacity = 0.02 * velocityDimming;
+                    velocityOpacity = Math.max(velocityOpacity, minOpacity);
+                }
+
+                const finalOpacity = basePower * velocityOpacity;
+
+                // Draw smooth curve through this point
+                ctx.beginPath();
+                ctx.moveTo(prevMidX, prevMidY);
+                ctx.quadraticCurveTo(points[i].x, points[i].y, nextMidX, nextMidY);
+                ctx.strokeStyle = `rgba(76, 175, 80, ${finalOpacity})`;
+                ctx.stroke();
+            }
+
+            // Last segment: curve from midpoint to last point
+            const lastIdx = points.length - 1;
+            const lastMidX = (points[lastIdx - 1].x + points[lastIdx].x) / 2;
+            const lastMidY = (points[lastIdx - 1].y + points[lastIdx].y) / 2;
+
+            const lastSpeed = speeds[lastIdx - 1] || 0;
+            velocityOpacity = 1.0;
+            if (velocityDimming > 0 && lastSpeed > 0) {
+                const falloffRate = 20;
+                const dimFactor = Math.exp(-lastSpeed / falloffRate);
+                velocityOpacity = 1.0 - velocityDimming * (1.0 - dimFactor);
+                const minOpacity = 0.02 * velocityDimming;
+                velocityOpacity = Math.max(velocityOpacity, minOpacity);
+            }
+
+            ctx.beginPath();
+            ctx.moveTo(lastMidX, lastMidY);
+            ctx.lineTo(points[lastIdx].x, points[lastIdx].y);
+            ctx.strokeStyle = `rgba(76, 175, 80, ${basePower * velocityOpacity})`;
             ctx.stroke();
         }
 
