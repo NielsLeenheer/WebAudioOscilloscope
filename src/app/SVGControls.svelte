@@ -1,80 +1,87 @@
 <script>
     import { parseSVGPath } from '../utils/shapes.js';
     import { svgExamples, complexShapes } from '../utils/svgExamples.js';
+    import { onMount } from 'svelte';
 
     let { audioEngine, isPlaying } = $props();
 
     let svgPath = $state('');
     let numSamples = $state(200);
-    let selectedExample = $state('star'); // Default to first item
-    let showApplyButton = $state(false);
-    let programmaticChange = false; // Flag to track programmatic vs user changes
+    let selectedExample = $state('star');
+    let validationError = $state('');
+    let isValid = $state(true);
+
+    function validatePath() {
+        const pathData = svgPath.trim();
+
+        if (!pathData) {
+            validationError = '';
+            isValid = true;
+            return false;
+        }
+
+        try {
+            parseSVGPath(pathData, numSamples, true);
+            validationError = '';
+            isValid = true;
+            return true;
+        } catch (error) {
+            validationError = error.message;
+            isValid = false;
+            return false;
+        }
+    }
 
     function drawSVGPath() {
         if (!isPlaying) return;
 
-        const pathData = svgPath.trim();
-
-        if (!pathData) {
-            alert('Please enter an SVG path');
-            return;
-        }
-
-        try {
-            const points = parseSVGPath(pathData, numSamples, true); // Always auto-center
+        if (validatePath()) {
+            const points = parseSVGPath(svgPath.trim(), numSamples, true);
             audioEngine.createWaveform(points);
-            showApplyButton = false; // Hide button after applying
-        } catch (error) {
-            alert('Error parsing SVG path: ' + error.message);
-            console.error(error);
         }
     }
 
     function handleTextareaInput(event) {
-        // Only show button for actual user input (not programmatic changes)
-        if (!programmaticChange) {
-            showApplyButton = true;
-        }
+        // Switch to "custom" when user manually edits
+        selectedExample = 'custom';
+        validatePath();
     }
 
-    // Watch for selection changes and auto-load
-    function handleSelectChange() {
-        if (selectedExample) {
-            const pathData = svgExamples[selectedExample];
+    function handleSelectChange(event) {
+        if (selectedExample === 'custom') {
+            // Don't change textarea content for custom
+            return;
+        }
 
-            if (pathData) {
-                programmaticChange = true; // Set flag before updating
-                svgPath = pathData;
+        const pathData = svgExamples[selectedExample];
 
-                // Adjust sample points based on complexity
-                if (complexShapes.includes(selectedExample)) {
-                    numSamples = 400;
-                } else {
-                    numSamples = 200;
-                }
+        if (pathData) {
+            svgPath = pathData;
 
-                showApplyButton = false;
+            // Adjust sample points based on complexity
+            if (complexShapes.includes(selectedExample)) {
+                numSamples = 400;
+            } else {
+                numSamples = 200;
+            }
 
-                if (isPlaying) {
-                    drawSVGPath();
-                }
+            validatePath();
 
-                // Reset flag after DOM update
-                setTimeout(() => {
-                    programmaticChange = false;
-                }, 0);
+            if (isPlaying && isValid) {
+                drawSVGPath();
             }
         }
     }
 
-    // Run on mount to load initial example
-    $effect(() => {
+    onMount(() => {
+        // Load initial example
         handleSelectChange();
     });
 </script>
 
 <div class="control-group">
     <select bind:value={selectedExample} onchange={handleSelectChange}>
+        <option value="custom">Custom...</option>
         <option value="star">Star</option>
         <option value="html5">HTML5 Logo</option>
         <option value="heart_svg">Heart (SVG)</option>
@@ -91,14 +98,19 @@
         bind:value={svgPath}
         oninput={handleTextareaInput}
         rows="4"
-        style="margin-top: 10px;"
+        style="margin-top: 10px; {isValid ? '' : 'border: 2px solid #c62828;'}"
         placeholder="Paste SVG path data here, e.g.:
 M 10,10 L 90,90 L 10,90 Z
 
 Or try a simple example:
 M 0,0 L 50,50 L 0,100 L -50,50 Z"
     ></textarea>
-    {#if showApplyButton}
+    {#if validationError}
+        <div style="color: #c62828; font-size: 12px; margin-top: 5px;">
+            ⚠️ {validationError}
+        </div>
+    {/if}
+    {#if selectedExample === 'custom' && svgPath.trim() && isValid}
         <button onclick={() => drawSVGPath()} style="margin-top: 10px;">Apply Custom Path</button>
     {/if}
     <div style="margin-top: 10px;">
