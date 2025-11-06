@@ -10,6 +10,8 @@
     let selectedExample = $state('star');
     let validationError = $state('');
     let isValid = $state(true);
+    let validationTimeout = null;
+    let applyTimeout = null;
 
     function validatePath() {
         const pathData = svgPath.trim();
@@ -26,7 +28,7 @@
             isValid = true;
             return true;
         } catch (error) {
-            validationError = error.message;
+            validationError = error.message || 'Invalid SVG path';
             isValid = false;
             return false;
         }
@@ -35,16 +37,39 @@
     function drawSVGPath() {
         if (!isPlaying) return;
 
-        if (validatePath()) {
-            const points = parseSVGPath(svgPath.trim(), numSamples, true);
-            audioEngine.createWaveform(points);
+        try {
+            if (validatePath()) {
+                const points = parseSVGPath(svgPath.trim(), numSamples, true);
+                audioEngine.createWaveform(points);
+            }
+        } catch (error) {
+            console.error('Error drawing SVG path:', error);
+            validationError = error.message || 'Error drawing path';
+            isValid = false;
         }
     }
 
     function handleTextareaInput(event) {
         // Switch to "custom" when user manually edits
         selectedExample = 'custom';
-        validatePath();
+
+        // Debounce validation
+        if (validationTimeout) {
+            clearTimeout(validationTimeout);
+        }
+        validationTimeout = setTimeout(() => {
+            validatePath();
+        }, 300);
+
+        // Debounce auto-apply
+        if (applyTimeout) {
+            clearTimeout(applyTimeout);
+        }
+        applyTimeout = setTimeout(() => {
+            if (isPlaying && isValid) {
+                drawSVGPath();
+            }
+        }, 800);
     }
 
     function handleSelectChange(event) {
@@ -97,7 +122,7 @@
     <textarea
         bind:value={svgPath}
         oninput={handleTextareaInput}
-        rows="4"
+        rows="8"
         style="margin-top: 10px; {isValid ? '' : 'border: 2px solid #c62828;'}"
         placeholder="Paste SVG path data here, e.g.:
 M 10,10 L 90,90 L 10,90 Z
@@ -109,9 +134,6 @@ M 0,0 L 50,50 L 0,100 L -50,50 Z"
         <div style="color: #c62828; font-size: 12px; margin-top: 5px;">
             ⚠️ {validationError}
         </div>
-    {/if}
-    {#if selectedExample === 'custom' && svgPath.trim() && isValid}
-        <button onclick={() => drawSVGPath()} style="margin-top: 10px;">Apply Custom Path</button>
     {/if}
     <div style="margin-top: 10px;">
         <label for="svgSamples">Sample Points:</label>
