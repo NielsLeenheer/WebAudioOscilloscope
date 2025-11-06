@@ -57,15 +57,13 @@ self.onmessage = function(e) {
         // Draw grid
         drawGrid(ctx, centerX, centerY, canvasWidth, canvasHeight);
 
-        // Calculate physics and render
+        // Calculate physics and collect all points first
         ctx.lineWidth = 1.5;
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
 
-        let prevX = null;
-        let prevY = null;
-        let prevPrevX = null;
-        let prevPrevY = null;
+        const points = [];
+        const speeds = [];
 
         for (let i = 0; i < leftData.length; i++) {
             // Add noise to audio signal if enabled
@@ -124,56 +122,60 @@ self.onmessage = function(e) {
             const screenX = centerX + beamX;
             const screenY = centerY + beamY;
 
-            // Calculate velocity-based opacity (fast beam = dimmer)
-            if (prevX !== null && prevY !== null) {
-                const dx = screenX - prevX;
-                const dy = screenY - prevY;
+            points.push({ x: screenX, y: screenY });
+
+            // Calculate speed for this point
+            if (points.length > 1) {
+                const prev = points[points.length - 2];
+                const dx = screenX - prev.x;
+                const dy = screenY - prev.y;
                 const speed = Math.sqrt(dx * dx + dy * dy);
+                speeds.push(speed);
+            }
+        }
 
-                // Apply gradual exponential falloff based on speed
-                let velocityOpacity = 1.0;
+        // Draw one continuous smooth path
+        if (points.length > 2) {
+            // Calculate average opacity
+            let totalSpeed = 0;
+            for (let i = 0; i < speeds.length; i++) {
+                totalSpeed += speeds[i];
+            }
+            const avgSpeed = totalSpeed / speeds.length;
 
-                if (velocityDimming > 0 && speed > 0) {
-                    // More gradual falloff: starts dimming gradually from speed=0
-                    // velocityDimming scales the effect (0=no dimming, 1=max dimming)
-                    const falloffRate = 20; // Higher = more gradual transition
-                    const dimFactor = Math.exp(-speed / falloffRate);
-
-                    // Blend between no dimming (1.0) and dimmed based on velocityDimming
-                    velocityOpacity = 1.0 - velocityDimming * (1.0 - dimFactor);
-
-                    // Set minimum opacity based on dimming amount
-                    const minOpacity = 0.02 * velocityDimming;
-                    velocityOpacity = Math.max(velocityOpacity, minOpacity);
-                }
-
-                const finalOpacity = basePower * velocityOpacity;
-                ctx.strokeStyle = `rgba(76, 175, 80, ${finalOpacity})`;
-
-                // Draw smooth curve using quadratic Bézier
-                ctx.beginPath();
-                ctx.moveTo(prevX, prevY);
-
-                if (prevPrevX !== null && prevPrevY !== null) {
-                    // Use quadratic curve with control point at previous position
-                    // This creates a smooth curve through the points
-                    const controlX = prevX;
-                    const controlY = prevY;
-                    const endX = (prevX + screenX) / 2;
-                    const endY = (prevY + screenY) / 2;
-                    ctx.quadraticCurveTo(controlX, controlY, endX, endY);
-                } else {
-                    // First few points, just draw straight line
-                    ctx.lineTo(screenX, screenY);
-                }
-
-                ctx.stroke();
+            // Calculate velocity-based opacity
+            let velocityOpacity = 1.0;
+            if (velocityDimming > 0 && avgSpeed > 0) {
+                const falloffRate = 20;
+                const dimFactor = Math.exp(-avgSpeed / falloffRate);
+                velocityOpacity = 1.0 - velocityDimming * (1.0 - dimFactor);
+                const minOpacity = 0.02 * velocityDimming;
+                velocityOpacity = Math.max(velocityOpacity, minOpacity);
             }
 
-            prevPrevX = prevX;
-            prevPrevY = prevY;
-            prevX = screenX;
-            prevY = screenY;
+            const finalOpacity = basePower * velocityOpacity;
+            ctx.strokeStyle = `rgba(76, 175, 80, ${finalOpacity})`;
+
+            // Build one continuous smooth path
+            ctx.beginPath();
+            ctx.moveTo(points[0].x, points[0].y);
+
+            // Use quadratic curves for smooth interpolation
+            for (let i = 1; i < points.length - 1; i++) {
+                const curr = points[i];
+                const next = points[i + 1];
+                // Midpoint becomes the endpoint of this curve
+                const midX = (curr.x + next.x) / 2;
+                const midY = (curr.y + next.y) / 2;
+                ctx.quadraticCurveTo(curr.x, curr.y, midX, midY);
+            }
+
+            // Draw final segment to last point
+            const last = points[points.length - 1];
+            const secondLast = points[points.length - 2];
+            ctx.quadraticCurveTo(secondLast.x, secondLast.y, last.x, last.y);
+
+            ctx.stroke();
         }
 
         // Calculate FPS
