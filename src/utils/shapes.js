@@ -202,27 +202,42 @@ export function parseSVGPath(pathData, numSamples = 200, autoCenter = true) {
     // Create an SVG element to use the browser's path parsing
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-    path.setAttribute('d', pathData);
+
+    try {
+        path.setAttribute('d', pathData);
+    } catch (error) {
+        throw new Error('Invalid SVG path syntax');
+    }
+
     svg.appendChild(path);
 
-    const totalLength = path.getTotalLength();
+    let totalLength;
+    try {
+        totalLength = path.getTotalLength();
+    } catch (error) {
+        throw new Error('Invalid SVG path - cannot calculate length');
+    }
 
-    if (totalLength === 0) {
+    if (totalLength === 0 || !isFinite(totalLength)) {
         throw new Error('Invalid path or path has zero length');
     }
 
     const points = [];
 
     // Sample points along the path
-    for (let i = 0; i < numSamples; i++) {
-        const distance = (i / numSamples) * totalLength;
-        const point = path.getPointAtLength(distance);
-        points.push([point.x, point.y]);
-    }
+    try {
+        for (let i = 0; i < numSamples; i++) {
+            const distance = (i / numSamples) * totalLength;
+            const point = path.getPointAtLength(distance);
+            points.push([point.x, point.y]);
+        }
 
-    // Close the path by adding the first point at the end
-    if (points.length > 0) {
-        points.push(points[0]);
+        // Close the path by adding the first point at the end
+        if (points.length > 0) {
+            points.push(points[0]);
+        }
+    } catch (error) {
+        throw new Error('Error sampling points from path');
     }
 
     if (autoCenter) {
