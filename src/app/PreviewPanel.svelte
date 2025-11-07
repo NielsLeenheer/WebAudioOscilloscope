@@ -312,7 +312,7 @@
         const centerX = canvasWidth / 2;
         const centerY = canvasHeight / 2;
         const scale = Math.min(canvasWidth, canvasHeight) / 2.5;
-        const basePower = 0.2 + (beamPower * 0.8);
+        const basePower = 0.2 + (beamPower * 1.4); // Allow up to 3.0 max brightness
 
         if (worker) {
             workerBusy = true;
@@ -405,7 +405,7 @@
         <div class="control-panel">
             <div class="slider-control">
                 <label>INTENS</label>
-                <input type="range" min="0" max="1" step="0.01" bind:value={beamPower} />
+                <input type="range" min="0" max="2" step="0.01" bind:value={beamPower} />
                 <span class="value">{beamPower.toFixed(2)}</span>
             </div>
             <div class="slider-control">
