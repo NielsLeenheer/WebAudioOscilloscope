@@ -1,7 +1,7 @@
 <script>
     import { onMount, onDestroy } from 'svelte';
 
-    let { audioEngine, isPlaying, inputSource } = $props();
+    let { audioEngine, isPlaying, inputSource, isPowered } = $props();
 
     let canvas;
     let gridCanvas;
@@ -212,7 +212,13 @@
     }
 
     function draw() {
-        if (!isPlaying) {
+        if (!isPowered) {
+            stopVisualization();
+            return;
+        }
+
+        // For generated audio, check if it's playing; for microphone, always continue
+        if (inputSource === 'generated' && !isPlaying) {
             stopVisualization();
             return;
         }
@@ -287,9 +293,9 @@
         }
     }
 
-    // React to isPlaying changes
+    // React to isPlaying and isPowered changes
     $effect(() => {
-        if (isPlaying) {
+        if (isPowered && (isPlaying || inputSource === 'microphone')) {
             startVisualization();
         } else {
             stopVisualization();
@@ -495,14 +501,13 @@
 
 <style>
     .preview-panel {
-        background: #2d2d2d;
-        border-radius: 6px;
-        border: 1px solid #444;
-        margin: 20px;
+        background: transparent;
         display: flex;
         flex-direction: column;
         align-items: center;
-        height: calc(100% - 40px);
+        height: 100%;
+        padding: 20px;
+        box-sizing: border-box;
     }
 
     .canvas-container {

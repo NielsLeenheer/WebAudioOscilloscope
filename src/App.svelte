@@ -1,6 +1,8 @@
 <script>
-    import Header from './app/Header.svelte';
+    import GeneratorHeader from './app/GeneratorHeader.svelte';
+    import OscilloscopeHeader from './app/OscilloscopeHeader.svelte';
     import Navigation from './app/Navigation.svelte';
+    import InputSelector from './app/InputSelector.svelte';
     import Content from './app/Content.svelte';
     import PreviewPanel from './app/PreviewPanel.svelte';
     import { AudioEngine } from './utils/AudioEngine.js';
@@ -9,6 +11,7 @@
     let isPlaying = $state(false);
     let activeTab = $state('instructions');
     let inputSource = $state('generated'); // 'generated' or 'microphone'
+    let isPowered = $state(false);
 
     function start() {
         audioEngine.start();
@@ -19,45 +22,71 @@
         audioEngine.stop();
         isPlaying = false;
     }
-
-    function startGenerated() {
-        inputSource = 'generated';
-        start();
-    }
-
-    function startMicrophone() {
-        inputSource = 'microphone';
-        start();
-    }
 </script>
 
-<Header {isPlaying} {start} {stop} {startGenerated} {startMicrophone} {inputSource} />
-<Navigation bind:activeTab />
-
-<div id="main-content">
-    <div class="content-left">
-        <Content {audioEngine} {isPlaying} {activeTab} />
+<div id="app-container">
+    <!-- Left Side: Generator -->
+    <div class="left-side">
+        <GeneratorHeader {isPlaying} {start} {stop} />
+        <Navigation bind:activeTab />
+        <div class="content-area">
+            <Content {audioEngine} {isPlaying} {activeTab} />
+        </div>
     </div>
-    <div class="content-right">
-        <PreviewPanel {audioEngine} {isPlaying} {inputSource} />
+
+    <!-- Right Side: Oscilloscope -->
+    <div class="right-side">
+        <OscilloscopeHeader bind:isPowered />
+        <InputSelector bind:inputSource />
+        <div class="content-area">
+            <PreviewPanel {audioEngine} {isPlaying} {inputSource} {isPowered} />
+        </div>
     </div>
 </div>
 
 <style>
-    #main-content {
+    #app-container {
         display: flex;
-        height: calc(100vh - 61px - 63px);
+        height: 100vh;
     }
 
-    .content-left {
+    .left-side,
+    .right-side {
         flex: 1;
-        min-width: 0; /* Allow flex item to shrink below content size */
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+    }
+
+    .left-side {
+        background: #fff;
+    }
+
+    .right-side {
+        background: #0a0a0a;
+    }
+
+    .content-area {
+        flex: 1;
         overflow: auto;
     }
 
-    .content-right {
-        flex: 1;
-        min-width: 0; /* Allow flex item to shrink below content size */
-        overflow: auto;
+    /* Dark scrollbar for right side */
+    .right-side .content-area::-webkit-scrollbar {
+        width: 12px;
+    }
+
+    .right-side .content-area::-webkit-scrollbar-track {
+        background: #1a1a1a;
+    }
+
+    .right-side .content-area::-webkit-scrollbar-thumb {
+        background: #333;
+        border-radius: 6px;
+    }
+
+    .right-side .content-area::-webkit-scrollbar-thumb:hover {
+        background: #444;
     }
 </style>
