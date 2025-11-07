@@ -211,14 +211,16 @@
         }
     }
 
+    function clearScreen() {
+        if (worker) {
+            worker.postMessage({
+                type: 'clear'
+            });
+        }
+    }
+
     function draw() {
         if (!isPowered) {
-            stopVisualization();
-            return;
-        }
-
-        // For generated audio, check if it's playing; for microphone, always continue
-        if (inputSource === 'generated' && !isPlaying) {
             stopVisualization();
             return;
         }
@@ -232,25 +234,35 @@
 
         // Get analysers based on input source
         let analyserLeft, analyserRight;
+        let hasValidInput = false;
 
         if (inputSource === 'microphone') {
-            if (!micAnalyserLeft || !micAnalyserRight) {
-                return;
+            if (micAnalyserLeft && micAnalyserRight) {
+                analyserLeft = micAnalyserLeft;
+                analyserRight = micAnalyserRight;
+                hasValidInput = true;
             }
-            analyserLeft = micAnalyserLeft;
-            analyserRight = micAnalyserRight;
         } else {
+            // For generated input, always continue even if not playing
             const analysers = audioEngine.getAnalysers();
-            if (!analysers.left || !analysers.right) {
-                return;
+            if (analysers.left && analysers.right) {
+                analyserLeft = analysers.left;
+                analyserRight = analysers.right;
+                hasValidInput = true;
             }
-            analyserLeft = analysers.left;
-            analyserRight = analysers.right;
         }
 
-        // Get time domain data from both channels
-        analyserLeft.getFloatTimeDomainData(leftData);
-        analyserRight.getFloatTimeDomainData(rightData);
+        // Get time domain data from both channels (or zeros if not available)
+        if (hasValidInput) {
+            analyserLeft.getFloatTimeDomainData(leftData);
+            analyserRight.getFloatTimeDomainData(rightData);
+        } else {
+            // Fill with zeros when no input (noise will be added in worker)
+            if (!leftData) leftData = new Float32Array(2048);
+            if (!rightData) rightData = new Float32Array(2048);
+            leftData.fill(0);
+            rightData.fill(0);
+        }
 
         // Send data to worker for physics calculation AND rendering
         // Use full canvas size (600x600) to allow overscan
@@ -314,6 +326,13 @@
             startMicrophoneInput();
         } else {
             stopMicrophoneInput();
+        }
+    });
+
+    // React to power changes - clear screen when powered off
+    $effect(() => {
+        if (!isPowered) {
+            clearScreen();
         }
     });
 </script>

@@ -335,6 +335,22 @@ self.onmessage = function(e) {
         return;
     }
 
+    if (type === 'clear') {
+        // Clear the canvas completely (power off)
+        if (!ctx || !offscreenCanvas) return;
+        ctx.fillStyle = 'rgb(26, 31, 26)';
+        ctx.fillRect(0, 0, offscreenCanvas.width, offscreenCanvas.height);
+
+        // Reset beam position
+        beamX = 0;
+        beamY = 0;
+        velocityX = 0;
+        velocityY = 0;
+        smoothedBeamX = 0;
+        smoothedBeamY = 0;
+        return;
+    }
+
     if (type === 'render') {
         const {
             leftData,
