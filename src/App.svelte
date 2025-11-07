@@ -9,6 +9,7 @@
     let isPlaying = $state(false);
     let activeTab = $state('instructions');
     let showPreview = $state(true);
+    let inputSource = $state('generated'); // 'generated' or 'microphone'
 
     function start() {
         audioEngine.start();
@@ -19,9 +20,19 @@
         audioEngine.stop();
         isPlaying = false;
     }
+
+    function startGenerated() {
+        inputSource = 'generated';
+        start();
+    }
+
+    function startMicrophone() {
+        inputSource = 'microphone';
+        start();
+    }
 </script>
 
-<Header {isPlaying} {start} {stop} />
+<Header {isPlaying} {start} {stop} {startGenerated} {startMicrophone} {inputSource} />
 <Navigation bind:activeTab bind:showPreview />
 
 <div id="main-content">
@@ -30,7 +41,7 @@
     </div>
     {#if showPreview}
     <div class="content-right">
-        <PreviewPanel {audioEngine} {isPlaying} />
+        <PreviewPanel {audioEngine} {isPlaying} {inputSource} />
     </div>
     {/if}
 </div>

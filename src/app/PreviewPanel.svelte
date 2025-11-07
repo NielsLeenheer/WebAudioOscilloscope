@@ -1,7 +1,7 @@
 <script>
     import { onMount, onDestroy } from 'svelte';
 
-    let { audioEngine, isPlaying } = $props();
+    let { audioEngine, isPlaying, inputSource } = $props();
 
     let canvas;
     let gridCanvas;
@@ -10,7 +10,6 @@
     let rightData = null;
     let worker = null;
     let workerBusy = false;
-    let inputSource = $state('generated'); // 'generated' or 'microphone'
     let micStream = null;
     let micAudioContext = null;
     let micAnalyserLeft = null;
@@ -323,10 +322,6 @@
             class="grid-canvas"
         ></canvas>
     </div>
-    <div class="input-selector">
-        <button class:active={inputSource === 'generated'} onclick={() => inputSource = 'generated'}>GENERATED</button>
-        <button class:active={inputSource === 'microphone'} onclick={() => inputSource = 'microphone'}>MICROPHONE</button>
-    </div>
     <div class="mode-selector">
         <button class:active={mode === 'xy'} onclick={() => mode = 'xy'}>X/Y</button>
         <button class:active={mode === 'a'} onclick={() => mode = 'a'}>A</button>
@@ -528,40 +523,6 @@
         background: transparent;
         pointer-events: none;
         border-radius: 4px;
-    }
-
-    .input-selector {
-        display: flex;
-        gap: 5px;
-        padding: 10px 15px;
-        background: #1a1a1a;
-        border-radius: 4px;
-        margin-bottom: 10px;
-    }
-
-    .input-selector button {
-        flex: 1;
-        padding: 8px 16px;
-        background: #2d2d2d;
-        color: #888;
-        border: 1px solid #444;
-        border-radius: 4px;
-        font-family: system-ui;
-        font-size: 11px;
-        font-weight: 600;
-        cursor: pointer;
-        transition: all 0.2s;
-    }
-
-    .input-selector button:hover {
-        background: #333;
-        color: #aaa;
-    }
-
-    .input-selector button.active {
-        background: #4CAF50;
-        color: #000;
-        border-color: #4CAF50;
     }
 
     .mode-selector {
