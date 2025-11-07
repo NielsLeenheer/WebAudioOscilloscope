@@ -18,7 +18,6 @@
     let signalNoise = $state(0.015); // Random noise added to audio signal (0-1)
     let beamPower = $state(0.50); // Beam power (affects opacity: high power = bright, low power = dim)
     let velocityDimming = $state(0.90); // How much fast movements dim (0=no dimming, 1=maximum dimming)
-    let debugSubsegments = $state(false); // Show debug red dots at sub-segment boundaries
 
     onMount(() => {
         // Initialize Web Worker with OffscreenCanvas
@@ -117,7 +116,6 @@
                     basePower,
                     persistence,
                     velocityDimming,
-                    debugSubsegments,
                     canvasWidth: 400,
                     canvasHeight: 400
                 }
@@ -149,42 +147,39 @@
             height="400"
         ></canvas>
     </div>
-    <div class="sliders">
-        <div class="slider-control">
-            <label>Force: {forceMultiplier.toFixed(2)}</label>
-            <input type="range" min="0.01" max="0.5" step="0.01" bind:value={forceMultiplier} />
+    <details class="controls-details">
+        <summary>Physics Controls</summary>
+        <div class="sliders">
+            <div class="slider-control">
+                <label>Force: {forceMultiplier.toFixed(2)}</label>
+                <input type="range" min="0.01" max="0.5" step="0.01" bind:value={forceMultiplier} />
+            </div>
+            <div class="slider-control">
+                <label>Damping: {damping.toFixed(2)}</label>
+                <input type="range" min="0.1" max="0.99" step="0.01" bind:value={damping} />
+            </div>
+            <div class="slider-control">
+                <label>Mass: {mass.toFixed(2)}</label>
+                <input type="range" min="0.01" max="5.0" step="0.01" bind:value={mass} />
+            </div>
+            <div class="slider-control">
+                <label>Persistence: {persistence.toFixed(3)}</label>
+                <input type="range" min="0.0" max="0.95" step="0.005" bind:value={persistence} />
+            </div>
+            <div class="slider-control">
+                <label>Signal Noise: {signalNoise.toFixed(3)}</label>
+                <input type="range" min="0" max="0.2" step="0.001" bind:value={signalNoise} />
+            </div>
+            <div class="slider-control">
+                <label>Beam Power: {beamPower.toFixed(2)}</label>
+                <input type="range" min="0" max="1" step="0.01" bind:value={beamPower} />
+            </div>
+            <div class="slider-control">
+                <label>Velocity Dimming: {velocityDimming.toFixed(2)}</label>
+                <input type="range" min="0" max="1" step="0.01" bind:value={velocityDimming} />
+            </div>
         </div>
-        <div class="slider-control">
-            <label>Damping: {damping.toFixed(2)}</label>
-            <input type="range" min="0.1" max="0.99" step="0.01" bind:value={damping} />
-        </div>
-        <div class="slider-control">
-            <label>Mass: {mass.toFixed(2)}</label>
-            <input type="range" min="0.01" max="5.0" step="0.01" bind:value={mass} />
-        </div>
-        <div class="slider-control">
-            <label>Persistence: {persistence.toFixed(3)}</label>
-            <input type="range" min="0.0" max="0.95" step="0.005" bind:value={persistence} />
-        </div>
-        <div class="slider-control">
-            <label>Signal Noise: {signalNoise.toFixed(3)}</label>
-            <input type="range" min="0" max="0.2" step="0.001" bind:value={signalNoise} />
-        </div>
-        <div class="slider-control">
-            <label>Beam Power: {beamPower.toFixed(2)}</label>
-            <input type="range" min="0" max="1" step="0.01" bind:value={beamPower} />
-        </div>
-        <div class="slider-control">
-            <label>Velocity Dimming: {velocityDimming.toFixed(2)}</label>
-            <input type="range" min="0" max="1" step="0.01" bind:value={velocityDimming} />
-        </div>
-        <div class="checkbox-control">
-            <label>
-                <input type="checkbox" bind:checked={debugSubsegments} />
-                Debug Sub-segments
-            </label>
-        </div>
-    </div>
+    </details>
 </div>
 
 <style>
@@ -207,6 +202,42 @@
         display: block;
         background: #000;
         border-radius: 4px;
+    }
+
+    .controls-details {
+        border: none;
+        margin: 0;
+    }
+
+    .controls-details summary {
+        cursor: pointer;
+        padding: 15px;
+        background: #1a1a1a;
+        color: #4CAF50;
+        font-family: system-ui;
+        font-size: 13px;
+        font-weight: 600;
+        list-style: none;
+        user-select: none;
+        border-radius: 4px;
+    }
+
+    .controls-details summary::-webkit-details-marker {
+        display: none;
+    }
+
+    .controls-details summary::before {
+        content: '▶ ';
+        display: inline-block;
+        transition: transform 0.2s;
+    }
+
+    .controls-details[open] summary::before {
+        transform: rotate(90deg);
+    }
+
+    .controls-details summary:hover {
+        background: #252525;
     }
 
     .sliders {
@@ -257,29 +288,5 @@
         border-radius: 50%;
         cursor: pointer;
         border: none;
-    }
-
-    .checkbox-control {
-        display: flex;
-        align-items: center;
-        padding-top: 5px;
-    }
-
-    .checkbox-control label {
-        color: #4CAF50;
-        font-family: system-ui;
-        font-size: 12px;
-        font-weight: 600;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        cursor: pointer;
-    }
-
-    .checkbox-control input[type="checkbox"] {
-        width: 16px;
-        height: 16px;
-        cursor: pointer;
-        accent-color: #4CAF50;
     }
 </style>
