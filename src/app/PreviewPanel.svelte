@@ -29,11 +29,22 @@
     let focus = $state(0.2); // Focus control (-1.0 to 1.0, 0.0 = perfect focus, abs value = blur amount)
     let timeDiv = $state(1.0); // Time/Div: controls zoom level (1.0 = full buffer, 0.1 = 10% of buffer)
     let triggerLevel = $state(0.0); // Trigger level: voltage threshold for triggering (-1.0 to 1.0)
-    let amplDivA = $state(0.6); // Ampl/Div A: vertical amplitude scaling for channel A (0.1 to 2.5, exponential to ~15.6)
+    // Base amplification steps (like real oscilloscope)
+    const amplSteps = [0.002, 0.005, 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10];
+    const amplLabels = ['2mV', '5mV', '10mV', '20mV', '50mV', '0.1V', '0.2V', '0.5V', '1V', '2V', '5V', '10V'];
+
+    let amplBaseA = $state(8); // Index into amplSteps (default 1V)
+    let amplFineA = $state(1.0); // Fine adjustment multiplier (0.5 to 2.5)
     let positionA = $state(0.0); // Position A: vertical offset for channel A (-1.0 to 1.0)
-    let amplDivB = $state(0.6); // Ampl/Div B: vertical amplitude scaling for channel B (0.1 to 2.5, exponential to ~15.6)
+
+    let amplBaseB = $state(8); // Index into amplSteps (default 1V)
+    let amplFineB = $state(1.0); // Fine adjustment multiplier (0.5 to 2.5)
     let positionB = $state(0.0); // Position B: vertical offset for channel B (-1.0 to 1.0)
     let xPosition = $state(0.0); // X Position: horizontal offset (-1.0 to 1.0)
+
+    // Calculate combined amplification
+    let amplDivA = $derived(amplSteps[amplBaseA] * amplFineA);
+    let amplDivB = $derived(amplSteps[amplBaseB] * amplFineB);
 
     async function startMicrophoneInput() {
         try {
@@ -422,8 +433,17 @@
             </div>
             <div class="slider-control">
                 <label>AMPL/DIV</label>
-                <input type="range" min="0.1" max="2.5" step="0.1" bind:value={amplDivA} disabled={mode === 'b'} />
-                <span class="value">{amplDivA.toFixed(1)}</span>
+                <select bind:value={amplBaseA} disabled={mode === 'b'}>
+                    {#each amplLabels as label, i}
+                        <option value={i}>{label}</option>
+                    {/each}
+                </select>
+                <span class="value">{amplLabels[amplBaseA]}</span>
+            </div>
+            <div class="slider-control">
+                <label>FINE</label>
+                <input type="range" min="0.5" max="2.5" step="0.01" bind:value={amplFineA} disabled={mode === 'b'} />
+                <span class="value">{amplFineA.toFixed(2)}×</span>
             </div>
         </div>
 
@@ -437,8 +457,17 @@
             </div>
             <div class="slider-control">
                 <label>AMPL/DIV</label>
-                <input type="range" min="0.1" max="2.5" step="0.1" bind:value={amplDivB} disabled={mode === 'a'} />
-                <span class="value">{amplDivB.toFixed(1)}</span>
+                <select bind:value={amplBaseB} disabled={mode === 'a'}>
+                    {#each amplLabels as label, i}
+                        <option value={i}>{label}</option>
+                    {/each}
+                </select>
+                <span class="value">{amplLabels[amplBaseB]}</span>
+            </div>
+            <div class="slider-control">
+                <label>FINE</label>
+                <input type="range" min="0.5" max="2.5" step="0.01" bind:value={amplFineB} disabled={mode === 'a'} />
+                <span class="value">{amplFineB.toFixed(2)}×</span>
             </div>
         </div>
     </div>
@@ -738,5 +767,34 @@
     .slider-control input[type="range"]:disabled::-moz-range-thumb {
         background: #555;
         cursor: not-allowed;
+    }
+
+    .slider-control select {
+        width: 100%;
+        background: #2d2d2d;
+        color: #4CAF50;
+        border: 1px solid #333;
+        border-radius: 4px;
+        padding: 4px 8px;
+        font-family: system-ui;
+        font-size: 12px;
+        cursor: pointer;
+        outline: none;
+    }
+
+    .slider-control select:hover:not(:disabled) {
+        border-color: #4CAF50;
+    }
+
+    .slider-control select:disabled {
+        background: #1a1a1a;
+        color: #666;
+        border-color: #222;
+        cursor: not-allowed;
+    }
+
+    .slider-control select option {
+        background: #2d2d2d;
+        color: #4CAF50;
     }
 </style>

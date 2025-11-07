@@ -101,15 +101,6 @@ function processSignals(leftData, rightData, signalNoise) {
     return { processedLeft, processedRight };
 }
 
-// Apply exponential curve to AMPL/DIV for more natural control feel
-function applyExponentialAmplitude(amplDiv) {
-    // Use power of 3 for exponential response
-    // This gives even finer control at lower amplifications
-    // Most of the slider range is for small adjustments (0.1-2),
-    // with extreme values at the end (8-16)
-    return Math.pow(amplDiv, 3);
-}
-
 // ============================================================================
 // STAGE B: INTERPRETATION
 // Convert processed signals to target coordinates based on mode
@@ -117,9 +108,9 @@ function applyExponentialAmplitude(amplDiv) {
 function interpretSignals(processedLeft, processedRight, mode, scale, centerX, centerY, canvasWidth, timeDiv, triggerLevel, amplDivA, positionA, amplDivB, positionB, xPosition) {
     const targets = [];
 
-    // Apply exponential curve to amplitude controls
-    const expAmplDivA = applyExponentialAmplitude(amplDivA);
-    const expAmplDivB = applyExponentialAmplitude(amplDivB);
+    // Use amplitude directly (already calculated from base * fine in UI)
+    const expAmplDivA = amplDivA;
+    const expAmplDivB = amplDivB;
 
     if (mode === 'xy') {
         // X/Y mode: left channel = X (with A controls), right channel = Y (with B controls)
