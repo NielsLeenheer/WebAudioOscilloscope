@@ -39,12 +39,11 @@
         // Clear canvas
         ctx.clearRect(0, 0, width, height);
 
-        // Grid style
-        ctx.strokeStyle = 'rgba(0, 255, 100, 0.3)';
-        ctx.fillStyle = 'rgba(0, 255, 100, 0.5)';
+        // Grid style - black lines
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
         ctx.lineWidth = 1;
 
-        // Draw major divisions (10x10 grid)
+        // Draw 10x10 grid
         const divisions = 10;
         const divSize = width / divisions;
 
@@ -66,33 +65,37 @@
             ctx.stroke();
         }
 
-        // Draw minor divisions (dots at 5x5 subdivisions)
-        for (let i = 0; i <= divisions; i++) {
-            for (let j = 0; j <= divisions; j++) {
-                // Draw 4 dots between major divisions
-                for (let dx = 1; dx < 5; dx++) {
-                    for (let dy = 1; dy < 5; dy++) {
-                        if (i < divisions && j < divisions) {
-                            const x = i * divSize + (dx * divSize / 5);
-                            const y = j * divSize + (dy * divSize / 5);
-                            ctx.beginPath();
-                            ctx.arc(x, y, 1, 0, 2 * Math.PI);
-                            ctx.fill();
-                        }
-                    }
-                }
+        // Draw tick marks on center lines
+        // 5 ticks per division = 0.2 step each
+        const ticksPerDiv = 5;
+        const tickLength = 4;
+
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.7)';
+        ctx.lineWidth = 1;
+
+        // Horizontal center line ticks (Y = center)
+        for (let i = 0; i <= divisions * ticksPerDiv; i++) {
+            const x = (i / ticksPerDiv) * divSize;
+            // Skip if this is a major grid line
+            if (i % ticksPerDiv !== 0) {
+                ctx.beginPath();
+                ctx.moveTo(x, centerY - tickLength);
+                ctx.lineTo(x, centerY + tickLength);
+                ctx.stroke();
             }
         }
 
-        // Draw center crosshair (brighter)
-        ctx.strokeStyle = 'rgba(0, 255, 100, 0.6)';
-        ctx.lineWidth = 1.5;
-        ctx.beginPath();
-        ctx.moveTo(0, centerY);
-        ctx.lineTo(width, centerY);
-        ctx.moveTo(centerX, 0);
-        ctx.lineTo(centerX, height);
-        ctx.stroke();
+        // Vertical center line ticks (X = center)
+        for (let i = 0; i <= divisions * ticksPerDiv; i++) {
+            const y = (i / ticksPerDiv) * divSize;
+            // Skip if this is a major grid line
+            if (i % ticksPerDiv !== 0) {
+                ctx.beginPath();
+                ctx.moveTo(centerX - tickLength, y);
+                ctx.lineTo(centerX + tickLength, y);
+                ctx.stroke();
+            }
+        }
     }
 
     onMount(() => {
@@ -334,7 +337,7 @@
         display: flex;
         justify-content: center;
         align-items: center;
-        background: #000;
+        background: #1a1f1a;
         border-radius: 4px;
         width: 400px;
         height: 400px;
@@ -345,7 +348,7 @@
         top: 0;
         left: 0;
         display: block;
-        background: #000;
+        background: #1a1f1a;
         border-radius: 4px;
     }
 

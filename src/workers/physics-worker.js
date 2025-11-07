@@ -270,7 +270,8 @@ self.onmessage = function(e) {
         if (!ctx) return;
 
         // Clear canvas with adjustable fade effect for persistence
-        ctx.fillStyle = `rgba(0, 0, 0, ${1 - persistence})`;
+        // Background: dark gray with greenish tint (#1a1f1a = rgb(26, 31, 26))
+        ctx.fillStyle = `rgba(26, 31, 26, ${1 - persistence})`;
         ctx.fillRect(0, 0, canvasWidth, canvasHeight);
 
         // ========================================================================
