@@ -12,6 +12,7 @@
     let activeTab = $state('shapes');
     let inputSource = $state('generated'); // 'generated' or 'microphone'
     let isPowered = $state(false);
+    let mode = $state('a'); // Display mode: 'a', 'b', 'ab', or 'xy'
 
     function start() {
         audioEngine.start();
@@ -37,9 +38,9 @@
     <!-- Right Side: Oscilloscope -->
     <div class="right-side">
         <OscilloscopeHeader bind:isPowered />
-        <InputSelector bind:inputSource />
+        <InputSelector bind:inputSource bind:mode />
         <div class="content-area">
-            <PreviewPanel {audioEngine} {isPlaying} {inputSource} {isPowered} />
+            <PreviewPanel {audioEngine} {isPlaying} {inputSource} {isPowered} bind:mode />
         </div>
     </div>
 </div>

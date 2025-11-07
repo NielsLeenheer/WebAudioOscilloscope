@@ -1,7 +1,7 @@
 <script>
     import { onMount, onDestroy } from 'svelte';
 
-    let { audioEngine, isPlaying, inputSource, isPowered } = $props();
+    let { audioEngine, isPlaying, inputSource, isPowered, mode = $bindable() } = $props();
 
     let canvas;
     let gridCanvas;
@@ -24,7 +24,6 @@
     let beamPower = $state(0.75); // Beam power (affects opacity: high power = bright, low power = dim)
     let velocityDimming = $state(0.90); // How much fast movements dim (0=no dimming, 1=maximum dimming)
     let focus = $state(0.2); // Focus control (-1.0 to 1.0, 0.0 = perfect focus, abs value = blur amount)
-    let mode = $state('a'); // Display mode: 'a', 'b', 'ab', or 'xy'
     let timeDiv = $state(1.0); // Time/Div: controls zoom level (1.0 = full buffer, 0.1 = 10% of buffer)
     let triggerLevel = $state(0.0); // Trigger level: voltage threshold for triggering (-1.0 to 1.0)
     let amplDivA = $state(0.6); // Ampl/Div A: vertical amplitude scaling for channel A (0.1 to 2.0)
@@ -344,12 +343,6 @@
 </script>
 
 <div class="preview-panel">
-    <div class="mode-selector">
-        <button class:active={mode === 'a'} onclick={() => mode = 'a'}>A</button>
-        <button class:active={mode === 'b'} onclick={() => mode = 'b'}>B</button>
-        <button class:active={mode === 'ab'} onclick={() => mode = 'ab'}>A/B</button>
-        <button class:active={mode === 'xy'} onclick={() => mode = 'xy'}>X/Y</button>
-    </div>
     <div class="canvas-container">
         <canvas
             bind:this={canvas}
@@ -365,127 +358,75 @@
             class="grid-canvas"
         ></canvas>
     </div>
-    <div class="visible-controls">
-        <div class="slider-control">
-            <label>INTENS</label>
-            <input type="range" min="0" max="1" step="0.01" bind:value={beamPower} />
-            <span class="value">{beamPower.toFixed(2)}</span>
+    <div class="controls-grid">
+        <!-- Top Left: Display Controls -->
+        <div class="control-panel">
+            <div class="slider-control">
+                <label>INTENS</label>
+                <input type="range" min="0" max="1" step="0.01" bind:value={beamPower} />
+                <span class="value">{beamPower.toFixed(2)}</span>
+            </div>
+            <div class="slider-control">
+                <label>FOCUS</label>
+                <input type="range" min="-1" max="1" step="0.01" bind:value={focus} />
+                <span class="value">{focus.toFixed(2)}</span>
+            </div>
         </div>
-        <div class="slider-control">
-            <label>FOCUS</label>
-            <input type="range" min="-1" max="1" step="0.01" bind:value={focus} />
-            <span class="value">{focus.toFixed(2)}</span>
+
+        <!-- Top Right: Position/Time Controls -->
+        <div class="control-panel">
+            <div class="slider-control">
+                <label>X POS</label>
+                <input type="range" min="-1" max="1" step="0.01" bind:value={xPosition} />
+                <span class="value">{xPosition.toFixed(2)}</span>
+            </div>
+            {#if mode !== 'xy'}
+                <div class="slider-control">
+                    <label>TIME/DIV</label>
+                    <input type="range" min="0.1" max="1" step="0.05" bind:value={timeDiv} />
+                    <span class="value">{timeDiv.toFixed(2)}</span>
+                </div>
+                <div class="slider-control">
+                    <label>TRIGGER</label>
+                    <input type="range" min="-1" max="1" step="0.01" bind:value={triggerLevel} />
+                    <span class="value">{triggerLevel.toFixed(2)}</span>
+                </div>
+            {/if}
         </div>
-        {#if mode === 'xy'}
-            <div class="slider-control">
-                <label>AMPL/DIV A</label>
-                <input type="range" min="0.1" max="16" step="0.1" bind:value={amplDivA} />
-                <span class="value">{amplDivA.toFixed(1)}</span>
-            </div>
-            <div class="slider-control">
-                <label>X POS</label>
-                <input type="range" min="-1" max="1" step="0.01" bind:value={xPosition} />
-                <span class="value">{xPosition.toFixed(2)}</span>
-            </div>
-            <div class="slider-control">
-                <label>AMPL/DIV B</label>
-                <input type="range" min="0.1" max="16" step="0.1" bind:value={amplDivB} />
-                <span class="value">{amplDivB.toFixed(1)}</span>
-            </div>
-            <div class="slider-control">
-                <label>POSITION B</label>
-                <input type="range" min="-1" max="1" step="0.01" bind:value={positionB} />
-                <span class="value">{positionB.toFixed(2)}</span>
-            </div>
-        {:else if mode === 'a'}
-            <div class="slider-control">
-                <label>POSITION A</label>
-                <input type="range" min="-1" max="1" step="0.01" bind:value={positionA} />
-                <span class="value">{positionA.toFixed(2)}</span>
-            </div>
-            <div class="slider-control">
-                <label>AMPL/DIV A</label>
-                <input type="range" min="0.1" max="16" step="0.1" bind:value={amplDivA} />
-                <span class="value">{amplDivA.toFixed(1)}</span>
-            </div>
-            <div class="slider-control">
-                <label>X POS</label>
-                <input type="range" min="-1" max="1" step="0.01" bind:value={xPosition} />
-                <span class="value">{xPosition.toFixed(2)}</span>
-            </div>
-            <div class="slider-control">
-                <label>TIME/DIV</label>
-                <input type="range" min="0.1" max="1" step="0.05" bind:value={timeDiv} />
-                <span class="value">{timeDiv.toFixed(2)}</span>
-            </div>
-            <div class="slider-control">
-                <label>TRIGGER</label>
-                <input type="range" min="-1" max="1" step="0.01" bind:value={triggerLevel} />
-                <span class="value">{triggerLevel.toFixed(2)}</span>
-            </div>
-        {:else if mode === 'b'}
-            <div class="slider-control">
-                <label>POSITION B</label>
-                <input type="range" min="-1" max="1" step="0.01" bind:value={positionB} />
-                <span class="value">{positionB.toFixed(2)}</span>
-            </div>
-            <div class="slider-control">
-                <label>AMPL/DIV B</label>
-                <input type="range" min="0.1" max="16" step="0.1" bind:value={amplDivB} />
-                <span class="value">{amplDivB.toFixed(1)}</span>
-            </div>
-            <div class="slider-control">
-                <label>X POS</label>
-                <input type="range" min="-1" max="1" step="0.01" bind:value={xPosition} />
-                <span class="value">{xPosition.toFixed(2)}</span>
-            </div>
-            <div class="slider-control">
-                <label>TIME/DIV</label>
-                <input type="range" min="0.1" max="1" step="0.05" bind:value={timeDiv} />
-                <span class="value">{timeDiv.toFixed(2)}</span>
-            </div>
-            <div class="slider-control">
-                <label>TRIGGER</label>
-                <input type="range" min="-1" max="1" step="0.01" bind:value={triggerLevel} />
-                <span class="value">{triggerLevel.toFixed(2)}</span>
-            </div>
-        {:else if mode === 'ab'}
-            <div class="slider-control">
-                <label>POSITION A</label>
-                <input type="range" min="-1" max="1" step="0.01" bind:value={positionA} />
-                <span class="value">{positionA.toFixed(2)}</span>
-            </div>
-            <div class="slider-control">
-                <label>AMPL/DIV A</label>
-                <input type="range" min="0.1" max="16" step="0.1" bind:value={amplDivA} />
-                <span class="value">{amplDivA.toFixed(1)}</span>
-            </div>
-            <div class="slider-control">
-                <label>POSITION B</label>
-                <input type="range" min="-1" max="1" step="0.01" bind:value={positionB} />
-                <span class="value">{positionB.toFixed(2)}</span>
-            </div>
-            <div class="slider-control">
-                <label>AMPL/DIV B</label>
-                <input type="range" min="0.1" max="16" step="0.1" bind:value={amplDivB} />
-                <span class="value">{amplDivB.toFixed(1)}</span>
-            </div>
-            <div class="slider-control">
-                <label>X POS</label>
-                <input type="range" min="-1" max="1" step="0.01" bind:value={xPosition} />
-                <span class="value">{xPosition.toFixed(2)}</span>
-            </div>
-            <div class="slider-control">
-                <label>TIME/DIV</label>
-                <input type="range" min="0.1" max="1" step="0.05" bind:value={timeDiv} />
-                <span class="value">{timeDiv.toFixed(2)}</span>
-            </div>
-            <div class="slider-control">
-                <label>TRIGGER</label>
-                <input type="range" min="-1" max="1" step="0.01" bind:value={triggerLevel} />
-                <span class="value">{triggerLevel.toFixed(2)}</span>
-            </div>
-        {/if}
+
+        <!-- Bottom Left: Channel A Controls -->
+        <div class="control-panel">
+            {#if mode === 'a' || mode === 'ab' || mode === 'xy'}
+                <div class="panel-label">CHANNEL A</div>
+                <div class="slider-control">
+                    <label>POSITION</label>
+                    <input type="range" min="-1" max="1" step="0.01" bind:value={positionA} />
+                    <span class="value">{positionA.toFixed(2)}</span>
+                </div>
+                <div class="slider-control">
+                    <label>AMPL/DIV</label>
+                    <input type="range" min="0.1" max="16" step="0.1" bind:value={amplDivA} />
+                    <span class="value">{amplDivA.toFixed(1)}</span>
+                </div>
+            {/if}
+        </div>
+
+        <!-- Bottom Right: Channel B Controls -->
+        <div class="control-panel">
+            {#if mode === 'b' || mode === 'ab' || mode === 'xy'}
+                <div class="panel-label">CHANNEL B</div>
+                <div class="slider-control">
+                    <label>POSITION</label>
+                    <input type="range" min="-1" max="1" step="0.01" bind:value={positionB} />
+                    <span class="value">{positionB.toFixed(2)}</span>
+                </div>
+                <div class="slider-control">
+                    <label>AMPL/DIV</label>
+                    <input type="range" min="0.1" max="16" step="0.1" bind:value={amplDivB} />
+                    <span class="value">{amplDivB.toFixed(1)}</span>
+                </div>
+            {/if}
+        </div>
     </div>
     <details class="controls-details">
         <summary>Physics Controls</summary>
@@ -568,48 +509,35 @@
         border-radius: 4px;
     }
 
-    .mode-selector {
-        display: flex;
-        gap: 5px;
-        padding: 10px 15px;
-        background: #1a1a1a;
-        border-radius: 4px;
-        margin-bottom: 10px;
+    .controls-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+        padding: 20px;
+        width: 100%;
+        max-width: 800px;
+        box-sizing: border-box;
     }
 
-    .mode-selector button {
-        flex: 1;
-        padding: 8px 16px;
-        background: #2d2d2d;
-        color: #888;
-        border: 1px solid #444;
-        border-radius: 4px;
-        font-family: system-ui;
-        font-size: 12px;
-        font-weight: 600;
-        cursor: pointer;
-        transition: all 0.2s;
-    }
-
-    .mode-selector button:hover {
-        background: #333;
-        color: #aaa;
-    }
-
-    .mode-selector button.active {
-        background: #4CAF50;
-        color: #000;
-        border-color: #4CAF50;
-    }
-
-    .visible-controls {
+    .control-panel {
         display: flex;
         flex-direction: column;
         gap: 10px;
         padding: 15px;
         background: #1a1a1a;
         border-radius: 4px;
-        margin-bottom: 10px;
+        min-height: 80px;
+    }
+
+    .panel-label {
+        color: #4CAF50;
+        font-family: system-ui;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.5px;
+        margin-bottom: 5px;
+        padding-bottom: 8px;
+        border-bottom: 1px solid #333;
     }
 
     .controls-details {
