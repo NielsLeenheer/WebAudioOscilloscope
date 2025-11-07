@@ -1,9 +1,22 @@
 <script>
+    import { onMount } from 'svelte';
+    import {
+        generateCircle,
+        generateSquare,
+        generateTriangle,
+        generateStar,
+        generateHeart,
+        generateSpiral,
+        generateLissajous
+    } from '../utils/shapes.js';
+
     let { audioEngine, isPlaying } = $props();
 
     let frequency = $state(440);
     let leftWave = $state('sine');
     let rightWave = $state('sine');
+    let lissX = $state(3);
+    let lissY = $state(2);
 
     function generateWave(type, freq, phase = 0) {
         const sampleRate = 44100;
@@ -54,6 +67,19 @@
         audioEngine.createWaveform(stereoPoints);
     }
 
+    function drawShape(shapeGenerator) {
+        if (!isPlaying) return;
+        const points = shapeGenerator();
+        audioEngine.createWaveform(points);
+    }
+
+    // Generate default sine wave when component mounts and audio starts playing
+    onMount(() => {
+        if (isPlaying) {
+            updateWaves();
+        }
+    });
+
     // Update waves when parameters change and audio is playing
     $effect(() => {
         if (isPlaying) {
@@ -91,6 +117,37 @@
     </div>
 </div>
 
+<div class="control-group">
+    <label>X/Y Shapes:</label>
+    <div class="shapes-grid">
+        <button onclick={() => drawShape(generateCircle)}>Circle</button>
+        <button onclick={() => drawShape(generateSquare)}>Square</button>
+        <button onclick={() => drawShape(generateTriangle)}>Triangle</button>
+        <button onclick={() => drawShape(generateStar)}>Star</button>
+        <button onclick={() => drawShape(generateHeart)}>Heart</button>
+        <button onclick={() => drawShape(generateSpiral)}>Spiral</button>
+        <button onclick={() => drawShape(() => generateLissajous(3, 2))}>Lissajous 3:2</button>
+        <button onclick={() => drawShape(() => generateLissajous(5, 4))}>Lissajous 5:4</button>
+    </div>
+</div>
+
+<div class="control-group">
+    <label>Custom Lissajous:</label>
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+        <div>
+            <label for="lissX">X Frequency Ratio:</label>
+            <input type="number" id="lissX" bind:value={lissX} min="1" max="10" step="1">
+        </div>
+        <div>
+            <label for="lissY">Y Frequency Ratio:</label>
+            <input type="number" id="lissY" bind:value={lissY} min="1" max="10" step="1">
+        </div>
+    </div>
+    <button onclick={() => drawShape(() => generateLissajous(lissX, lissY))} style="margin-top: 10px;">
+        Draw Custom
+    </button>
+</div>
+
 <style>
     .wave-grid {
         display: grid;
@@ -119,5 +176,27 @@
         border-color: #1976d2;
         color: #1976d2;
         font-weight: 600;
+    }
+
+    .shapes-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 8px;
+    }
+
+    .shapes-grid button {
+        padding: 10px;
+        background: #f5f5f5;
+        border: 2px solid #ddd;
+        border-radius: 4px;
+        cursor: pointer;
+        font-family: system-ui;
+        font-size: 11pt;
+        transition: all 0.2s;
+    }
+
+    .shapes-grid button:hover {
+        background: #e8e8e8;
+        border-color: #999;
     }
 </style>
