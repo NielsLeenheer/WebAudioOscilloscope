@@ -103,9 +103,11 @@ function processSignals(leftData, rightData, signalNoise) {
 
 // Apply exponential curve to AMPL/DIV for more natural control feel
 function applyExponentialAmplitude(amplDiv) {
-    // Use power of 2 for exponential response
-    // This gives finer control at lower amplifications
-    return Math.pow(amplDiv, 2);
+    // Use power of 3 for exponential response
+    // This gives even finer control at lower amplifications
+    // Most of the slider range is for small adjustments (0.1-2),
+    // with extreme values at the end (8-16)
+    return Math.pow(amplDiv, 3);
 }
 
 // ============================================================================
