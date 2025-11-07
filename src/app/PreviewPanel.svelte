@@ -29,9 +29,9 @@
     let focus = $state(0.2); // Focus control (-1.0 to 1.0, 0.0 = perfect focus, abs value = blur amount)
     let timeDiv = $state(1.0); // Time/Div: controls zoom level (1.0 = full buffer, 0.1 = 10% of buffer)
     let triggerLevel = $state(0.0); // Trigger level: voltage threshold for triggering (-1.0 to 1.0)
-    let amplDivA = $state(0.6); // Ampl/Div A: vertical amplitude scaling for channel A (0.1 to 2.0)
+    let amplDivA = $state(0.6); // Ampl/Div A: vertical amplitude scaling for channel A (0.1 to 2.5, exponential to ~15.6)
     let positionA = $state(0.0); // Position A: vertical offset for channel A (-1.0 to 1.0)
-    let amplDivB = $state(0.6); // Ampl/Div B: vertical amplitude scaling for channel B (0.1 to 2.0)
+    let amplDivB = $state(0.6); // Ampl/Div B: vertical amplitude scaling for channel B (0.1 to 2.5, exponential to ~15.6)
     let positionB = $state(0.0); // Position B: vertical offset for channel B (-1.0 to 1.0)
     let xPosition = $state(0.0); // X Position: horizontal offset (-1.0 to 1.0)
 
@@ -422,7 +422,7 @@
             </div>
             <div class="slider-control">
                 <label>AMPL/DIV</label>
-                <input type="range" min="0.1" max="16" step="0.1" bind:value={amplDivA} disabled={mode === 'b'} />
+                <input type="range" min="0.1" max="2.5" step="0.1" bind:value={amplDivA} disabled={mode === 'b'} />
                 <span class="value">{amplDivA.toFixed(1)}</span>
             </div>
         </div>
@@ -437,7 +437,7 @@
             </div>
             <div class="slider-control">
                 <label>AMPL/DIV</label>
-                <input type="range" min="0.1" max="16" step="0.1" bind:value={amplDivB} disabled={mode === 'a'} />
+                <input type="range" min="0.1" max="2.5" step="0.1" bind:value={amplDivB} disabled={mode === 'a'} />
                 <span class="value">{amplDivB.toFixed(1)}</span>
             </div>
         </div>
