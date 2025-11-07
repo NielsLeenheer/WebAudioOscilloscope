@@ -5,6 +5,7 @@
 
     let canvas;
     let gridCanvas;
+    let physicsDialog;
     let animationId = null;
     let leftData = null;
     let rightData = null;
@@ -223,6 +224,18 @@
         }
     }
 
+    function openPhysicsDialog() {
+        if (physicsDialog) {
+            physicsDialog.show();
+        }
+    }
+
+    function closePhysicsDialog() {
+        if (physicsDialog) {
+            physicsDialog.close();
+        }
+    }
+
     function draw() {
         if (!isPowered) {
             stopVisualization();
@@ -343,6 +356,7 @@
 </script>
 
 <div class="preview-panel">
+    <button class="physics-button" onclick={openPhysicsDialog}>⚙</button>
     <div class="canvas-container">
         <canvas
             bind:this={canvas}
@@ -422,42 +436,46 @@
             </div>
         </div>
     </div>
-    <details class="controls-details">
-        <summary>Physics Controls</summary>
-        <div class="sliders">
-            <div class="slider-control">
-                <label>Force</label>
-                <input type="range" min="0.01" max="0.5" step="0.01" bind:value={forceMultiplier} />
-                <span class="value">{forceMultiplier.toFixed(2)}</span>
-            </div>
-            <div class="slider-control">
-                <label>Damping</label>
-                <input type="range" min="0.1" max="0.99" step="0.01" bind:value={damping} />
-                <span class="value">{damping.toFixed(2)}</span>
-            </div>
-            <div class="slider-control">
-                <label>Mass</label>
-                <input type="range" min="0.01" max="5.0" step="0.01" bind:value={mass} />
-                <span class="value">{mass.toFixed(2)}</span>
-            </div>
-            <div class="slider-control">
-                <label>Persistence</label>
-                <input type="range" min="0.0" max="0.95" step="0.005" bind:value={persistence} />
-                <span class="value">{persistence.toFixed(3)}</span>
-            </div>
-            <div class="slider-control">
-                <label>Noise</label>
-                <input type="range" min="0" max="0.2" step="0.001" bind:value={signalNoise} />
-                <span class="value">{signalNoise.toFixed(3)}</span>
-            </div>
-            <div class="slider-control">
-                <label>Dimming</label>
-                <input type="range" min="0" max="1" step="0.01" bind:value={velocityDimming} />
-                <span class="value">{velocityDimming.toFixed(2)}</span>
-            </div>
-        </div>
-    </details>
 </div>
+
+<dialog bind:this={physicsDialog} class="physics-dialog">
+    <div class="dialog-header">
+        <h3>Physics Controls</h3>
+        <button class="close-button" onclick={closePhysicsDialog}>✕</button>
+    </div>
+    <div class="sliders">
+        <div class="slider-control">
+            <label>Force</label>
+            <input type="range" min="0.01" max="0.5" step="0.01" bind:value={forceMultiplier} />
+            <span class="value">{forceMultiplier.toFixed(2)}</span>
+        </div>
+        <div class="slider-control">
+            <label>Damping</label>
+            <input type="range" min="0.1" max="0.99" step="0.01" bind:value={damping} />
+            <span class="value">{damping.toFixed(2)}</span>
+        </div>
+        <div class="slider-control">
+            <label>Mass</label>
+            <input type="range" min="0.01" max="5.0" step="0.01" bind:value={mass} />
+            <span class="value">{mass.toFixed(2)}</span>
+        </div>
+        <div class="slider-control">
+            <label>Persistence</label>
+            <input type="range" min="0.0" max="0.95" step="0.005" bind:value={persistence} />
+            <span class="value">{persistence.toFixed(3)}</span>
+        </div>
+        <div class="slider-control">
+            <label>Noise</label>
+            <input type="range" min="0" max="0.2" step="0.001" bind:value={signalNoise} />
+            <span class="value">{signalNoise.toFixed(3)}</span>
+        </div>
+        <div class="slider-control">
+            <label>Dimming</label>
+            <input type="range" min="0" max="1" step="0.01" bind:value={velocityDimming} />
+            <span class="value">{velocityDimming.toFixed(2)}</span>
+        </div>
+    </div>
+</dialog>
 
 <style>
     .preview-panel {
@@ -468,6 +486,31 @@
         height: 100%;
         padding: 20px;
         box-sizing: border-box;
+        position: relative;
+    }
+
+    .physics-button {
+        position: absolute;
+        top: 20px;
+        right: 20px;
+        width: 40px;
+        height: 40px;
+        background: #1a1a1a;
+        border: 1px solid #333;
+        border-radius: 4px;
+        color: #4CAF50;
+        font-size: 20px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s;
+        z-index: 10;
+    }
+
+    .physics-button:hover {
+        background: #252525;
+        border-color: #4CAF50;
     }
 
     .canvas-container {
@@ -543,40 +586,56 @@
         color: #666;
     }
 
-    .controls-details {
-        border: none;
+    .physics-dialog {
+        position: absolute;
+        top: 70px;
+        right: 20px;
         margin: 0;
+        padding: 0;
+        background: #1a1a1a;
+        border: 1px solid #333;
+        border-radius: 4px;
+        color: #4CAF50;
+        min-width: 300px;
     }
 
-    .controls-details summary {
-        cursor: pointer;
+    .physics-dialog::backdrop {
+        background: transparent;
+    }
+
+    .dialog-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
         padding: 15px;
-        background: #1a1a1a;
-        color: #4CAF50;
+        border-bottom: 1px solid #333;
+    }
+
+    .dialog-header h3 {
+        margin: 0;
         font-family: system-ui;
         font-size: 13px;
         font-weight: 600;
-        list-style: none;
-        user-select: none;
-        border-radius: 4px;
+        color: #4CAF50;
     }
 
-    .controls-details summary::-webkit-details-marker {
-        display: none;
+    .close-button {
+        background: transparent;
+        border: none;
+        color: #888;
+        font-size: 20px;
+        cursor: pointer;
+        padding: 0;
+        width: 24px;
+        height: 24px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: color 0.2s;
     }
 
-    .controls-details summary::before {
-        content: '▶ ';
-        display: inline-block;
-        transition: transform 0.2s;
-    }
-
-    .controls-details[open] summary::before {
-        transform: rotate(90deg);
-    }
-
-    .controls-details summary:hover {
-        background: #252525;
+    .close-button:hover {
+        color: #4CAF50;
     }
 
     .sliders {
@@ -584,8 +643,6 @@
         flex-direction: column;
         gap: 10px;
         padding: 15px;
-        background: #1a1a1a;
-        border-radius: 4px;
     }
 
     .slider-control {
