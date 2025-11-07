@@ -46,7 +46,7 @@
                     value = 0;
             }
 
-            points.push({ x: value, y: value });
+            points.push(value);
         }
 
         return points;
@@ -58,11 +58,8 @@
         const leftPoints = generateWave(leftWave, frequency, 0);
         const rightPoints = generateWave(rightWave, frequency, 0);
 
-        // Combine left and right into stereo points
-        const stereoPoints = leftPoints.map((_, i) => ({
-            x: leftPoints[i].x,
-            y: rightPoints[i].y
-        }));
+        // Combine left and right into stereo points as [x, y] arrays
+        const stereoPoints = leftPoints.map((leftVal, i) => [leftVal, rightPoints[i]]);
 
         audioEngine.createWaveform(stereoPoints);
     }
