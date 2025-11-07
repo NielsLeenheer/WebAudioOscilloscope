@@ -60,6 +60,21 @@ function calculateVelocityOpacity(speed, velocityDimming, basePower) {
     return basePower * velocityOpacity;
 }
 
+// Get color based on channel (for A/B dual-trace mode)
+function getChannelColor(point, opacity) {
+    if (!point.channel) {
+        // Default green phosphor for single-channel modes
+        return `rgba(76, 175, 80, ${opacity})`;
+    }
+    if (point.channel === 'a') {
+        // Green for channel A
+        return `rgba(76, 175, 80, ${opacity})`;
+    } else {
+        // Yellow-green for channel B (for differentiation)
+        return `rgba(205, 220, 57, ${opacity})`;
+    }
+}
+
 // Find trigger point: looks for rising edge where signal crosses trigger level
 function findTriggerPoint(data, triggerLevel) {
     // Start search from 10% into the buffer to avoid edge effects
@@ -123,6 +138,38 @@ function interpretSignals(processedLeft, processedRight, mode, scale, centerX, c
             const targetY = -processedRight[i] * scale * amplDivB + posOffsetB;
 
             targets.push({ x: targetX, y: targetY });
+        }
+    } else if (mode === 'ab') {
+        // A/B dual-trace mode: Show both channels overlaid
+        // We'll mark which channel each target belongs to
+
+        // Find trigger point (use channel A for triggering)
+        const triggerIndex = findTriggerPoint(processedLeft, triggerLevel);
+
+        // Calculate how many samples to display based on TIME/DIV
+        const samplesToDisplay = Math.floor(processedLeft.length * timeDiv);
+
+        // Determine start and end indices
+        const startIndex = triggerIndex;
+        const endIndex = Math.min(startIndex + samplesToDisplay, processedLeft.length);
+
+        // X position offset
+        const xOffset = xPosition * canvasWidth;
+
+        // Create target coordinates for both channels
+        for (let i = startIndex; i < endIndex; i++) {
+            const relativeIndex = i - startIndex;
+            const targetX = (relativeIndex / samplesToDisplay) * canvasWidth - centerX + xOffset;
+
+            // Channel A target
+            const yOffsetA = positionA * scale * 2;
+            const targetYA = -processedLeft[i] * scale * amplDivA + yOffsetA;
+            targets.push({ x: targetX, y: targetYA, channel: 'a' });
+
+            // Channel B target
+            const yOffsetB = positionB * scale * 2;
+            const targetYB = -processedRight[i] * scale * amplDivB + yOffsetB;
+            targets.push({ x: targetX, y: targetYB, channel: 'b' });
         }
     } else {
         // A or B mode: Time-based waveform with triggering
@@ -221,7 +268,12 @@ function simulatePhysics(targets, forceMultiplier, damping, mass, scale, centerX
         const screenX = centerX + smoothedBeamX;
         const screenY = centerY + smoothedBeamY;
 
-        points.push({ x: screenX, y: screenY });
+        // Preserve channel information if present (for A/B mode)
+        const point = { x: screenX, y: screenY };
+        if (target.channel) {
+            point.channel = target.channel;
+        }
+        points.push(point);
 
         // Calculate speed for this point
         if (points.length > 1) {
@@ -322,7 +374,7 @@ self.onmessage = function(e) {
             ctx.beginPath();
             ctx.moveTo(points[0].x, points[0].y);
             ctx.lineTo(firstMidX, firstMidY);
-            ctx.strokeStyle = `rgba(76, 175, 80, ${firstOpacity})`;
+            ctx.strokeStyle = getChannelColor(points[0], firstOpacity);
             ctx.stroke();
 
             // Middle segments: curve from midpoint to midpoint through the actual point
@@ -362,7 +414,7 @@ self.onmessage = function(e) {
                     ctx.beginPath();
                     ctx.moveTo(pt1.x, pt1.y);
                     ctx.lineTo(pt2.x, pt2.y);
-                    ctx.strokeStyle = `rgba(76, 175, 80, ${interpolatedOpacity})`;
+                    ctx.strokeStyle = getChannelColor(points[i], interpolatedOpacity);
                     ctx.stroke();
                 }
             }
@@ -376,7 +428,7 @@ self.onmessage = function(e) {
             ctx.beginPath();
             ctx.moveTo(lastMidX, lastMidY);
             ctx.lineTo(points[lastIdx].x, points[lastIdx].y);
-            ctx.strokeStyle = `rgba(76, 175, 80, ${lastOpacity})`;
+            ctx.strokeStyle = getChannelColor(points[lastIdx], lastOpacity);
             ctx.stroke();
         }
 

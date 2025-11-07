@@ -10,6 +10,11 @@
     let rightData = null;
     let worker = null;
     let workerBusy = false;
+    let inputSource = $state('generated'); // 'generated' or 'microphone'
+    let micStream = null;
+    let micAudioContext = null;
+    let micAnalyserLeft = null;
+    let micAnalyserRight = null;
 
     // Physics parameters (adjustable)
     let forceMultiplier = $state(0.22);
@@ -20,7 +25,7 @@
     let beamPower = $state(0.50); // Beam power (affects opacity: high power = bright, low power = dim)
     let velocityDimming = $state(0.90); // How much fast movements dim (0=no dimming, 1=maximum dimming)
     let focus = $state(1.0); // Focus control (1.0 = perfect focus, 0.0 = maximum blur)
-    let mode = $state('xy'); // Display mode: 'xy', 'a', or 'b'
+    let mode = $state('xy'); // Display mode: 'xy', 'a', 'b', or 'ab'
     let timeDiv = $state(1.0); // Time/Div: controls zoom level (1.0 = full buffer, 0.1 = 10% of buffer)
     let triggerLevel = $state(0.0); // Trigger level: voltage threshold for triggering (-1.0 to 1.0)
     let amplDivA = $state(1.0); // Ampl/Div A: vertical amplitude scaling for channel A (0.1 to 2.0)
@@ -28,6 +33,54 @@
     let amplDivB = $state(1.0); // Ampl/Div B: vertical amplitude scaling for channel B (0.1 to 2.0)
     let positionB = $state(0.0); // Position B: vertical offset for channel B (-1.0 to 1.0)
     let xPosition = $state(0.0); // X Position: horizontal offset (-1.0 to 1.0)
+
+    async function startMicrophoneInput() {
+        try {
+            micStream = await navigator.mediaDevices.getUserMedia({
+                audio: {
+                    echoCancellation: false,
+                    noiseSuppression: false,
+                    autoGainControl: false
+                }
+            });
+
+            micAudioContext = new AudioContext();
+            const source = micAudioContext.createMediaStreamSource(micStream);
+
+            // Create a stereo splitter
+            const splitter = micAudioContext.createChannelSplitter(2);
+            source.connect(splitter);
+
+            // Create analysers for left and right channels
+            micAnalyserLeft = micAudioContext.createAnalyser();
+            micAnalyserLeft.fftSize = 2048;
+            splitter.connect(micAnalyserLeft, 0);
+
+            micAnalyserRight = micAudioContext.createAnalyser();
+            micAnalyserRight.fftSize = 2048;
+            splitter.connect(micAnalyserRight, 1);
+
+            console.log('Microphone input started');
+        } catch (error) {
+            console.error('Error accessing microphone:', error);
+            alert('Could not access microphone. Please check permissions.');
+            inputSource = 'generated';
+        }
+    }
+
+    function stopMicrophoneInput() {
+        if (micStream) {
+            micStream.getTracks().forEach(track => track.stop());
+            micStream = null;
+        }
+        if (micAudioContext) {
+            micAudioContext.close();
+            micAudioContext = null;
+        }
+        micAnalyserLeft = null;
+        micAnalyserRight = null;
+        console.log('Microphone input stopped');
+    }
 
     function drawGrid() {
         if (!gridCanvas) return;
@@ -128,6 +181,7 @@
 
     onDestroy(() => {
         stopVisualization();
+        stopMicrophoneInput();
         if (worker) {
             worker.terminate();
             worker = null;
@@ -168,14 +222,27 @@
             return;
         }
 
-        const analysers = audioEngine.getAnalysers();
-        if (!analysers.left || !analysers.right) {
-            return;
+        // Get analysers based on input source
+        let analyserLeft, analyserRight;
+
+        if (inputSource === 'microphone') {
+            if (!micAnalyserLeft || !micAnalyserRight) {
+                return;
+            }
+            analyserLeft = micAnalyserLeft;
+            analyserRight = micAnalyserRight;
+        } else {
+            const analysers = audioEngine.getAnalysers();
+            if (!analysers.left || !analysers.right) {
+                return;
+            }
+            analyserLeft = analysers.left;
+            analyserRight = analysers.right;
         }
 
         // Get time domain data from both channels
-        analysers.left.getFloatTimeDomainData(leftData);
-        analysers.right.getFloatTimeDomainData(rightData);
+        analyserLeft.getFloatTimeDomainData(leftData);
+        analyserRight.getFloatTimeDomainData(rightData);
 
         // Send data to worker for physics calculation AND rendering
         const centerX = 400 / 2;
@@ -229,6 +296,15 @@
             }
         }
     });
+
+    // React to input source changes
+    $effect(() => {
+        if (inputSource === 'microphone') {
+            startMicrophoneInput();
+        } else {
+            stopMicrophoneInput();
+        }
+    });
 </script>
 
 <div class="preview-panel">
@@ -247,10 +323,15 @@
             class="grid-canvas"
         ></canvas>
     </div>
+    <div class="input-selector">
+        <button class:active={inputSource === 'generated'} onclick={() => inputSource = 'generated'}>GENERATED</button>
+        <button class:active={inputSource === 'microphone'} onclick={() => inputSource = 'microphone'}>MICROPHONE</button>
+    </div>
     <div class="mode-selector">
         <button class:active={mode === 'xy'} onclick={() => mode = 'xy'}>X/Y</button>
         <button class:active={mode === 'a'} onclick={() => mode = 'a'}>A</button>
         <button class:active={mode === 'b'} onclick={() => mode = 'b'}>B</button>
+        <button class:active={mode === 'ab'} onclick={() => mode = 'ab'}>A/B</button>
     </div>
     <div class="visible-controls">
         <div class="slider-control">
@@ -311,6 +392,42 @@
                 <span class="value">{triggerLevel.toFixed(2)}</span>
             </div>
         {:else if mode === 'b'}
+            <div class="slider-control">
+                <label>POSITION B</label>
+                <input type="range" min="-1" max="1" step="0.01" bind:value={positionB} />
+                <span class="value">{positionB.toFixed(2)}</span>
+            </div>
+            <div class="slider-control">
+                <label>AMPL/DIV B</label>
+                <input type="range" min="0.1" max="2" step="0.1" bind:value={amplDivB} />
+                <span class="value">{amplDivB.toFixed(1)}</span>
+            </div>
+            <div class="slider-control">
+                <label>X POS</label>
+                <input type="range" min="-1" max="1" step="0.01" bind:value={xPosition} />
+                <span class="value">{xPosition.toFixed(2)}</span>
+            </div>
+            <div class="slider-control">
+                <label>TIME/DIV</label>
+                <input type="range" min="0.1" max="1" step="0.05" bind:value={timeDiv} />
+                <span class="value">{timeDiv.toFixed(2)}</span>
+            </div>
+            <div class="slider-control">
+                <label>TRIGGER</label>
+                <input type="range" min="-1" max="1" step="0.01" bind:value={triggerLevel} />
+                <span class="value">{triggerLevel.toFixed(2)}</span>
+            </div>
+        {:else if mode === 'ab'}
+            <div class="slider-control">
+                <label>POSITION A</label>
+                <input type="range" min="-1" max="1" step="0.01" bind:value={positionA} />
+                <span class="value">{positionA.toFixed(2)}</span>
+            </div>
+            <div class="slider-control">
+                <label>AMPL/DIV A</label>
+                <input type="range" min="0.1" max="2" step="0.1" bind:value={amplDivA} />
+                <span class="value">{amplDivA.toFixed(1)}</span>
+            </div>
             <div class="slider-control">
                 <label>POSITION B</label>
                 <input type="range" min="-1" max="1" step="0.01" bind:value={positionB} />
@@ -411,6 +528,40 @@
         background: transparent;
         pointer-events: none;
         border-radius: 4px;
+    }
+
+    .input-selector {
+        display: flex;
+        gap: 5px;
+        padding: 10px 15px;
+        background: #1a1a1a;
+        border-radius: 4px;
+        margin-bottom: 10px;
+    }
+
+    .input-selector button {
+        flex: 1;
+        padding: 8px 16px;
+        background: #2d2d2d;
+        color: #888;
+        border: 1px solid #444;
+        border-radius: 4px;
+        font-family: system-ui;
+        font-size: 11px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .input-selector button:hover {
+        background: #333;
+        color: #aaa;
+    }
+
+    .input-selector button.active {
+        background: #4CAF50;
+        color: #000;
+        border-color: #4CAF50;
     }
 
     .mode-selector {
