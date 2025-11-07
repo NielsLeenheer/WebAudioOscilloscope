@@ -590,6 +590,8 @@
         position: fixed;
         top: 20px;
         right: 20px;
+        left: auto;
+        bottom: auto;
         margin: 0;
         padding: 0;
         background: rgba(26, 26, 26, 0.2);
@@ -597,7 +599,9 @@
         border-radius: 4px;
         color: #4CAF50;
         min-width: 300px;
+        max-width: 400px;
         backdrop-filter: blur(10px);
+        transform: none;
     }
 
     .physics-dialog::backdrop {
