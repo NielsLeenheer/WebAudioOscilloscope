@@ -529,7 +529,7 @@
         justify-content: center;
         align-items: center;
         background: #1a1f1a;
-        border-radius: 4px;
+        border-radius: 8px;
         width: 400px;
         height: 400px;
         overflow: hidden; /* Clip the overscan area */
@@ -542,7 +542,7 @@
         left: -100px;
         display: block;
         background: #1a1f1a;
-        border-radius: 4px;
+        border-radius: 8px;
     }
 
     .grid-canvas {
@@ -553,7 +553,7 @@
         display: block;
         background: transparent;
         pointer-events: none;
-        border-radius: 4px;
+        border-radius: 8px;
     }
 
     .controls-grid {
