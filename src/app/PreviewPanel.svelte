@@ -18,6 +18,7 @@
     let signalNoise = $state(0.015); // Random noise added to audio signal (0-1)
     let beamPower = $state(0.50); // Beam power (affects opacity: high power = bright, low power = dim)
     let velocityDimming = $state(0.90); // How much fast movements dim (0=no dimming, 1=maximum dimming)
+    let debugSubsegments = $state(false); // Show debug red dots at sub-segment boundaries
 
     onMount(() => {
         // Initialize Web Worker with OffscreenCanvas
@@ -116,6 +117,7 @@
                     basePower,
                     persistence,
                     velocityDimming,
+                    debugSubsegments,
                     canvasWidth: 400,
                     canvasHeight: 400
                 }
@@ -175,6 +177,12 @@
         <div class="slider-control">
             <label>Velocity Dimming: {velocityDimming.toFixed(2)}</label>
             <input type="range" min="0" max="1" step="0.01" bind:value={velocityDimming} />
+        </div>
+        <div class="checkbox-control">
+            <label>
+                <input type="checkbox" bind:checked={debugSubsegments} />
+                Debug Sub-segments
+            </label>
         </div>
     </div>
 </div>
@@ -249,5 +257,29 @@
         border-radius: 50%;
         cursor: pointer;
         border: none;
+    }
+
+    .checkbox-control {
+        display: flex;
+        align-items: center;
+        padding-top: 5px;
+    }
+
+    .checkbox-control label {
+        color: #4CAF50;
+        font-family: system-ui;
+        font-size: 12px;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        cursor: pointer;
+    }
+
+    .checkbox-control input[type="checkbox"] {
+        width: 16px;
+        height: 16px;
+        cursor: pointer;
+        accent-color: #4CAF50;
     }
 </style>

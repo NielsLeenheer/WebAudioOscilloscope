@@ -15,9 +15,10 @@ const SMOOTHING_ALPHA = 0.4;
 const MAX_SUBSEGMENTS = 8;
 const MIN_SUBSEGMENT_LENGTH = 4; // Minimum pixels per sub-segment
 
-// Ease-in-out function for smooth opacity transitions (quartic for more extreme curve)
-function easeInOutQuad(t) {
-    return t < 0.5 ? 8 * t * t * t * t : 1 - Math.pow(-2 * t + 2, 4) / 2;
+// Ease-in function for opacity transitions (quartic: slow start with delay, then accelerate)
+// Mimics physics behavior where magnetic force takes time to overcome inertia
+function easeInQuartic(t) {
+    return t * t * t * t;
 }
 
 // Calculate point on quadratic Bézier curve at parameter t (0-1)
@@ -99,6 +100,7 @@ self.onmessage = function(e) {
             basePower,
             persistence,
             velocityDimming,
+            debugSubsegments,
             canvasWidth,
             canvasHeight
         } = data;
@@ -239,8 +241,8 @@ self.onmessage = function(e) {
                     const pt1 = quadraticBezierPoint(prevMidX, prevMidY, points[i].x, points[i].y, nextMidX, nextMidY, t1Offset);
                     const pt2 = quadraticBezierPoint(prevMidX, prevMidY, points[i].x, points[i].y, nextMidX, nextMidY, t2);
 
-                    // Interpolate opacity with ease-in-out
-                    const easedT = easeInOutQuad(t1 + 0.5 / numSubSegments); // Use middle of sub-segment
+                    // Interpolate opacity with ease-in (slow start, then accelerate)
+                    const easedT = easeInQuartic(t1 + 0.5 / numSubSegments); // Use middle of sub-segment
                     const interpolatedOpacity = currentOpacity + (nextOpacity - currentOpacity) * easedT;
 
                     // Draw sub-segment
@@ -250,11 +252,13 @@ self.onmessage = function(e) {
                     ctx.strokeStyle = `rgba(76, 175, 80, ${interpolatedOpacity})`;
                     ctx.stroke();
 
-                    // Debug: Draw red dot at start of each sub-segment
-                    ctx.fillStyle = 'rgba(255, 0, 0, 0.8)';
-                    ctx.beginPath();
-                    ctx.arc(pt1.x, pt1.y, 2, 0, 2 * Math.PI);
-                    ctx.fill();
+                    // Debug: Draw small red dot at start of each sub-segment (if enabled)
+                    if (debugSubsegments) {
+                        ctx.fillStyle = 'rgba(255, 0, 0, 0.8)';
+                        ctx.beginPath();
+                        ctx.arc(pt1.x, pt1.y, 1, 0, 2 * Math.PI);
+                        ctx.fill();
+                    }
                 }
             }
 
