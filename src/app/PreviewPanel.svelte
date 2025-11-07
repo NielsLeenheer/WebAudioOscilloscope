@@ -498,7 +498,11 @@
         background: #2d2d2d;
         border-radius: 6px;
         border: 1px solid #444;
-        margin: 20px 20px 20px 0;
+        margin: 20px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        height: calc(100% - 40px);
     }
 
     .canvas-container {

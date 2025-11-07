@@ -7,9 +7,8 @@
     import drawIcon from '../assets/icons/draw.svg?raw';
     import pathsIcon from '../assets/icons/paths.svg?raw';
     import settingsIcon from '../assets/icons/settings.svg?raw';
-    import previewIcon from '../assets/icons/preview.svg?raw';
 
-    let { activeTab = $bindable(), showPreview = $bindable() } = $props();
+    let { activeTab = $bindable() } = $props();
 </script>
 
 <div class="navigation">
@@ -50,18 +49,12 @@
             Settings
         </label>
     </nav>
-
-    <button id="preview" onclick={() => { showPreview = !showPreview }} class:active={showPreview}>
-        <Icon data={previewIcon} />
-        Preview
-    </button>
 </div>
 
 <style>
     .navigation {
         display: flex;
         align-items: center;
-        justify-content: space-between;
         padding: 0 20px;
         background: #fafafa;
         border-bottom: 1px solid #ddd;
@@ -109,39 +102,5 @@
     input {
         position: absolute;
         opacity: 0;
-    }
-
-    button#preview {
-        background-color: #fff;
-        color: #333;
-        border: none;
-        border-radius: 6px;
-        height: 32px;
-        padding: 0 12px;
-        font-family: system-ui;
-        font-size: 10pt;
-        font-weight: 600;
-        cursor: pointer;
-        display: flex;
-        place-items: center;
-        user-select: none;
-    }
-
-    button#preview :global(svg) {
-        width: 1.5em;
-        height: 1.5em;
-        margin-right: 4px;
-    }
-
-    button#preview.active {
-        background-color: #d5d5d5;
-    }
-
-    button#preview:hover:not(:disabled) {
-        background: #f5f5f5;
-    }
-
-    button#preview.active:hover {
-        background: #c8c8c8;
     }
 </style>

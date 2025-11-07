@@ -8,7 +8,6 @@
     let audioEngine = new AudioEngine();
     let isPlaying = $state(false);
     let activeTab = $state('instructions');
-    let showPreview = $state(true);
     let inputSource = $state('generated'); // 'generated' or 'microphone'
 
     function start() {
@@ -33,17 +32,15 @@
 </script>
 
 <Header {isPlaying} {start} {stop} {startGenerated} {startMicrophone} {inputSource} />
-<Navigation bind:activeTab bind:showPreview />
+<Navigation bind:activeTab />
 
 <div id="main-content">
     <div class="content-left">
         <Content {audioEngine} {isPlaying} {activeTab} />
     </div>
-    {#if showPreview}
     <div class="content-right">
         <PreviewPanel {audioEngine} {isPlaying} {inputSource} />
     </div>
-    {/if}
 </div>
 
 <style>
@@ -54,11 +51,13 @@
 
     .content-left {
         flex: 1;
+        min-width: 0; /* Allow flex item to shrink below content size */
         overflow: auto;
     }
 
     .content-right {
-        width: 440px;
-        flex-shrink: 0;
+        flex: 1;
+        min-width: 0; /* Allow flex item to shrink below content size */
+        overflow: auto;
     }
 </style>
