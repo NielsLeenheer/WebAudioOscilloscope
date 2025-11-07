@@ -94,6 +94,7 @@ self.onmessage = function(e) {
             basePower,
             persistence,
             velocityDimming,
+            mode,
             canvasWidth,
             canvasHeight
         } = data;
@@ -115,79 +116,136 @@ self.onmessage = function(e) {
         const points = [];
         const speeds = [];
 
-        for (let i = 0; i < leftData.length; i++) {
-            // Add noise to audio signal if enabled
-            let leftSignal = leftData[i];
-            let rightSignal = rightData[i];
+        if (mode === 'xy') {
+            // X/Y mode: left channel = X, right channel = Y
+            for (let i = 0; i < leftData.length; i++) {
+                // Add noise to audio signal if enabled
+                let leftSignal = leftData[i];
+                let rightSignal = rightData[i];
 
-            if (signalNoise > 0) {
-                leftSignal += (Math.random() - 0.5) * signalNoise;
-                rightSignal += (Math.random() - 0.5) * signalNoise;
+                if (signalNoise > 0) {
+                    leftSignal += (Math.random() - 0.5) * signalNoise;
+                    rightSignal += (Math.random() - 0.5) * signalNoise;
+                }
+
+                // Target position from audio data (with noise)
+                const targetX = leftSignal * scale;
+                const targetY = -rightSignal * scale;
+
+                // Calculate force (like a spring pulling beam to target)
+                const forceX = (targetX - beamX) * forceMultiplier;
+                const forceY = (targetY - beamY) * forceMultiplier;
+
+                // Calculate acceleration (F = ma, so a = F/m)
+                const accelX = forceX / mass;
+                const accelY = forceY / mass;
+
+                // Update velocity
+                velocityX += accelX;
+                velocityY += accelY;
+
+                // Apply damping (friction/air resistance)
+                velocityX *= damping;
+                velocityY *= damping;
+
+                // Update position
+                beamX += velocityX;
+                beamY += velocityY;
+
+                // Safety checks: prevent NaN/Infinity and extreme values
+                if (!isFinite(beamX) || !isFinite(beamY) || !isFinite(velocityX) || !isFinite(velocityY)) {
+                    // Reset to origin if values become invalid
+                    beamX = 0;
+                    beamY = 0;
+                    velocityX = 0;
+                    velocityY = 0;
+                    smoothedBeamX = 0;
+                    smoothedBeamY = 0;
+                } else {
+                    // Clamp beam position to reasonable bounds (prevent runaway)
+                    const maxPosition = scale * 10; // Allow some overshoot but not too much
+                    beamX = Math.max(-maxPosition, Math.min(maxPosition, beamX));
+                    beamY = Math.max(-maxPosition, Math.min(maxPosition, beamY));
+
+                    // Clamp velocities to prevent extreme values
+                    const maxVelocity = scale * 2;
+                    velocityX = Math.max(-maxVelocity, Math.min(maxVelocity, velocityX));
+                    velocityY = Math.max(-maxVelocity, Math.min(maxVelocity, velocityY));
+                }
+
+                // Apply exponential smoothing to positions
+                // This creates naturally smooth movement while preserving physics accuracy
+                smoothedBeamX = SMOOTHING_ALPHA * beamX + (1 - SMOOTHING_ALPHA) * smoothedBeamX;
+                smoothedBeamY = SMOOTHING_ALPHA * beamY + (1 - SMOOTHING_ALPHA) * smoothedBeamY;
+
+                // Convert to screen coordinates using smoothed positions
+                const screenX = centerX + smoothedBeamX;
+                const screenY = centerY + smoothedBeamY;
+
+                points.push({ x: screenX, y: screenY });
+
+                // Calculate speed for this point
+                if (points.length > 1) {
+                    const prev = points[points.length - 2];
+                    const dx = screenX - prev.x;
+                    const dy = screenY - prev.y;
+                    const speed = Math.sqrt(dx * dx + dy * dy);
+                    speeds.push(speed);
+                }
             }
+        } else {
+            // A or B mode: Time-based waveform
+            const channelData = mode === 'a' ? leftData : rightData;
 
-            // Target position from audio data (with noise)
-            const targetX = leftSignal * scale;
-            const targetY = -rightSignal * scale;
+            for (let i = 0; i < channelData.length; i++) {
+                // Add noise to audio signal if enabled
+                let signal = channelData[i];
 
-            // Calculate force (like a spring pulling beam to target)
-            const forceX = (targetX - beamX) * forceMultiplier;
-            const forceY = (targetY - beamY) * forceMultiplier;
+                if (signalNoise > 0) {
+                    signal += (Math.random() - 0.5) * signalNoise;
+                }
 
-            // Calculate acceleration (F = ma, so a = F/m)
-            const accelX = forceX / mass;
-            const accelY = forceY / mass;
+                // X position is based on time (index)
+                const targetX = (i / channelData.length) * canvasWidth;
+                // Y position is based on amplitude (centered)
+                const targetY = centerY - (signal * scale);
 
-            // Update velocity
-            velocityX += accelX;
-            velocityY += accelY;
+                // Apply physics simulation for Y axis only
+                const forceY = (targetY - beamY) * forceMultiplier;
+                const accelY = forceY / mass;
+                velocityY += accelY;
+                velocityY *= damping;
+                beamY += velocityY;
 
-            // Apply damping (friction/air resistance)
-            velocityX *= damping;
-            velocityY *= damping;
+                // Safety checks for Y
+                if (!isFinite(beamY) || !isFinite(velocityY)) {
+                    beamY = centerY;
+                    velocityY = 0;
+                    smoothedBeamY = centerY;
+                } else {
+                    const maxPosition = scale * 10;
+                    beamY = Math.max(centerY - maxPosition, Math.min(centerY + maxPosition, beamY));
+                    const maxVelocity = scale * 2;
+                    velocityY = Math.max(-maxVelocity, Math.min(maxVelocity, velocityY));
+                }
 
-            // Update position
-            beamX += velocityX;
-            beamY += velocityY;
+                // Apply smoothing to Y position only
+                smoothedBeamY = SMOOTHING_ALPHA * beamY + (1 - SMOOTHING_ALPHA) * smoothedBeamY;
 
-            // Safety checks: prevent NaN/Infinity and extreme values
-            if (!isFinite(beamX) || !isFinite(beamY) || !isFinite(velocityX) || !isFinite(velocityY)) {
-                // Reset to origin if values become invalid
-                beamX = 0;
-                beamY = 0;
-                velocityX = 0;
-                velocityY = 0;
-                smoothedBeamX = 0;
-                smoothedBeamY = 0;
-            } else {
-                // Clamp beam position to reasonable bounds (prevent runaway)
-                const maxPosition = scale * 10; // Allow some overshoot but not too much
-                beamX = Math.max(-maxPosition, Math.min(maxPosition, beamX));
-                beamY = Math.max(-maxPosition, Math.min(maxPosition, beamY));
+                // Screen coordinates: X is time, Y is smoothed amplitude
+                const screenX = targetX;
+                const screenY = smoothedBeamY;
 
-                // Clamp velocities to prevent extreme values
-                const maxVelocity = scale * 2;
-                velocityX = Math.max(-maxVelocity, Math.min(maxVelocity, velocityX));
-                velocityY = Math.max(-maxVelocity, Math.min(maxVelocity, velocityY));
-            }
+                points.push({ x: screenX, y: screenY });
 
-            // Apply exponential smoothing to positions
-            // This creates naturally smooth movement while preserving physics accuracy
-            smoothedBeamX = SMOOTHING_ALPHA * beamX + (1 - SMOOTHING_ALPHA) * smoothedBeamX;
-            smoothedBeamY = SMOOTHING_ALPHA * beamY + (1 - SMOOTHING_ALPHA) * smoothedBeamY;
-
-            // Convert to screen coordinates using smoothed positions
-            const screenX = centerX + smoothedBeamX;
-            const screenY = centerY + smoothedBeamY;
-
-            points.push({ x: screenX, y: screenY });
-
-            // Calculate speed for this point
-            if (points.length > 1) {
-                const prev = points[points.length - 2];
-                const dx = screenX - prev.x;
-                const dy = screenY - prev.y;
-                const speed = Math.sqrt(dx * dx + dy * dy);
-                speeds.push(speed);
+                // Calculate speed for this point
+                if (points.length > 1) {
+                    const prev = points[points.length - 2];
+                    const dx = screenX - prev.x;
+                    const dy = screenY - prev.y;
+                    const speed = Math.sqrt(dx * dx + dy * dy);
+                    speeds.push(speed);
+                }
             }
         }
 

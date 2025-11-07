@@ -19,6 +19,7 @@
     let beamPower = $state(0.50); // Beam power (affects opacity: high power = bright, low power = dim)
     let velocityDimming = $state(0.90); // How much fast movements dim (0=no dimming, 1=maximum dimming)
     let focus = $state(1.0); // Focus control (1.0 = perfect focus, 0.0 = maximum blur)
+    let mode = $state('xy'); // Display mode: 'xy', 'a', or 'b'
 
     onMount(() => {
         // Initialize Web Worker with OffscreenCanvas
@@ -117,6 +118,7 @@
                     basePower,
                     persistence,
                     velocityDimming,
+                    mode,
                     canvasWidth: 400,
                     canvasHeight: 400
                 }
@@ -148,6 +150,11 @@
             height="400"
             style="filter: blur({(1 - focus) * 3}px);"
         ></canvas>
+    </div>
+    <div class="mode-selector">
+        <button class:active={mode === 'xy'} onclick={() => mode = 'xy'}>X/Y</button>
+        <button class:active={mode === 'a'} onclick={() => mode = 'a'}>A</button>
+        <button class:active={mode === 'b'} onclick={() => mode = 'b'}>B</button>
     </div>
     <div class="visible-controls">
         <div class="slider-control">
@@ -218,6 +225,40 @@
         display: block;
         background: #000;
         border-radius: 4px;
+    }
+
+    .mode-selector {
+        display: flex;
+        gap: 5px;
+        padding: 10px 15px;
+        background: #1a1a1a;
+        border-radius: 4px;
+        margin-bottom: 10px;
+    }
+
+    .mode-selector button {
+        flex: 1;
+        padding: 8px 16px;
+        background: #2d2d2d;
+        color: #888;
+        border: 1px solid #444;
+        border-radius: 4px;
+        font-family: system-ui;
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .mode-selector button:hover {
+        background: #333;
+        color: #aaa;
+    }
+
+    .mode-selector button.active {
+        background: #4CAF50;
+        color: #000;
+        border-color: #4CAF50;
     }
 
     .visible-controls {
