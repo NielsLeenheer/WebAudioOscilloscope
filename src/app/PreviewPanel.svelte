@@ -151,40 +151,48 @@
     </div>
     <div class="visible-controls">
         <div class="slider-control">
-            <label>INTENS: {beamPower.toFixed(2)}</label>
+            <label>INTENS</label>
             <input type="range" min="0" max="1" step="0.01" bind:value={beamPower} />
+            <span class="value">{beamPower.toFixed(2)}</span>
         </div>
         <div class="slider-control">
-            <label>FOCUS: {focus.toFixed(2)}</label>
+            <label>FOCUS</label>
             <input type="range" min="0" max="1" step="0.01" bind:value={focus} />
+            <span class="value">{focus.toFixed(2)}</span>
         </div>
     </div>
     <details class="controls-details">
         <summary>Physics Controls</summary>
         <div class="sliders">
             <div class="slider-control">
-                <label>Force: {forceMultiplier.toFixed(2)}</label>
+                <label>Force</label>
                 <input type="range" min="0.01" max="0.5" step="0.01" bind:value={forceMultiplier} />
+                <span class="value">{forceMultiplier.toFixed(2)}</span>
             </div>
             <div class="slider-control">
-                <label>Damping: {damping.toFixed(2)}</label>
+                <label>Damping</label>
                 <input type="range" min="0.1" max="0.99" step="0.01" bind:value={damping} />
+                <span class="value">{damping.toFixed(2)}</span>
             </div>
             <div class="slider-control">
-                <label>Mass: {mass.toFixed(2)}</label>
+                <label>Mass</label>
                 <input type="range" min="0.01" max="5.0" step="0.01" bind:value={mass} />
+                <span class="value">{mass.toFixed(2)}</span>
             </div>
             <div class="slider-control">
-                <label>Persistence: {persistence.toFixed(3)}</label>
+                <label>Persistence</label>
                 <input type="range" min="0.0" max="0.95" step="0.005" bind:value={persistence} />
+                <span class="value">{persistence.toFixed(3)}</span>
             </div>
             <div class="slider-control">
-                <label>Signal Noise: {signalNoise.toFixed(3)}</label>
+                <label>Noise</label>
                 <input type="range" min="0" max="0.2" step="0.001" bind:value={signalNoise} />
+                <span class="value">{signalNoise.toFixed(3)}</span>
             </div>
             <div class="slider-control">
-                <label>Velocity Dimming: {velocityDimming.toFixed(2)}</label>
+                <label>Dimming</label>
                 <input type="range" min="0" max="1" step="0.01" bind:value={velocityDimming} />
+                <span class="value">{velocityDimming.toFixed(2)}</span>
             </div>
         </div>
     </details>
@@ -268,9 +276,10 @@
     }
 
     .slider-control {
-        display: flex;
-        flex-direction: column;
-        gap: 5px;
+        display: grid;
+        grid-template-columns: auto 1fr auto;
+        gap: 10px;
+        align-items: center;
     }
 
     .slider-control label {
@@ -278,6 +287,16 @@
         font-family: system-ui;
         font-size: 12px;
         font-weight: 600;
+        white-space: nowrap;
+    }
+
+    .slider-control .value {
+        color: #4CAF50;
+        font-family: monospace;
+        font-size: 12px;
+        font-weight: 600;
+        min-width: 40px;
+        text-align: right;
     }
 
     .slider-control input[type="range"] {
