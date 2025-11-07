@@ -380,52 +380,46 @@
                 <input type="range" min="-1" max="1" step="0.01" bind:value={xPosition} />
                 <span class="value">{xPosition.toFixed(2)}</span>
             </div>
-            {#if mode !== 'xy'}
-                <div class="slider-control">
-                    <label>TIME/DIV</label>
-                    <input type="range" min="0.1" max="1" step="0.05" bind:value={timeDiv} />
-                    <span class="value">{timeDiv.toFixed(2)}</span>
-                </div>
-                <div class="slider-control">
-                    <label>TRIGGER</label>
-                    <input type="range" min="-1" max="1" step="0.01" bind:value={triggerLevel} />
-                    <span class="value">{triggerLevel.toFixed(2)}</span>
-                </div>
-            {/if}
+            <div class="slider-control" class:disabled={mode === 'xy'}>
+                <label>TIME/DIV</label>
+                <input type="range" min="0.1" max="1" step="0.05" bind:value={timeDiv} disabled={mode === 'xy'} />
+                <span class="value">{timeDiv.toFixed(2)}</span>
+            </div>
+            <div class="slider-control" class:disabled={mode === 'xy'}>
+                <label>TRIGGER</label>
+                <input type="range" min="-1" max="1" step="0.01" bind:value={triggerLevel} disabled={mode === 'xy'} />
+                <span class="value">{triggerLevel.toFixed(2)}</span>
+            </div>
         </div>
 
         <!-- Bottom Left: Channel A Controls -->
-        <div class="control-panel">
-            {#if mode === 'a' || mode === 'ab' || mode === 'xy'}
-                <div class="panel-label">CHANNEL A</div>
-                <div class="slider-control">
-                    <label>POSITION</label>
-                    <input type="range" min="-1" max="1" step="0.01" bind:value={positionA} />
-                    <span class="value">{positionA.toFixed(2)}</span>
-                </div>
-                <div class="slider-control">
-                    <label>AMPL/DIV</label>
-                    <input type="range" min="0.1" max="16" step="0.1" bind:value={amplDivA} />
-                    <span class="value">{amplDivA.toFixed(1)}</span>
-                </div>
-            {/if}
+        <div class="control-panel" class:disabled={mode === 'b'}>
+            <div class="panel-label">CHANNEL A</div>
+            <div class="slider-control">
+                <label>POSITION</label>
+                <input type="range" min="-1" max="1" step="0.01" bind:value={positionA} disabled={mode === 'b'} />
+                <span class="value">{positionA.toFixed(2)}</span>
+            </div>
+            <div class="slider-control">
+                <label>AMPL/DIV</label>
+                <input type="range" min="0.1" max="16" step="0.1" bind:value={amplDivA} disabled={mode === 'b'} />
+                <span class="value">{amplDivA.toFixed(1)}</span>
+            </div>
         </div>
 
         <!-- Bottom Right: Channel B Controls -->
-        <div class="control-panel">
-            {#if mode === 'b' || mode === 'ab' || mode === 'xy'}
-                <div class="panel-label">CHANNEL B</div>
-                <div class="slider-control">
-                    <label>POSITION</label>
-                    <input type="range" min="-1" max="1" step="0.01" bind:value={positionB} />
-                    <span class="value">{positionB.toFixed(2)}</span>
-                </div>
-                <div class="slider-control">
-                    <label>AMPL/DIV</label>
-                    <input type="range" min="0.1" max="16" step="0.1" bind:value={amplDivB} />
-                    <span class="value">{amplDivB.toFixed(1)}</span>
-                </div>
-            {/if}
+        <div class="control-panel" class:disabled={mode === 'a'}>
+            <div class="panel-label">CHANNEL B</div>
+            <div class="slider-control">
+                <label>POSITION</label>
+                <input type="range" min="-1" max="1" step="0.01" bind:value={positionB} disabled={mode === 'a'} />
+                <span class="value">{positionB.toFixed(2)}</span>
+            </div>
+            <div class="slider-control">
+                <label>AMPL/DIV</label>
+                <input type="range" min="0.1" max="16" step="0.1" bind:value={amplDivB} disabled={mode === 'a'} />
+                <span class="value">{amplDivB.toFixed(1)}</span>
+            </div>
         </div>
     </div>
     <details class="controls-details">
@@ -527,6 +521,11 @@
         background: #1a1a1a;
         border-radius: 4px;
         min-height: 80px;
+        transition: opacity 0.2s;
+    }
+
+    .control-panel.disabled {
+        opacity: 0.4;
     }
 
     .panel-label {
@@ -538,6 +537,10 @@
         margin-bottom: 5px;
         padding-bottom: 8px;
         border-bottom: 1px solid #333;
+    }
+
+    .control-panel.disabled .panel-label {
+        color: #666;
     }
 
     .controls-details {
@@ -590,6 +593,11 @@
         grid-template-columns: auto 1fr auto;
         gap: 10px;
         align-items: center;
+        transition: opacity 0.2s;
+    }
+
+    .slider-control.disabled {
+        opacity: 0.4;
     }
 
     .slider-control label {
@@ -598,6 +606,10 @@
         font-size: 12px;
         font-weight: 600;
         white-space: nowrap;
+    }
+
+    .slider-control.disabled label {
+        color: #666;
     }
 
     .slider-control .value {
@@ -609,6 +621,10 @@
         text-align: right;
     }
 
+    .slider-control.disabled .value {
+        color: #666;
+    }
+
     .slider-control input[type="range"] {
         width: 100%;
         height: 4px;
@@ -616,6 +632,11 @@
         border-radius: 2px;
         outline: none;
         -webkit-appearance: none;
+    }
+
+    .slider-control input[type="range"]:disabled {
+        background: #222;
+        cursor: not-allowed;
     }
 
     .slider-control input[type="range"]::-webkit-slider-thumb {
@@ -628,6 +649,11 @@
         cursor: pointer;
     }
 
+    .slider-control input[type="range"]:disabled::-webkit-slider-thumb {
+        background: #555;
+        cursor: not-allowed;
+    }
+
     .slider-control input[type="range"]::-moz-range-thumb {
         width: 16px;
         height: 16px;
@@ -635,5 +661,10 @@
         border-radius: 50%;
         cursor: pointer;
         border: none;
+    }
+
+    .slider-control input[type="range"]:disabled::-moz-range-thumb {
+        background: #555;
+        cursor: not-allowed;
     }
 </style>
