@@ -15,9 +15,9 @@ const SMOOTHING_ALPHA = 0.4;
 const MAX_SUBSEGMENTS = 8;
 const MIN_SUBSEGMENT_LENGTH = 4; // Minimum pixels per sub-segment
 
-// Ease-in-out function for smooth opacity transitions
+// Ease-in-out function for smooth opacity transitions (quartic for more extreme curve)
 function easeInOutQuad(t) {
-    return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+    return t < 0.5 ? 8 * t * t * t * t : 1 - Math.pow(-2 * t + 2, 4) / 2;
 }
 
 // Calculate point on quadratic Bézier curve at parameter t (0-1)
@@ -249,6 +249,12 @@ self.onmessage = function(e) {
                     ctx.lineTo(pt2.x, pt2.y);
                     ctx.strokeStyle = `rgba(76, 175, 80, ${interpolatedOpacity})`;
                     ctx.stroke();
+
+                    // Debug: Draw red dot at start of each sub-segment
+                    ctx.fillStyle = 'rgba(255, 0, 0, 0.8)';
+                    ctx.beginPath();
+                    ctx.arc(pt1.x, pt1.y, 2, 0, 2 * Math.PI);
+                    ctx.fill();
                 }
             }
 
