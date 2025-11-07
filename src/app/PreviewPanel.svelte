@@ -18,6 +18,7 @@
     let signalNoise = $state(0.015); // Random noise added to audio signal (0-1)
     let beamPower = $state(0.50); // Beam power (affects opacity: high power = bright, low power = dim)
     let velocityDimming = $state(0.90); // How much fast movements dim (0=no dimming, 1=maximum dimming)
+    let focus = $state(1.0); // Focus control (1.0 = perfect focus, 0.0 = maximum blur)
 
     onMount(() => {
         // Initialize Web Worker with OffscreenCanvas
@@ -145,7 +146,18 @@
             bind:this={canvas}
             width="400"
             height="400"
+            style="filter: blur({(1 - focus) * 3}px);"
         ></canvas>
+    </div>
+    <div class="visible-controls">
+        <div class="slider-control">
+            <label>INTENS: {beamPower.toFixed(2)}</label>
+            <input type="range" min="0" max="1" step="0.01" bind:value={beamPower} />
+        </div>
+        <div class="slider-control">
+            <label>FOCUS: {focus.toFixed(2)}</label>
+            <input type="range" min="0" max="1" step="0.01" bind:value={focus} />
+        </div>
     </div>
     <details class="controls-details">
         <summary>Physics Controls</summary>
@@ -169,10 +181,6 @@
             <div class="slider-control">
                 <label>Signal Noise: {signalNoise.toFixed(3)}</label>
                 <input type="range" min="0" max="0.2" step="0.001" bind:value={signalNoise} />
-            </div>
-            <div class="slider-control">
-                <label>Beam Power: {beamPower.toFixed(2)}</label>
-                <input type="range" min="0" max="1" step="0.01" bind:value={beamPower} />
             </div>
             <div class="slider-control">
                 <label>Velocity Dimming: {velocityDimming.toFixed(2)}</label>
@@ -202,6 +210,16 @@
         display: block;
         background: #000;
         border-radius: 4px;
+    }
+
+    .visible-controls {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        padding: 15px;
+        background: #1a1a1a;
+        border-radius: 4px;
+        margin-bottom: 10px;
     }
 
     .controls-details {
