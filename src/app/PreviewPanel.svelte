@@ -23,8 +23,10 @@
     let mode = $state('xy'); // Display mode: 'xy', 'a', or 'b'
     let timeDiv = $state(1.0); // Time/Div: controls zoom level (1.0 = full buffer, 0.1 = 10% of buffer)
     let triggerLevel = $state(0.0); // Trigger level: voltage threshold for triggering (-1.0 to 1.0)
-    let amplDiv = $state(1.0); // Ampl/Div: vertical amplitude scaling (0.1 to 2.0)
-    let yPosition = $state(0.0); // Y Position: vertical offset (-1.0 to 1.0)
+    let amplDivA = $state(1.0); // Ampl/Div A: vertical amplitude scaling for channel A (0.1 to 2.0)
+    let positionA = $state(0.0); // Position A: vertical offset for channel A (-1.0 to 1.0)
+    let amplDivB = $state(1.0); // Ampl/Div B: vertical amplitude scaling for channel B (0.1 to 2.0)
+    let positionB = $state(0.0); // Position B: vertical offset for channel B (-1.0 to 1.0)
     let xPosition = $state(0.0); // X Position: horizontal offset (-1.0 to 1.0)
 
     function drawGrid() {
@@ -201,8 +203,10 @@
                     mode,
                     timeDiv,
                     triggerLevel,
-                    amplDiv,
-                    yPosition,
+                    amplDivA,
+                    positionA,
+                    amplDivB,
+                    positionB,
                     xPosition,
                     canvasWidth: 400,
                     canvasHeight: 400
@@ -259,31 +263,78 @@
             <input type="range" min="0" max="1" step="0.01" bind:value={focus} />
             <span class="value">{focus.toFixed(2)}</span>
         </div>
-        {#if mode !== 'xy'}
+        {#if mode === 'xy'}
+            <div class="slider-control">
+                <label>AMPL/DIV A</label>
+                <input type="range" min="0.1" max="2" step="0.1" bind:value={amplDivA} />
+                <span class="value">{amplDivA.toFixed(1)}</span>
+            </div>
+            <div class="slider-control">
+                <label>POSITION A</label>
+                <input type="range" min="-1" max="1" step="0.01" bind:value={positionA} />
+                <span class="value">{positionA.toFixed(2)}</span>
+            </div>
+            <div class="slider-control">
+                <label>AMPL/DIV B</label>
+                <input type="range" min="0.1" max="2" step="0.1" bind:value={amplDivB} />
+                <span class="value">{amplDivB.toFixed(1)}</span>
+            </div>
+            <div class="slider-control">
+                <label>X POS</label>
+                <input type="range" min="-1" max="1" step="0.01" bind:value={xPosition} />
+                <span class="value">{xPosition.toFixed(2)}</span>
+            </div>
+        {:else if mode === 'a'}
+            <div class="slider-control">
+                <label>POSITION A</label>
+                <input type="range" min="-1" max="1" step="0.01" bind:value={positionA} />
+                <span class="value">{positionA.toFixed(2)}</span>
+            </div>
+            <div class="slider-control">
+                <label>AMPL/DIV A</label>
+                <input type="range" min="0.1" max="2" step="0.1" bind:value={amplDivA} />
+                <span class="value">{amplDivA.toFixed(1)}</span>
+            </div>
+            <div class="slider-control">
+                <label>X POS</label>
+                <input type="range" min="-1" max="1" step="0.01" bind:value={xPosition} />
+                <span class="value">{xPosition.toFixed(2)}</span>
+            </div>
             <div class="slider-control">
                 <label>TIME/DIV</label>
                 <input type="range" min="0.1" max="1" step="0.05" bind:value={timeDiv} />
                 <span class="value">{timeDiv.toFixed(2)}</span>
             </div>
             <div class="slider-control">
-                <label>AMPL/DIV</label>
-                <input type="range" min="0.1" max="2" step="0.1" bind:value={amplDiv} />
-                <span class="value">{amplDiv.toFixed(1)}</span>
-            </div>
-            <div class="slider-control">
                 <label>TRIGGER</label>
                 <input type="range" min="-1" max="1" step="0.01" bind:value={triggerLevel} />
                 <span class="value">{triggerLevel.toFixed(2)}</span>
             </div>
+        {:else if mode === 'b'}
             <div class="slider-control">
-                <label>Y POS</label>
-                <input type="range" min="-1" max="1" step="0.01" bind:value={yPosition} />
-                <span class="value">{yPosition.toFixed(2)}</span>
+                <label>POSITION B</label>
+                <input type="range" min="-1" max="1" step="0.01" bind:value={positionB} />
+                <span class="value">{positionB.toFixed(2)}</span>
+            </div>
+            <div class="slider-control">
+                <label>AMPL/DIV B</label>
+                <input type="range" min="0.1" max="2" step="0.1" bind:value={amplDivB} />
+                <span class="value">{amplDivB.toFixed(1)}</span>
             </div>
             <div class="slider-control">
                 <label>X POS</label>
                 <input type="range" min="-1" max="1" step="0.01" bind:value={xPosition} />
                 <span class="value">{xPosition.toFixed(2)}</span>
+            </div>
+            <div class="slider-control">
+                <label>TIME/DIV</label>
+                <input type="range" min="0.1" max="1" step="0.05" bind:value={timeDiv} />
+                <span class="value">{timeDiv.toFixed(2)}</span>
+            </div>
+            <div class="slider-control">
+                <label>TRIGGER</label>
+                <input type="range" min="-1" max="1" step="0.01" bind:value={triggerLevel} />
+                <span class="value">{triggerLevel.toFixed(2)}</span>
             </div>
         {/if}
     </div>

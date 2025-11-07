@@ -105,19 +105,32 @@ function processSignals(leftData, rightData, signalNoise) {
 // STAGE B: INTERPRETATION
 // Convert processed signals to target coordinates based on mode
 // ============================================================================
-function interpretSignals(processedLeft, processedRight, mode, scale, centerX, centerY, canvasWidth, timeDiv, triggerLevel, amplDiv, yPosition, xPosition) {
+function interpretSignals(processedLeft, processedRight, mode, scale, centerX, centerY, canvasWidth, timeDiv, triggerLevel, amplDivA, positionA, amplDivB, positionB, xPosition) {
     const targets = [];
 
     if (mode === 'xy') {
-        // X/Y mode: left channel = X, right channel = Y
+        // X/Y mode: left channel = X (with A controls), right channel = Y (with B controls)
+        // X position offset
+        const xOffset = xPosition * canvasWidth;
+
         for (let i = 0; i < processedLeft.length; i++) {
-            const targetX = processedLeft[i] * scale;
-            const targetY = -processedRight[i] * scale;
+            // Left channel (A) controls horizontal with AMPL/DIV A and POSITION A
+            const posOffsetA = positionA * scale * 2;
+            const targetX = processedLeft[i] * scale * amplDivA + posOffsetA + xOffset;
+
+            // Right channel (B) controls vertical with AMPL/DIV B and POSITION B (but inverted for Y axis)
+            const posOffsetB = positionB * scale * 2;
+            const targetY = -processedRight[i] * scale * amplDivB + posOffsetB;
+
             targets.push({ x: targetX, y: targetY });
         }
     } else {
         // A or B mode: Time-based waveform with triggering
         const channelData = mode === 'a' ? processedLeft : processedRight;
+
+        // Use the appropriate channel controls
+        const amplDiv = mode === 'a' ? amplDivA : amplDivB;
+        const position = mode === 'a' ? positionA : positionB;
 
         // Find trigger point
         const triggerIndex = findTriggerPoint(channelData, triggerLevel);
@@ -138,7 +151,7 @@ function interpretSignals(processedLeft, processedRight, mode, scale, centerX, c
             // X position is based on time with position offset
             const targetX = (relativeIndex / samplesToDisplay) * canvasWidth - centerX + xOffset;
             // Y position is based on amplitude with AMPL/DIV and Y position offset
-            const yOffset = yPosition * scale * 2; // Scale the position offset
+            const yOffset = position * scale * 2; // Scale the position offset
             const targetY = -channelData[i] * scale * amplDiv + yOffset;
             targets.push({ x: targetX, y: targetY });
         }
@@ -260,8 +273,10 @@ self.onmessage = function(e) {
             mode,
             timeDiv,
             triggerLevel,
-            amplDiv,
-            yPosition,
+            amplDivA,
+            positionA,
+            amplDivB,
+            positionB,
             xPosition,
             canvasWidth,
             canvasHeight
@@ -282,7 +297,7 @@ self.onmessage = function(e) {
         const { processedLeft, processedRight } = processSignals(leftData, rightData, signalNoise);
 
         // STAGE B: Interpretation - Convert signals to target coordinates based on mode
-        const targets = interpretSignals(processedLeft, processedRight, mode, scale, centerX, centerY, canvasWidth, timeDiv, triggerLevel, amplDiv, yPosition, xPosition);
+        const targets = interpretSignals(processedLeft, processedRight, mode, scale, centerX, centerY, canvasWidth, timeDiv, triggerLevel, amplDivA, positionA, amplDivB, positionB, xPosition);
 
         // STAGE C: Physics Simulation - Apply electron beam physics uniformly
         const { points, speeds } = simulatePhysics(targets, forceMultiplier, damping, mass, scale, centerX, centerY);
