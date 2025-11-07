@@ -602,6 +602,8 @@
         max-width: 400px;
         backdrop-filter: blur(10px);
         transform: none;
+        box-shadow: 0px 0px 4px #1c5e20;
+        z-index: 20;
     }
 
     .physics-dialog::backdrop {
