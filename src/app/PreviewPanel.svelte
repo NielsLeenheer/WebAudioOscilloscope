@@ -1,5 +1,7 @@
 <script>
     import { onMount, onDestroy } from 'svelte';
+    import { Icon } from 'svelte-icon';
+    import sineIcon from '../assets/icons/glyph/sine.svg?raw';
 
     let { audioEngine, isPlaying, inputSource, isPowered, mode = $bindable() } = $props();
 
@@ -356,7 +358,9 @@
 </script>
 
 <div class="preview-panel">
-    <button class="physics-button" onclick={openPhysicsDialog}>⚙</button>
+    <button class="physics-button" onclick={openPhysicsDialog}>
+        <Icon data={sineIcon} />
+    </button>
     <div class="canvas-container">
         <canvas
             bind:this={canvas}
@@ -495,22 +499,25 @@
         right: 20px;
         width: 40px;
         height: 40px;
-        background: #1a1a1a;
-        border: 1px solid #333;
-        border-radius: 4px;
+        background: none;
+        border: none;
         color: #4CAF50;
-        font-size: 20px;
         cursor: pointer;
         display: flex;
         align-items: center;
         justify-content: center;
         transition: all 0.2s;
         z-index: 10;
+        padding: 0;
     }
 
     .physics-button:hover {
-        background: #252525;
-        border-color: #4CAF50;
+        opacity: 0.7;
+    }
+
+    .physics-button :global(svg) {
+        width: 40px;
+        height: 40px;
     }
 
     .canvas-container {
