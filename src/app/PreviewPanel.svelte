@@ -20,16 +20,16 @@
     let damping = $state(0.44);
     let mass = $state(0.11);
     let persistence = $state(0.030); // Afterglow/fade effect (0=instant fade, 1=long trail)
-    let signalNoise = $state(0.015); // Random noise added to audio signal (0-1)
-    let beamPower = $state(0.50); // Beam power (affects opacity: high power = bright, low power = dim)
+    let signalNoise = $state(0.030); // Random noise added to audio signal (0-1)
+    let beamPower = $state(0.75); // Beam power (affects opacity: high power = bright, low power = dim)
     let velocityDimming = $state(0.90); // How much fast movements dim (0=no dimming, 1=maximum dimming)
-    let focus = $state(1.0); // Focus control (1.0 = perfect focus, 0.0 = maximum blur)
+    let focus = $state(0.2); // Focus control (-1.0 to 1.0, 0.0 = perfect focus, abs value = blur amount)
     let mode = $state('xy'); // Display mode: 'xy', 'a', 'b', or 'ab'
     let timeDiv = $state(1.0); // Time/Div: controls zoom level (1.0 = full buffer, 0.1 = 10% of buffer)
     let triggerLevel = $state(0.0); // Trigger level: voltage threshold for triggering (-1.0 to 1.0)
-    let amplDivA = $state(1.0); // Ampl/Div A: vertical amplitude scaling for channel A (0.1 to 2.0)
+    let amplDivA = $state(0.6); // Ampl/Div A: vertical amplitude scaling for channel A (0.1 to 2.0)
     let positionA = $state(0.0); // Position A: vertical offset for channel A (-1.0 to 1.0)
-    let amplDivB = $state(1.0); // Ampl/Div B: vertical amplitude scaling for channel B (0.1 to 2.0)
+    let amplDivB = $state(0.6); // Ampl/Div B: vertical amplitude scaling for channel B (0.1 to 2.0)
     let positionB = $state(0.0); // Position B: vertical offset for channel B (-1.0 to 1.0)
     let xPosition = $state(0.0); // X Position: horizontal offset (-1.0 to 1.0)
 
@@ -319,7 +319,7 @@
             width="600"
             height="600"
             class="scope-canvas"
-            style="filter: blur({(1 - focus) * 3}px);"
+            style="filter: blur({Math.abs(focus) * 3}px);"
         ></canvas>
         <canvas
             bind:this={gridCanvas}
@@ -342,7 +342,7 @@
         </div>
         <div class="slider-control">
             <label>FOCUS</label>
-            <input type="range" min="0" max="1" step="0.01" bind:value={focus} />
+            <input type="range" min="-1" max="1" step="0.01" bind:value={focus} />
             <span class="value">{focus.toFixed(2)}</span>
         </div>
         {#if mode === 'xy'}
@@ -352,9 +352,9 @@
                 <span class="value">{amplDivA.toFixed(1)}</span>
             </div>
             <div class="slider-control">
-                <label>POSITION A</label>
-                <input type="range" min="-1" max="1" step="0.01" bind:value={positionA} />
-                <span class="value">{positionA.toFixed(2)}</span>
+                <label>X POS</label>
+                <input type="range" min="-1" max="1" step="0.01" bind:value={xPosition} />
+                <span class="value">{xPosition.toFixed(2)}</span>
             </div>
             <div class="slider-control">
                 <label>AMPL/DIV B</label>
@@ -365,11 +365,6 @@
                 <label>POSITION B</label>
                 <input type="range" min="-1" max="1" step="0.01" bind:value={positionB} />
                 <span class="value">{positionB.toFixed(2)}</span>
-            </div>
-            <div class="slider-control">
-                <label>X POS</label>
-                <input type="range" min="-1" max="1" step="0.01" bind:value={xPosition} />
-                <span class="value">{xPosition.toFixed(2)}</span>
             </div>
         {:else if mode === 'a'}
             <div class="slider-control">
