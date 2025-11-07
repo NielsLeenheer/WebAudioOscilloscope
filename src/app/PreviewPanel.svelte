@@ -529,7 +529,7 @@
         justify-content: center;
         align-items: center;
         background: #1a1f1a;
-        border-radius: 8px;
+        border-radius: 50px;
         width: 400px;
         height: 400px;
         overflow: hidden; /* Clip the overscan area */
