@@ -1,4 +1,6 @@
 <script>
+    import { Icon } from 'svelte-icon';
+    import powerIcon from '../assets/icons/power.svg?raw';
     let { isPowered = $bindable() } = $props();
 
     function togglePower() {
@@ -8,13 +10,11 @@
 
 <header>
     <button id="power" class:powered={isPowered} onclick={togglePower}>
-        <div class="power-icon">
-            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                <path d="M12 2v10m0 0a5 5 0 0 1 5 5v0a5 5 0 0 1-5 5v0a5 5 0 0 1-5-5v0a5 5 0 0 1 5-5z" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/>
-            </svg>
-        </div>
-        <span>{isPowered ? 'POWER ON' : 'POWER OFF'}</span>
+        <Icon data={powerIcon} />
+        {isPowered ? 'POWER ON' : 'POWER OFF'}
     </button>
+
+    <h1>Oscilloscope</h1>
 </header>
 
 <style>
@@ -30,7 +30,7 @@
     button {
         background-color: #2d2d2d;
         color: #888;
-        border: 2px solid #444;
+        /* border: 2px solid #444; */
         border-radius: 6px;
         height: 36px;
         padding: 0 16px;
@@ -70,5 +70,12 @@
     .power-icon svg {
         width: 100%;
         height: 100%;
+    }
+
+    h1 {
+        margin: 0;
+        color: #555;
+        font-size: 1.5em;
+        margin-left: 0.5em;
     }
 </style>
