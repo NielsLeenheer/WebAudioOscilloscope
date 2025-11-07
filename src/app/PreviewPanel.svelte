@@ -20,6 +20,8 @@
     let velocityDimming = $state(0.90); // How much fast movements dim (0=no dimming, 1=maximum dimming)
     let focus = $state(1.0); // Focus control (1.0 = perfect focus, 0.0 = maximum blur)
     let mode = $state('xy'); // Display mode: 'xy', 'a', or 'b'
+    let timeDiv = $state(1.0); // Time/Div: controls zoom level (1.0 = full buffer, 0.1 = 10% of buffer)
+    let triggerLevel = $state(0.0); // Trigger level: voltage threshold for triggering (-1.0 to 1.0)
 
     onMount(() => {
         // Initialize Web Worker with OffscreenCanvas
@@ -119,6 +121,8 @@
                     persistence,
                     velocityDimming,
                     mode,
+                    timeDiv,
+                    triggerLevel,
                     canvasWidth: 400,
                     canvasHeight: 400
                 }
@@ -167,6 +171,18 @@
             <input type="range" min="0" max="1" step="0.01" bind:value={focus} />
             <span class="value">{focus.toFixed(2)}</span>
         </div>
+        {#if mode !== 'xy'}
+            <div class="slider-control">
+                <label>TIME/DIV</label>
+                <input type="range" min="0.1" max="1" step="0.05" bind:value={timeDiv} />
+                <span class="value">{timeDiv.toFixed(2)}</span>
+            </div>
+            <div class="slider-control">
+                <label>TRIGGER</label>
+                <input type="range" min="-1" max="1" step="0.01" bind:value={triggerLevel} />
+                <span class="value">{triggerLevel.toFixed(2)}</span>
+            </div>
+        {/if}
     </div>
     <details class="controls-details">
         <summary>Physics Controls</summary>

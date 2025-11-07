@@ -60,6 +60,22 @@ function calculateVelocityOpacity(speed, velocityDimming, basePower) {
     return basePower * velocityOpacity;
 }
 
+// Find trigger point: looks for rising edge where signal crosses trigger level
+function findTriggerPoint(data, triggerLevel) {
+    // Start search from 10% into the buffer to avoid edge effects
+    const startSearch = Math.floor(data.length * 0.1);
+
+    for (let i = startSearch; i < data.length - 1; i++) {
+        // Rising edge: previous sample below trigger, current sample above
+        if (data[i] <= triggerLevel && data[i + 1] > triggerLevel) {
+            return i + 1;
+        }
+    }
+
+    // No trigger found, return start position
+    return 0;
+}
+
 self.onmessage = function(e) {
     const { type, data } = e.data;
 
@@ -95,6 +111,8 @@ self.onmessage = function(e) {
             persistence,
             velocityDimming,
             mode,
+            timeDiv,
+            triggerLevel,
             canvasWidth,
             canvasHeight
         } = data;
@@ -194,10 +212,21 @@ self.onmessage = function(e) {
                 }
             }
         } else {
-            // A or B mode: Time-based waveform
+            // A or B mode: Time-based waveform with triggering
             const channelData = mode === 'a' ? leftData : rightData;
 
-            for (let i = 0; i < channelData.length; i++) {
+            // Find trigger point
+            const triggerIndex = findTriggerPoint(channelData, triggerLevel);
+
+            // Calculate how many samples to display based on TIME/DIV
+            const samplesToDisplay = Math.floor(channelData.length * timeDiv);
+
+            // Determine start and end indices
+            const startIndex = triggerIndex;
+            const endIndex = Math.min(startIndex + samplesToDisplay, channelData.length);
+
+            // Render only the triggered portion
+            for (let i = startIndex; i < endIndex; i++) {
                 // Add noise to audio signal if enabled
                 let signal = channelData[i];
 
@@ -205,8 +234,9 @@ self.onmessage = function(e) {
                     signal += (Math.random() - 0.5) * signalNoise;
                 }
 
-                // X position is based on time (index)
-                const targetX = (i / channelData.length) * canvasWidth;
+                // X position is based on relative time position within displayed window
+                const relativeIndex = i - startIndex;
+                const targetX = (relativeIndex / samplesToDisplay) * canvasWidth;
                 // Y position is based on amplitude (centered)
                 const targetY = centerY - (signal * scale);
 
