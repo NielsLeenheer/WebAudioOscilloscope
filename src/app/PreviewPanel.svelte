@@ -587,16 +587,17 @@
     }
 
     .physics-dialog {
-        position: absolute;
-        top: 70px;
+        position: fixed;
+        top: 20px;
         right: 20px;
         margin: 0;
         padding: 0;
-        background: #1a1a1a;
-        border: 1px solid #333;
+        background: rgba(26, 26, 26, 0.2);
+        border: 1px solid rgba(51, 51, 51, 0.2);
         border-radius: 4px;
         color: #4CAF50;
         min-width: 300px;
+        backdrop-filter: blur(10px);
     }
 
     .physics-dialog::backdrop {
