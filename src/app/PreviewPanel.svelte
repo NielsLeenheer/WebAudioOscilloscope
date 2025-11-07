@@ -24,7 +24,7 @@
     let beamPower = $state(0.75); // Beam power (affects opacity: high power = bright, low power = dim)
     let velocityDimming = $state(0.90); // How much fast movements dim (0=no dimming, 1=maximum dimming)
     let focus = $state(0.2); // Focus control (-1.0 to 1.0, 0.0 = perfect focus, abs value = blur amount)
-    let mode = $state('xy'); // Display mode: 'xy', 'a', 'b', or 'ab'
+    let mode = $state('a'); // Display mode: 'a', 'b', 'ab', or 'xy'
     let timeDiv = $state(1.0); // Time/Div: controls zoom level (1.0 = full buffer, 0.1 = 10% of buffer)
     let triggerLevel = $state(0.0); // Trigger level: voltage threshold for triggering (-1.0 to 1.0)
     let amplDivA = $state(0.6); // Ampl/Div A: vertical amplitude scaling for channel A (0.1 to 2.0)
@@ -344,6 +344,12 @@
 </script>
 
 <div class="preview-panel">
+    <div class="mode-selector">
+        <button class:active={mode === 'a'} onclick={() => mode = 'a'}>A</button>
+        <button class:active={mode === 'b'} onclick={() => mode = 'b'}>B</button>
+        <button class:active={mode === 'ab'} onclick={() => mode = 'ab'}>A/B</button>
+        <button class:active={mode === 'xy'} onclick={() => mode = 'xy'}>X/Y</button>
+    </div>
     <div class="canvas-container">
         <canvas
             bind:this={canvas}
@@ -359,12 +365,6 @@
             class="grid-canvas"
         ></canvas>
     </div>
-    <div class="mode-selector">
-        <button class:active={mode === 'xy'} onclick={() => mode = 'xy'}>X/Y</button>
-        <button class:active={mode === 'a'} onclick={() => mode = 'a'}>A</button>
-        <button class:active={mode === 'b'} onclick={() => mode = 'b'}>B</button>
-        <button class:active={mode === 'ab'} onclick={() => mode = 'ab'}>A/B</button>
-    </div>
     <div class="visible-controls">
         <div class="slider-control">
             <label>INTENS</label>
@@ -379,7 +379,7 @@
         {#if mode === 'xy'}
             <div class="slider-control">
                 <label>AMPL/DIV A</label>
-                <input type="range" min="0.1" max="2" step="0.1" bind:value={amplDivA} />
+                <input type="range" min="0.1" max="16" step="0.1" bind:value={amplDivA} />
                 <span class="value">{amplDivA.toFixed(1)}</span>
             </div>
             <div class="slider-control">
@@ -389,7 +389,7 @@
             </div>
             <div class="slider-control">
                 <label>AMPL/DIV B</label>
-                <input type="range" min="0.1" max="2" step="0.1" bind:value={amplDivB} />
+                <input type="range" min="0.1" max="16" step="0.1" bind:value={amplDivB} />
                 <span class="value">{amplDivB.toFixed(1)}</span>
             </div>
             <div class="slider-control">
@@ -405,7 +405,7 @@
             </div>
             <div class="slider-control">
                 <label>AMPL/DIV A</label>
-                <input type="range" min="0.1" max="2" step="0.1" bind:value={amplDivA} />
+                <input type="range" min="0.1" max="16" step="0.1" bind:value={amplDivA} />
                 <span class="value">{amplDivA.toFixed(1)}</span>
             </div>
             <div class="slider-control">
@@ -431,7 +431,7 @@
             </div>
             <div class="slider-control">
                 <label>AMPL/DIV B</label>
-                <input type="range" min="0.1" max="2" step="0.1" bind:value={amplDivB} />
+                <input type="range" min="0.1" max="16" step="0.1" bind:value={amplDivB} />
                 <span class="value">{amplDivB.toFixed(1)}</span>
             </div>
             <div class="slider-control">
@@ -457,7 +457,7 @@
             </div>
             <div class="slider-control">
                 <label>AMPL/DIV A</label>
-                <input type="range" min="0.1" max="2" step="0.1" bind:value={amplDivA} />
+                <input type="range" min="0.1" max="16" step="0.1" bind:value={amplDivA} />
                 <span class="value">{amplDivA.toFixed(1)}</span>
             </div>
             <div class="slider-control">
@@ -467,7 +467,7 @@
             </div>
             <div class="slider-control">
                 <label>AMPL/DIV B</label>
-                <input type="range" min="0.1" max="2" step="0.1" bind:value={amplDivB} />
+                <input type="range" min="0.1" max="16" step="0.1" bind:value={amplDivB} />
                 <span class="value">{amplDivB.toFixed(1)}</span>
             </div>
             <div class="slider-control">

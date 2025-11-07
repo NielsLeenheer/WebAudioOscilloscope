@@ -9,7 +9,7 @@
 
     let audioEngine = new AudioEngine();
     let isPlaying = $state(false);
-    let activeTab = $state('instructions');
+    let activeTab = $state('shapes');
     let inputSource = $state('generated'); // 'generated' or 'microphone'
     let isPowered = $state(false);
 
