@@ -431,19 +431,11 @@
                 <input type="range" min="-1" max="1" step="0.01" bind:value={positionA} disabled={mode === 'b'} />
                 <span class="value">{positionA.toFixed(2)}</span>
             </div>
-            <div class="slider-control">
+            <div class="slider-control dual-slider">
                 <label>AMPL/DIV</label>
-                <select bind:value={amplBaseA} disabled={mode === 'b'}>
-                    {#each amplLabels as label, i}
-                        <option value={i}>{label}</option>
-                    {/each}
-                </select>
+                <input type="range" min="0" max="11" step="1" bind:value={amplBaseA} disabled={mode === 'b'} class="base-slider" />
+                <input type="range" min="0.5" max="2.5" step="0.01" bind:value={amplFineA} disabled={mode === 'b'} class="fine-slider" />
                 <span class="value">{amplLabels[amplBaseA]}</span>
-            </div>
-            <div class="slider-control">
-                <label>FINE</label>
-                <input type="range" min="0.5" max="2.5" step="0.01" bind:value={amplFineA} disabled={mode === 'b'} />
-                <span class="value">{amplFineA.toFixed(2)}×</span>
             </div>
         </div>
 
@@ -455,19 +447,11 @@
                 <input type="range" min="-1" max="1" step="0.01" bind:value={positionB} disabled={mode === 'a'} />
                 <span class="value">{positionB.toFixed(2)}</span>
             </div>
-            <div class="slider-control">
+            <div class="slider-control dual-slider">
                 <label>AMPL/DIV</label>
-                <select bind:value={amplBaseB} disabled={mode === 'a'}>
-                    {#each amplLabels as label, i}
-                        <option value={i}>{label}</option>
-                    {/each}
-                </select>
+                <input type="range" min="0" max="11" step="1" bind:value={amplBaseB} disabled={mode === 'a'} class="base-slider" />
+                <input type="range" min="0.5" max="2.5" step="0.01" bind:value={amplFineB} disabled={mode === 'a'} class="fine-slider" />
                 <span class="value">{amplLabels[amplBaseB]}</span>
-            </div>
-            <div class="slider-control">
-                <label>FINE</label>
-                <input type="range" min="0.5" max="2.5" step="0.01" bind:value={amplFineB} disabled={mode === 'a'} />
-                <span class="value">{amplFineB.toFixed(2)}×</span>
             </div>
         </div>
     </div>
@@ -796,5 +780,17 @@
     .slider-control select option {
         background: #2d2d2d;
         color: #4CAF50;
+    }
+
+    .slider-control.dual-slider {
+        grid-template-columns: 80px 1fr 1fr 50px;
+    }
+
+    .slider-control.dual-slider .base-slider {
+        width: 100%;
+    }
+
+    .slider-control.dual-slider .fine-slider {
+        width: 100%;
     }
 </style>
