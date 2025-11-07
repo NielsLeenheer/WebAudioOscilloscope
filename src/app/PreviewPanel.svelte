@@ -27,8 +27,19 @@
     let beamPower = $state(0.75); // Beam power (affects opacity: high power = bright, low power = dim)
     let velocityDimming = $state(0.90); // How much fast movements dim (0=no dimming, 1=maximum dimming)
     let focus = $state(0.2); // Focus control (-1.0 to 1.0, 0.0 = perfect focus, abs value = blur amount)
-    let timeDiv = $state(1.0); // Time/Div: controls zoom level (1.0 = full buffer, 0.1 = 10% of buffer)
+
+    // Time division steps (like real oscilloscope) - stored in microseconds for easy calculation
+    const timeDivSteps = [0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000, 50000, 100000, 200000, 500000];
+    const timeDivLabels = ['0.05µs', '0.1µs', '0.2µs', '0.5µs', '1µs', '2µs', '5µs', '10µs', '20µs', '50µs', '0.1ms', '0.2ms', '0.5ms', '1ms', '2ms', '5ms', '10ms', '20ms', '50ms', '0.1s', '0.2s', '0.5s'];
+
+    let timeDivBase = $state(13); // Index into timeDivSteps (default 1ms)
+    let timeDivFine = $state(1.0); // Fine adjustment multiplier (0.5 to 2.5)
     let triggerLevel = $state(0.0); // Trigger level: voltage threshold for triggering (-1.0 to 1.0)
+
+    // Calculate combined time division (normalized to 0-1 range where 1.0 = full buffer)
+    // Map the time values to zoom level: smaller time = more zoomed in = smaller timeDiv value
+    let timeDiv = $derived(Math.min(1.0, (timeDivSteps[timeDivBase] * timeDivFine) / 500000));
+
     // Base amplification steps (like real oscilloscope)
     const amplSteps = [0.002, 0.005, 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10];
     const amplLabels = ['2mV', '5mV', '10mV', '20mV', '50mV', '0.1V', '0.2V', '0.5V', '1V', '2V', '5V', '10V'];
@@ -411,10 +422,11 @@
                 <input type="range" min="-1" max="1" step="0.01" bind:value={xPosition} />
                 <span class="value">{xPosition.toFixed(2)}</span>
             </div>
-            <div class="slider-control" class:disabled={mode === 'xy'}>
+            <div class="slider-control dual-slider" class:disabled={mode === 'xy'}>
                 <label>TIME/DIV</label>
-                <input type="range" min="0.1" max="1" step="0.05" bind:value={timeDiv} disabled={mode === 'xy'} />
-                <span class="value">{timeDiv.toFixed(2)}</span>
+                <input type="range" min="0" max="21" step="1" bind:value={timeDivBase} disabled={mode === 'xy'} class="base-slider" />
+                <input type="range" min="0.5" max="2.5" step="0.01" bind:value={timeDivFine} disabled={mode === 'xy'} class="fine-slider" />
+                <span class="value">{timeDivLabels[timeDivBase]}</span>
             </div>
             <div class="slider-control" class:disabled={mode === 'xy'}>
                 <label>TRIGGER</label>
