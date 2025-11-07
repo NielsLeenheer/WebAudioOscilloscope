@@ -361,20 +361,22 @@
     <button class="physics-button" onclick={openPhysicsDialog}>
         <Icon data={sineIcon} />
     </button>
-    <div class="canvas-container">
-        <canvas
-            bind:this={canvas}
-            width="600"
-            height="600"
-            class="scope-canvas"
-            style="filter: blur({Math.abs(focus) * 3}px);"
-        ></canvas>
-        <canvas
-            bind:this={gridCanvas}
-            width="600"
-            height="600"
-            class="grid-canvas"
-        ></canvas>
+    <div class="canvas-area">
+        <div class="canvas-container">
+            <canvas
+                bind:this={canvas}
+                width="600"
+                height="600"
+                class="scope-canvas"
+                style="filter: blur({Math.abs(focus) * 3}px);"
+            ></canvas>
+            <canvas
+                bind:this={gridCanvas}
+                width="600"
+                height="600"
+                class="grid-canvas"
+            ></canvas>
+        </div>
     </div>
     <div class="controls-grid">
         <!-- Top Left: Display Controls -->
@@ -486,11 +488,17 @@
         background: transparent;
         display: flex;
         flex-direction: column;
-        align-items: center;
         height: 100%;
-        padding: 20px;
         box-sizing: border-box;
         position: relative;
+    }
+
+    .canvas-area {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 0;
     }
 
     .physics-button {
@@ -554,7 +562,6 @@
         gap: 10px;
         padding: 20px;
         width: 100%;
-        max-width: 800px;
         box-sizing: border-box;
     }
 
