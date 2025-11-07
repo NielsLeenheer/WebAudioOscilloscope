@@ -1,7 +1,6 @@
 <script>
     import { Icon } from 'svelte-icon';
-    import connectIcon from '../assets/icons/connect.svg?raw';
-    import disconnectIcon from '../assets/icons/disconnect.svg?raw';
+    import powerIcon from '../assets/icons/power.svg?raw';
     import audioPlayingGif from '../assets/audio-playing.gif';
 
     let { isPlaying, start, stop } = $props();
@@ -10,15 +9,17 @@
 <header>
     {#if !isPlaying}
     <button id="start" onclick={() => start()}>
-        <Icon data={connectIcon} />
-        Generate sound
+        <Icon data={powerIcon} />
+        POWER ON
     </button>
     {:else}
     <button id="stop" onclick={() => stop()}>
-        <Icon data={disconnectIcon} />
-        Stop
+        <Icon data={powerIcon} />
+        POWER OFF
     </button>
     {/if}
+
+    <h1>Generator</h1>
 
     {#if isPlaying}
     <img src={audioPlayingGif} alt="Audio playing" class="audio-playing" />
@@ -55,15 +56,13 @@
     button#start {
         background-color: #bbdefb;
         color: #1976d2;
-        border-color: #1976d2;
+        border: none;
     }
 
-    button#start:hover {
-        background-color: #90caf9;
-    }
-
-    button#stop:hover {
-        background-color: #f5f5f5;
+    button#stop {
+        background-color: #1976d2;
+        color: #bbdefb;
+        border: none;
     }
 
     button :global(svg) {
@@ -77,4 +76,12 @@
         margin-left: 8px;
         mix-blend-mode: multiply;
     }
+
+    h1 {
+        margin: 0;
+        color: #aaa;
+        font-size: 1.5em;
+        margin-left: 0.5em;
+    }
+
 </style>
