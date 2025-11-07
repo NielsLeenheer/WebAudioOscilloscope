@@ -76,6 +76,149 @@ function findTriggerPoint(data, triggerLevel) {
     return 0;
 }
 
+// ============================================================================
+// STAGE A: SIGNAL PROCESSING
+// Add noise to raw audio data (same for all modes)
+// ============================================================================
+function processSignals(leftData, rightData, signalNoise) {
+    const processedLeft = [];
+    const processedRight = [];
+
+    for (let i = 0; i < leftData.length; i++) {
+        let left = leftData[i];
+        let right = rightData[i];
+
+        // Add noise if enabled
+        if (signalNoise > 0) {
+            left += (Math.random() - 0.5) * signalNoise;
+            right += (Math.random() - 0.5) * signalNoise;
+        }
+
+        processedLeft.push(left);
+        processedRight.push(right);
+    }
+
+    return { processedLeft, processedRight };
+}
+
+// ============================================================================
+// STAGE B: INTERPRETATION
+// Convert processed signals to target coordinates based on mode
+// ============================================================================
+function interpretSignals(processedLeft, processedRight, mode, scale, centerX, centerY, canvasWidth, timeDiv, triggerLevel) {
+    const targets = [];
+
+    if (mode === 'xy') {
+        // X/Y mode: left channel = X, right channel = Y
+        for (let i = 0; i < processedLeft.length; i++) {
+            const targetX = processedLeft[i] * scale;
+            const targetY = -processedRight[i] * scale;
+            targets.push({ x: targetX, y: targetY });
+        }
+    } else {
+        // A or B mode: Time-based waveform with triggering
+        const channelData = mode === 'a' ? processedLeft : processedRight;
+
+        // Find trigger point
+        const triggerIndex = findTriggerPoint(channelData, triggerLevel);
+
+        // Calculate how many samples to display based on TIME/DIV
+        const samplesToDisplay = Math.floor(channelData.length * timeDiv);
+
+        // Determine start and end indices
+        const startIndex = triggerIndex;
+        const endIndex = Math.min(startIndex + samplesToDisplay, channelData.length);
+
+        // Create target coordinates for the triggered portion
+        for (let i = startIndex; i < endIndex; i++) {
+            const relativeIndex = i - startIndex;
+            // X position is based on time
+            const targetX = (relativeIndex / samplesToDisplay) * canvasWidth - centerX;
+            // Y position is based on amplitude
+            const targetY = -channelData[i] * scale;
+            targets.push({ x: targetX, y: targetY });
+        }
+    }
+
+    return targets;
+}
+
+// ============================================================================
+// STAGE C: PHYSICS SIMULATION
+// Apply electron beam physics uniformly to all target coordinates
+// ============================================================================
+function simulatePhysics(targets, forceMultiplier, damping, mass, scale, centerX, centerY) {
+    const points = [];
+    const speeds = [];
+
+    for (let i = 0; i < targets.length; i++) {
+        const target = targets[i];
+
+        // Calculate force (like a spring pulling beam to target)
+        const forceX = (target.x - beamX) * forceMultiplier;
+        const forceY = (target.y - beamY) * forceMultiplier;
+
+        // Calculate acceleration (F = ma, so a = F/m)
+        const accelX = forceX / mass;
+        const accelY = forceY / mass;
+
+        // Update velocity
+        velocityX += accelX;
+        velocityY += accelY;
+
+        // Apply damping (friction/air resistance)
+        velocityX *= damping;
+        velocityY *= damping;
+
+        // Update position
+        beamX += velocityX;
+        beamY += velocityY;
+
+        // Safety checks: prevent NaN/Infinity and extreme values
+        if (!isFinite(beamX) || !isFinite(beamY) || !isFinite(velocityX) || !isFinite(velocityY)) {
+            // Reset to origin if values become invalid
+            beamX = 0;
+            beamY = 0;
+            velocityX = 0;
+            velocityY = 0;
+            smoothedBeamX = 0;
+            smoothedBeamY = 0;
+        } else {
+            // Clamp beam position to reasonable bounds (prevent runaway)
+            const maxPosition = scale * 10;
+            beamX = Math.max(-maxPosition, Math.min(maxPosition, beamX));
+            beamY = Math.max(-maxPosition, Math.min(maxPosition, beamY));
+
+            // Clamp velocities to prevent extreme values
+            const maxVelocity = scale * 2;
+            velocityX = Math.max(-maxVelocity, Math.min(maxVelocity, velocityX));
+            velocityY = Math.max(-maxVelocity, Math.min(maxVelocity, velocityY));
+        }
+
+        // Apply exponential smoothing to positions
+        // This creates naturally smooth movement while preserving physics accuracy
+        smoothedBeamX = SMOOTHING_ALPHA * beamX + (1 - SMOOTHING_ALPHA) * smoothedBeamX;
+        smoothedBeamY = SMOOTHING_ALPHA * beamY + (1 - SMOOTHING_ALPHA) * smoothedBeamY;
+
+        // Convert to screen coordinates using smoothed positions
+        const screenX = centerX + smoothedBeamX;
+        const screenY = centerY + smoothedBeamY;
+
+        points.push({ x: screenX, y: screenY });
+
+        // Calculate speed for this point
+        if (points.length > 1) {
+            const prev = points[points.length - 2];
+            const dx = screenX - prev.x;
+            const dy = screenY - prev.y;
+            const speed = Math.sqrt(dx * dx + dy * dy);
+            speeds.push(speed);
+        }
+    }
+
+    return { points, speeds };
+}
+
 self.onmessage = function(e) {
     const { type, data } = e.data;
 
@@ -126,158 +269,27 @@ self.onmessage = function(e) {
         // Draw grid
         drawGrid(ctx, centerX, centerY, canvasWidth, canvasHeight);
 
-        // Calculate physics and collect all points first
+        // ========================================================================
+        // THREE-STAGE RENDERING PIPELINE
+        // ========================================================================
+
+        // STAGE A: Signal Processing - Add noise to raw audio data
+        const { processedLeft, processedRight } = processSignals(leftData, rightData, signalNoise);
+
+        // STAGE B: Interpretation - Convert signals to target coordinates based on mode
+        const targets = interpretSignals(processedLeft, processedRight, mode, scale, centerX, centerY, canvasWidth, timeDiv, triggerLevel);
+
+        // STAGE C: Physics Simulation - Apply electron beam physics uniformly
+        const { points, speeds } = simulatePhysics(targets, forceMultiplier, damping, mass, scale, centerX, centerY);
+
+        // ========================================================================
+        // RENDERING - Draw the simulated beam path
+        // ========================================================================
+
+        // Configure canvas for drawing
         ctx.lineWidth = 1.5;
         ctx.lineCap = 'butt'; // Use 'butt' to prevent overlapping caps at connection points
         ctx.lineJoin = 'round';
-
-        const points = [];
-        const speeds = [];
-
-        if (mode === 'xy') {
-            // X/Y mode: left channel = X, right channel = Y
-            for (let i = 0; i < leftData.length; i++) {
-                // Add noise to audio signal if enabled
-                let leftSignal = leftData[i];
-                let rightSignal = rightData[i];
-
-                if (signalNoise > 0) {
-                    leftSignal += (Math.random() - 0.5) * signalNoise;
-                    rightSignal += (Math.random() - 0.5) * signalNoise;
-                }
-
-                // Target position from audio data (with noise)
-                const targetX = leftSignal * scale;
-                const targetY = -rightSignal * scale;
-
-                // Calculate force (like a spring pulling beam to target)
-                const forceX = (targetX - beamX) * forceMultiplier;
-                const forceY = (targetY - beamY) * forceMultiplier;
-
-                // Calculate acceleration (F = ma, so a = F/m)
-                const accelX = forceX / mass;
-                const accelY = forceY / mass;
-
-                // Update velocity
-                velocityX += accelX;
-                velocityY += accelY;
-
-                // Apply damping (friction/air resistance)
-                velocityX *= damping;
-                velocityY *= damping;
-
-                // Update position
-                beamX += velocityX;
-                beamY += velocityY;
-
-                // Safety checks: prevent NaN/Infinity and extreme values
-                if (!isFinite(beamX) || !isFinite(beamY) || !isFinite(velocityX) || !isFinite(velocityY)) {
-                    // Reset to origin if values become invalid
-                    beamX = 0;
-                    beamY = 0;
-                    velocityX = 0;
-                    velocityY = 0;
-                    smoothedBeamX = 0;
-                    smoothedBeamY = 0;
-                } else {
-                    // Clamp beam position to reasonable bounds (prevent runaway)
-                    const maxPosition = scale * 10; // Allow some overshoot but not too much
-                    beamX = Math.max(-maxPosition, Math.min(maxPosition, beamX));
-                    beamY = Math.max(-maxPosition, Math.min(maxPosition, beamY));
-
-                    // Clamp velocities to prevent extreme values
-                    const maxVelocity = scale * 2;
-                    velocityX = Math.max(-maxVelocity, Math.min(maxVelocity, velocityX));
-                    velocityY = Math.max(-maxVelocity, Math.min(maxVelocity, velocityY));
-                }
-
-                // Apply exponential smoothing to positions
-                // This creates naturally smooth movement while preserving physics accuracy
-                smoothedBeamX = SMOOTHING_ALPHA * beamX + (1 - SMOOTHING_ALPHA) * smoothedBeamX;
-                smoothedBeamY = SMOOTHING_ALPHA * beamY + (1 - SMOOTHING_ALPHA) * smoothedBeamY;
-
-                // Convert to screen coordinates using smoothed positions
-                const screenX = centerX + smoothedBeamX;
-                const screenY = centerY + smoothedBeamY;
-
-                points.push({ x: screenX, y: screenY });
-
-                // Calculate speed for this point
-                if (points.length > 1) {
-                    const prev = points[points.length - 2];
-                    const dx = screenX - prev.x;
-                    const dy = screenY - prev.y;
-                    const speed = Math.sqrt(dx * dx + dy * dy);
-                    speeds.push(speed);
-                }
-            }
-        } else {
-            // A or B mode: Time-based waveform with triggering
-            const channelData = mode === 'a' ? leftData : rightData;
-
-            // Find trigger point
-            const triggerIndex = findTriggerPoint(channelData, triggerLevel);
-
-            // Calculate how many samples to display based on TIME/DIV
-            const samplesToDisplay = Math.floor(channelData.length * timeDiv);
-
-            // Determine start and end indices
-            const startIndex = triggerIndex;
-            const endIndex = Math.min(startIndex + samplesToDisplay, channelData.length);
-
-            // Render only the triggered portion
-            for (let i = startIndex; i < endIndex; i++) {
-                // Add noise to audio signal if enabled
-                let signal = channelData[i];
-
-                if (signalNoise > 0) {
-                    signal += (Math.random() - 0.5) * signalNoise;
-                }
-
-                // X position is based on relative time position within displayed window
-                const relativeIndex = i - startIndex;
-                const targetX = (relativeIndex / samplesToDisplay) * canvasWidth;
-                // Y position is based on amplitude (centered)
-                const targetY = centerY - (signal * scale);
-
-                // Apply physics simulation for Y axis only
-                const forceY = (targetY - beamY) * forceMultiplier;
-                const accelY = forceY / mass;
-                velocityY += accelY;
-                velocityY *= damping;
-                beamY += velocityY;
-
-                // Safety checks for Y
-                if (!isFinite(beamY) || !isFinite(velocityY)) {
-                    beamY = centerY;
-                    velocityY = 0;
-                    smoothedBeamY = centerY;
-                } else {
-                    const maxPosition = scale * 10;
-                    beamY = Math.max(centerY - maxPosition, Math.min(centerY + maxPosition, beamY));
-                    const maxVelocity = scale * 2;
-                    velocityY = Math.max(-maxVelocity, Math.min(maxVelocity, velocityY));
-                }
-
-                // Apply smoothing to Y position only
-                smoothedBeamY = SMOOTHING_ALPHA * beamY + (1 - SMOOTHING_ALPHA) * smoothedBeamY;
-
-                // Screen coordinates: X is time, Y is smoothed amplitude
-                const screenX = targetX;
-                const screenY = smoothedBeamY;
-
-                points.push({ x: screenX, y: screenY });
-
-                // Calculate speed for this point
-                if (points.length > 1) {
-                    const prev = points[points.length - 2];
-                    const dx = screenX - prev.x;
-                    const dy = screenY - prev.y;
-                    const speed = Math.sqrt(dx * dx + dy * dy);
-                    speeds.push(speed);
-                }
-            }
-        }
 
         // Draw each segment with gradual velocity-based dimming using smooth curves
         // Split each Bézier curve into sub-segments with ease-in-out opacity transitions
