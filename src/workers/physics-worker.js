@@ -60,21 +60,6 @@ function calculateVelocityOpacity(speed, velocityDimming, basePower) {
     return basePower * velocityOpacity;
 }
 
-// Get color based on channel (for A/B dual-trace mode)
-function getChannelColor(point, opacity) {
-    if (!point.channel) {
-        // Default green phosphor for single-channel modes
-        return `rgba(76, 175, 80, ${opacity})`;
-    }
-    if (point.channel === 'a') {
-        // Green for channel A
-        return `rgba(76, 175, 80, ${opacity})`;
-    } else {
-        // Yellow-green for channel B (for differentiation)
-        return `rgba(205, 220, 57, ${opacity})`;
-    }
-}
-
 // Find trigger point: looks for rising edge where signal crosses trigger level
 function findTriggerPoint(data, triggerLevel) {
     // Start search from 10% into the buffer to avoid edge effects
@@ -138,38 +123,6 @@ function interpretSignals(processedLeft, processedRight, mode, scale, centerX, c
             const targetY = -processedRight[i] * scale * amplDivB + posOffsetB;
 
             targets.push({ x: targetX, y: targetY });
-        }
-    } else if (mode === 'ab') {
-        // A/B dual-trace mode: Show both channels overlaid
-        // We'll mark which channel each target belongs to
-
-        // Find trigger point (use channel A for triggering)
-        const triggerIndex = findTriggerPoint(processedLeft, triggerLevel);
-
-        // Calculate how many samples to display based on TIME/DIV
-        const samplesToDisplay = Math.floor(processedLeft.length * timeDiv);
-
-        // Determine start and end indices
-        const startIndex = triggerIndex;
-        const endIndex = Math.min(startIndex + samplesToDisplay, processedLeft.length);
-
-        // X position offset
-        const xOffset = xPosition * canvasWidth;
-
-        // Create target coordinates for both channels
-        for (let i = startIndex; i < endIndex; i++) {
-            const relativeIndex = i - startIndex;
-            const targetX = (relativeIndex / samplesToDisplay) * canvasWidth - centerX + xOffset;
-
-            // Channel A target
-            const yOffsetA = positionA * scale * 2;
-            const targetYA = -processedLeft[i] * scale * amplDivA + yOffsetA;
-            targets.push({ x: targetX, y: targetYA, channel: 'a' });
-
-            // Channel B target
-            const yOffsetB = positionB * scale * 2;
-            const targetYB = -processedRight[i] * scale * amplDivB + yOffsetB;
-            targets.push({ x: targetX, y: targetYB, channel: 'b' });
         }
     } else {
         // A or B mode: Time-based waveform with triggering
@@ -268,12 +221,7 @@ function simulatePhysics(targets, forceMultiplier, damping, mass, scale, centerX
         const screenX = centerX + smoothedBeamX;
         const screenY = centerY + smoothedBeamY;
 
-        // Preserve channel information if present (for A/B mode)
-        const point = { x: screenX, y: screenY };
-        if (target.channel) {
-            point.channel = target.channel;
-        }
-        points.push(point);
+        points.push({ x: screenX, y: screenY });
 
         // Calculate speed for this point
         if (points.length > 1) {
@@ -286,6 +234,85 @@ function simulatePhysics(targets, forceMultiplier, damping, mass, scale, centerX
     }
 
     return { points, speeds };
+}
+
+// ============================================================================
+// RENDERING - Draw the simulated beam path
+// ============================================================================
+function renderTrace(ctx, points, speeds, velocityDimming, basePower) {
+    // Configure canvas for drawing
+    ctx.lineWidth = 1.5;
+    ctx.lineCap = 'butt'; // Use 'butt' to prevent overlapping caps at connection points
+    ctx.lineJoin = 'round';
+
+    // Draw each segment with gradual velocity-based dimming using smooth curves
+    // Split each Bézier curve into sub-segments with ease-in-out opacity transitions
+    if (points.length > 2) {
+        // First segment: start at first point, straight line to midpoint
+        const firstMidX = (points[0].x + points[1].x) / 2;
+        const firstMidY = (points[0].y + points[1].y) / 2;
+
+        const firstOpacity = calculateVelocityOpacity(speeds[0] || 0, velocityDimming, basePower);
+        ctx.beginPath();
+        ctx.moveTo(points[0].x, points[0].y);
+        ctx.lineTo(firstMidX, firstMidY);
+        ctx.strokeStyle = `rgba(76, 175, 80, ${firstOpacity})`;
+        ctx.stroke();
+
+        // Middle segments: curve from midpoint to midpoint through the actual point
+        // Split each curve into sub-segments for gradual opacity changes
+        for (let i = 1; i < points.length - 1; i++) {
+            const prevMidX = (points[i - 1].x + points[i].x) / 2;
+            const prevMidY = (points[i - 1].y + points[i].y) / 2;
+            const nextMidX = (points[i].x + points[i + 1].x) / 2;
+            const nextMidY = (points[i].y + points[i + 1].y) / 2;
+
+            // Estimate curve length to determine number of sub-segments
+            const curveLength = estimateBezierLength(prevMidX, prevMidY, points[i].x, points[i].y, nextMidX, nextMidY);
+            const numSubSegments = Math.max(1, Math.min(MAX_SUBSEGMENTS, Math.floor(curveLength / MIN_SUBSEGMENT_LENGTH)));
+
+            // Get opacities for current and next point
+            const currentSpeed = speeds[i] || 0;
+            const nextSpeed = speeds[i + 1] || 0;
+            const currentOpacity = calculateVelocityOpacity(currentSpeed, velocityDimming, basePower);
+            const nextOpacity = calculateVelocityOpacity(nextSpeed, velocityDimming, basePower);
+
+            // Draw curve as multiple sub-segments with interpolated opacity
+            for (let s = 0; s < numSubSegments; s++) {
+                const t1 = s / numSubSegments;
+                const t2 = (s + 1) / numSubSegments;
+
+                // Calculate points on the Bézier curve
+                // Offset start point very slightly to avoid overlapping with previous segment's endpoint
+                const t1Offset = s === 0 ? t1 : t1 + 0.001 / numSubSegments;
+                const pt1 = quadraticBezierPoint(prevMidX, prevMidY, points[i].x, points[i].y, nextMidX, nextMidY, t1Offset);
+                const pt2 = quadraticBezierPoint(prevMidX, prevMidY, points[i].x, points[i].y, nextMidX, nextMidY, t2);
+
+                // Interpolate opacity with ease-in (slow start, then accelerate)
+                const easedT = easeInQuartic(t1 + 0.5 / numSubSegments); // Use middle of sub-segment
+                const interpolatedOpacity = currentOpacity + (nextOpacity - currentOpacity) * easedT;
+
+                // Draw sub-segment
+                ctx.beginPath();
+                ctx.moveTo(pt1.x, pt1.y);
+                ctx.lineTo(pt2.x, pt2.y);
+                ctx.strokeStyle = `rgba(76, 175, 80, ${interpolatedOpacity})`;
+                ctx.stroke();
+            }
+        }
+
+        // Last segment: straight line from midpoint to last point
+        const lastIdx = points.length - 1;
+        const lastMidX = (points[lastIdx - 1].x + points[lastIdx].x) / 2;
+        const lastMidY = (points[lastIdx - 1].y + points[lastIdx].y) / 2;
+
+        const lastOpacity = calculateVelocityOpacity(speeds[lastIdx - 1] || 0, velocityDimming, basePower);
+        ctx.beginPath();
+        ctx.moveTo(lastMidX, lastMidY);
+        ctx.lineTo(points[lastIdx].x, points[lastIdx].y);
+        ctx.strokeStyle = `rgba(76, 175, 80, ${lastOpacity})`;
+        ctx.stroke();
+    }
 }
 
 self.onmessage = function(e) {
@@ -348,88 +375,31 @@ self.onmessage = function(e) {
         // STAGE A: Signal Processing - Add noise to raw audio data
         const { processedLeft, processedRight } = processSignals(leftData, rightData, signalNoise);
 
-        // STAGE B: Interpretation - Convert signals to target coordinates based on mode
-        const targets = interpretSignals(processedLeft, processedRight, mode, scale, centerX, centerY, canvasWidth, timeDiv, triggerLevel, amplDivA, positionA, amplDivB, positionB, xPosition);
+        // Handle A/B mode: render both channels sequentially
+        const modesToRender = mode === 'ab' ? ['a', 'b'] : [mode];
 
-        // STAGE C: Physics Simulation - Apply electron beam physics uniformly
-        const { points, speeds } = simulatePhysics(targets, forceMultiplier, damping, mass, scale, centerX, centerY);
+        for (const currentMode of modesToRender) {
+            // STAGE B: Interpretation - Convert signals to target coordinates based on mode
+            const targets = interpretSignals(processedLeft, processedRight, currentMode, scale, centerX, centerY, canvasWidth, timeDiv, triggerLevel, amplDivA, positionA, amplDivB, positionB, xPosition);
 
-        // ========================================================================
-        // RENDERING - Draw the simulated beam path
-        // ========================================================================
+            // STAGE C: Physics Simulation - Apply electron beam physics uniformly
+            const { points, speeds } = simulatePhysics(targets, forceMultiplier, damping, mass, scale, centerX, centerY);
 
-        // Configure canvas for drawing
-        ctx.lineWidth = 1.5;
-        ctx.lineCap = 'butt'; // Use 'butt' to prevent overlapping caps at connection points
-        ctx.lineJoin = 'round';
+            // ========================================================================
+            // RENDERING - Draw the simulated beam path
+            // ========================================================================
 
-        // Draw each segment with gradual velocity-based dimming using smooth curves
-        // Split each Bézier curve into sub-segments with ease-in-out opacity transitions
-        if (points.length > 2) {
-            // First segment: start at first point, straight line to midpoint
-            const firstMidX = (points[0].x + points[1].x) / 2;
-            const firstMidY = (points[0].y + points[1].y) / 2;
+            renderTrace(ctx, points, speeds, velocityDimming, basePower);
 
-            const firstOpacity = calculateVelocityOpacity(speeds[0] || 0, velocityDimming, basePower);
-            ctx.beginPath();
-            ctx.moveTo(points[0].x, points[0].y);
-            ctx.lineTo(firstMidX, firstMidY);
-            ctx.strokeStyle = getChannelColor(points[0], firstOpacity);
-            ctx.stroke();
-
-            // Middle segments: curve from midpoint to midpoint through the actual point
-            // Split each curve into sub-segments for gradual opacity changes
-            for (let i = 1; i < points.length - 1; i++) {
-                const prevMidX = (points[i - 1].x + points[i].x) / 2;
-                const prevMidY = (points[i - 1].y + points[i].y) / 2;
-                const nextMidX = (points[i].x + points[i + 1].x) / 2;
-                const nextMidY = (points[i].y + points[i + 1].y) / 2;
-
-                // Estimate curve length to determine number of sub-segments
-                const curveLength = estimateBezierLength(prevMidX, prevMidY, points[i].x, points[i].y, nextMidX, nextMidY);
-                const numSubSegments = Math.max(1, Math.min(MAX_SUBSEGMENTS, Math.floor(curveLength / MIN_SUBSEGMENT_LENGTH)));
-
-                // Get opacities for current and next point
-                const currentSpeed = speeds[i] || 0;
-                const nextSpeed = speeds[i + 1] || 0;
-                const currentOpacity = calculateVelocityOpacity(currentSpeed, velocityDimming, basePower);
-                const nextOpacity = calculateVelocityOpacity(nextSpeed, velocityDimming, basePower);
-
-                // Draw curve as multiple sub-segments with interpolated opacity
-                for (let s = 0; s < numSubSegments; s++) {
-                    const t1 = s / numSubSegments;
-                    const t2 = (s + 1) / numSubSegments;
-
-                    // Calculate points on the Bézier curve
-                    // Offset start point very slightly to avoid overlapping with previous segment's endpoint
-                    const t1Offset = s === 0 ? t1 : t1 + 0.001 / numSubSegments;
-                    const pt1 = quadraticBezierPoint(prevMidX, prevMidY, points[i].x, points[i].y, nextMidX, nextMidY, t1Offset);
-                    const pt2 = quadraticBezierPoint(prevMidX, prevMidY, points[i].x, points[i].y, nextMidX, nextMidY, t2);
-
-                    // Interpolate opacity with ease-in (slow start, then accelerate)
-                    const easedT = easeInQuartic(t1 + 0.5 / numSubSegments); // Use middle of sub-segment
-                    const interpolatedOpacity = currentOpacity + (nextOpacity - currentOpacity) * easedT;
-
-                    // Draw sub-segment
-                    ctx.beginPath();
-                    ctx.moveTo(pt1.x, pt1.y);
-                    ctx.lineTo(pt2.x, pt2.y);
-                    ctx.strokeStyle = getChannelColor(points[i], interpolatedOpacity);
-                    ctx.stroke();
-                }
+            // Reset beam position between channels in A/B mode
+            if (mode === 'ab' && currentMode === 'a') {
+                beamX = 0;
+                beamY = 0;
+                velocityX = 0;
+                velocityY = 0;
+                smoothedBeamX = 0;
+                smoothedBeamY = 0;
             }
-
-            // Last segment: straight line from midpoint to last point
-            const lastIdx = points.length - 1;
-            const lastMidX = (points[lastIdx - 1].x + points[lastIdx].x) / 2;
-            const lastMidY = (points[lastIdx - 1].y + points[lastIdx].y) / 2;
-
-            const lastOpacity = calculateVelocityOpacity(speeds[lastIdx - 1] || 0, velocityDimming, basePower);
-            ctx.beginPath();
-            ctx.moveTo(lastMidX, lastMidY);
-            ctx.lineTo(points[lastIdx].x, points[lastIdx].y);
-            ctx.strokeStyle = getChannelColor(points[lastIdx], lastOpacity);
-            ctx.stroke();
         }
 
         // Send ready message back to main thread
