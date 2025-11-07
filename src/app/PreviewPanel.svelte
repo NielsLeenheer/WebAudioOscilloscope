@@ -497,8 +497,8 @@
         position: absolute;
         top: 20px;
         right: 20px;
-        width: 40px;
-        height: 40px;
+        width: 24px;
+        height: 24px;
         background: none;
         border: none;
         color: #4CAF50;
@@ -506,18 +506,13 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        transition: all 0.2s;
         z-index: 10;
         padding: 0;
     }
 
-    .physics-button:hover {
-        opacity: 0.7;
-    }
-
     .physics-button :global(svg) {
-        width: 40px;
-        height: 40px;
+        width: 24px;
+        height: 24px;
     }
 
     .canvas-container {
