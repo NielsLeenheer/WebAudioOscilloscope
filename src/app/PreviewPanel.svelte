@@ -4,6 +4,7 @@
     let { audioEngine, isPlaying } = $props();
 
     let canvas;
+    let gridCanvas;
     let animationId = null;
     let leftData = null;
     let rightData = null;
@@ -22,8 +23,82 @@
     let mode = $state('xy'); // Display mode: 'xy', 'a', or 'b'
     let timeDiv = $state(1.0); // Time/Div: controls zoom level (1.0 = full buffer, 0.1 = 10% of buffer)
     let triggerLevel = $state(0.0); // Trigger level: voltage threshold for triggering (-1.0 to 1.0)
+    let amplDiv = $state(1.0); // Ampl/Div: vertical amplitude scaling (0.1 to 2.0)
+    let yPosition = $state(0.0); // Y Position: vertical offset (-1.0 to 1.0)
+    let xPosition = $state(0.0); // X Position: horizontal offset (-1.0 to 1.0)
+
+    function drawGrid() {
+        if (!gridCanvas) return;
+
+        const ctx = gridCanvas.getContext('2d');
+        const width = 400;
+        const height = 400;
+        const centerX = width / 2;
+        const centerY = height / 2;
+
+        // Clear canvas
+        ctx.clearRect(0, 0, width, height);
+
+        // Grid style
+        ctx.strokeStyle = 'rgba(0, 255, 100, 0.3)';
+        ctx.fillStyle = 'rgba(0, 255, 100, 0.5)';
+        ctx.lineWidth = 1;
+
+        // Draw major divisions (10x10 grid)
+        const divisions = 10;
+        const divSize = width / divisions;
+
+        // Vertical lines
+        for (let i = 0; i <= divisions; i++) {
+            const x = i * divSize;
+            ctx.beginPath();
+            ctx.moveTo(x, 0);
+            ctx.lineTo(x, height);
+            ctx.stroke();
+        }
+
+        // Horizontal lines
+        for (let i = 0; i <= divisions; i++) {
+            const y = i * divSize;
+            ctx.beginPath();
+            ctx.moveTo(0, y);
+            ctx.lineTo(width, y);
+            ctx.stroke();
+        }
+
+        // Draw minor divisions (dots at 5x5 subdivisions)
+        for (let i = 0; i <= divisions; i++) {
+            for (let j = 0; j <= divisions; j++) {
+                // Draw 4 dots between major divisions
+                for (let dx = 1; dx < 5; dx++) {
+                    for (let dy = 1; dy < 5; dy++) {
+                        if (i < divisions && j < divisions) {
+                            const x = i * divSize + (dx * divSize / 5);
+                            const y = j * divSize + (dy * divSize / 5);
+                            ctx.beginPath();
+                            ctx.arc(x, y, 1, 0, 2 * Math.PI);
+                            ctx.fill();
+                        }
+                    }
+                }
+            }
+        }
+
+        // Draw center crosshair (brighter)
+        ctx.strokeStyle = 'rgba(0, 255, 100, 0.6)';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(0, centerY);
+        ctx.lineTo(width, centerY);
+        ctx.moveTo(centerX, 0);
+        ctx.lineTo(centerX, height);
+        ctx.stroke();
+    }
 
     onMount(() => {
+        // Draw grid
+        drawGrid();
+
         // Initialize Web Worker with OffscreenCanvas
         worker = new Worker(new URL('../workers/physics-worker.js', import.meta.url), { type: 'module' });
 
@@ -123,6 +198,9 @@
                     mode,
                     timeDiv,
                     triggerLevel,
+                    amplDiv,
+                    yPosition,
+                    xPosition,
                     canvasWidth: 400,
                     canvasHeight: 400
                 }
@@ -152,7 +230,14 @@
             bind:this={canvas}
             width="400"
             height="400"
+            class="scope-canvas"
             style="filter: blur({(1 - focus) * 3}px);"
+        ></canvas>
+        <canvas
+            bind:this={gridCanvas}
+            width="400"
+            height="400"
+            class="grid-canvas"
         ></canvas>
     </div>
     <div class="mode-selector">
@@ -178,9 +263,24 @@
                 <span class="value">{timeDiv.toFixed(2)}</span>
             </div>
             <div class="slider-control">
+                <label>AMPL/DIV</label>
+                <input type="range" min="0.1" max="2" step="0.1" bind:value={amplDiv} />
+                <span class="value">{amplDiv.toFixed(1)}</span>
+            </div>
+            <div class="slider-control">
                 <label>TRIGGER</label>
                 <input type="range" min="-1" max="1" step="0.01" bind:value={triggerLevel} />
                 <span class="value">{triggerLevel.toFixed(2)}</span>
+            </div>
+            <div class="slider-control">
+                <label>Y POS</label>
+                <input type="range" min="-1" max="1" step="0.01" bind:value={yPosition} />
+                <span class="value">{yPosition.toFixed(2)}</span>
+            </div>
+            <div class="slider-control">
+                <label>X POS</label>
+                <input type="range" min="-1" max="1" step="0.01" bind:value={xPosition} />
+                <span class="value">{xPosition.toFixed(2)}</span>
             </div>
         {/if}
     </div>
@@ -230,16 +330,32 @@
     }
 
     .canvas-container {
+        position: relative;
         display: flex;
         justify-content: center;
         align-items: center;
         background: #000;
         border-radius: 4px;
+        width: 400px;
+        height: 400px;
     }
 
-    canvas {
+    .scope-canvas {
+        position: absolute;
+        top: 0;
+        left: 0;
         display: block;
         background: #000;
+        border-radius: 4px;
+    }
+
+    .grid-canvas {
+        position: absolute;
+        top: 0;
+        left: 0;
+        display: block;
+        background: transparent;
+        pointer-events: none;
         border-radius: 4px;
     }
 

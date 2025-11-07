@@ -105,7 +105,7 @@ function processSignals(leftData, rightData, signalNoise) {
 // STAGE B: INTERPRETATION
 // Convert processed signals to target coordinates based on mode
 // ============================================================================
-function interpretSignals(processedLeft, processedRight, mode, scale, centerX, centerY, canvasWidth, timeDiv, triggerLevel) {
+function interpretSignals(processedLeft, processedRight, mode, scale, centerX, centerY, canvasWidth, timeDiv, triggerLevel, amplDiv, yPosition, xPosition) {
     const targets = [];
 
     if (mode === 'xy') {
@@ -129,13 +129,17 @@ function interpretSignals(processedLeft, processedRight, mode, scale, centerX, c
         const startIndex = triggerIndex;
         const endIndex = Math.min(startIndex + samplesToDisplay, channelData.length);
 
+        // X position offset (convert from -1 to 1 range to pixel offset)
+        const xOffset = xPosition * canvasWidth;
+
         // Create target coordinates for the triggered portion
         for (let i = startIndex; i < endIndex; i++) {
             const relativeIndex = i - startIndex;
-            // X position is based on time
-            const targetX = (relativeIndex / samplesToDisplay) * canvasWidth - centerX;
-            // Y position is based on amplitude
-            const targetY = -channelData[i] * scale;
+            // X position is based on time with position offset
+            const targetX = (relativeIndex / samplesToDisplay) * canvasWidth - centerX + xOffset;
+            // Y position is based on amplitude with AMPL/DIV and Y position offset
+            const yOffset = yPosition * scale * 2; // Scale the position offset
+            const targetY = -channelData[i] * scale * amplDiv + yOffset;
             targets.push({ x: targetX, y: targetY });
         }
     }
@@ -256,6 +260,9 @@ self.onmessage = function(e) {
             mode,
             timeDiv,
             triggerLevel,
+            amplDiv,
+            yPosition,
+            xPosition,
             canvasWidth,
             canvasHeight
         } = data;
@@ -266,9 +273,6 @@ self.onmessage = function(e) {
         ctx.fillStyle = `rgba(0, 0, 0, ${1 - persistence})`;
         ctx.fillRect(0, 0, canvasWidth, canvasHeight);
 
-        // Draw grid
-        drawGrid(ctx, centerX, centerY, canvasWidth, canvasHeight);
-
         // ========================================================================
         // THREE-STAGE RENDERING PIPELINE
         // ========================================================================
@@ -277,7 +281,7 @@ self.onmessage = function(e) {
         const { processedLeft, processedRight } = processSignals(leftData, rightData, signalNoise);
 
         // STAGE B: Interpretation - Convert signals to target coordinates based on mode
-        const targets = interpretSignals(processedLeft, processedRight, mode, scale, centerX, centerY, canvasWidth, timeDiv, triggerLevel);
+        const targets = interpretSignals(processedLeft, processedRight, mode, scale, centerX, centerY, canvasWidth, timeDiv, triggerLevel, amplDiv, yPosition, xPosition);
 
         // STAGE C: Physics Simulation - Apply electron beam physics uniformly
         const { points, speeds } = simulatePhysics(targets, forceMultiplier, damping, mass, scale, centerX, centerY);
@@ -364,22 +368,3 @@ self.onmessage = function(e) {
         self.postMessage({ type: 'ready' });
     }
 };
-
-function drawGrid(ctx, centerX, centerY, width, height) {
-    ctx.strokeStyle = '#333';
-    ctx.lineWidth = 1;
-
-    // Draw center crosshair
-    ctx.beginPath();
-    ctx.moveTo(0, centerY);
-    ctx.lineTo(width, centerY);
-    ctx.moveTo(centerX, 0);
-    ctx.lineTo(centerX, height);
-    ctx.stroke();
-
-    // Draw circle guide
-    const radius = Math.min(width, height) / 2.5;
-    ctx.beginPath();
-    ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
-    ctx.stroke();
-}
