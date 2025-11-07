@@ -590,7 +590,7 @@
 
     .slider-control {
         display: grid;
-        grid-template-columns: auto 1fr auto;
+        grid-template-columns: 80px 1fr 50px;
         gap: 10px;
         align-items: center;
         transition: opacity 0.2s;
@@ -617,7 +617,6 @@
         font-family: monospace;
         font-size: 12px;
         font-weight: 600;
-        min-width: 40px;
         text-align: right;
     }
 

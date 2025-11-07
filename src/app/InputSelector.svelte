@@ -23,10 +23,22 @@
     </nav>
 
     <div class="mode-selector">
-        <button class:active={mode === 'a'} onclick={() => mode = 'a'}>A</button>
-        <button class:active={mode === 'b'} onclick={() => mode = 'b'}>B</button>
-        <button class:active={mode === 'ab'} onclick={() => mode = 'ab'}>A/B</button>
-        <button class:active={mode === 'xy'} onclick={() => mode = 'xy'}>X/Y</button>
+        <label>
+            <input type="radio" name="mode" value="a" bind:group={mode}>
+            A
+        </label>
+        <label>
+            <input type="radio" name="mode" value="b" bind:group={mode}>
+            B
+        </label>
+        <label>
+            <input type="radio" name="mode" value="ab" bind:group={mode}>
+            A/B
+        </label>
+        <label>
+            <input type="radio" name="mode" value="xy" bind:group={mode}>
+            X/Y
+        </label>
     </div>
 </div>
 
@@ -42,7 +54,8 @@
         padding-bottom: 15px;
     }
 
-    nav {
+    nav,
+    .mode-selector {
         border: none;
         border-radius: 6px;
         background: #2d2d2d;
@@ -54,36 +67,8 @@
         user-select: none;
     }
 
-    .mode-selector {
-        display: flex;
-        gap: 5px;
-    }
-
-    .mode-selector button {
-        padding: 8px 16px;
-        background: #2d2d2d;
-        color: #888;
-        border: 1px solid #444;
-        border-radius: 4px;
-        font-family: system-ui;
-        font-size: 12px;
-        font-weight: 600;
-        cursor: pointer;
-        transition: all 0.2s;
-    }
-
-    .mode-selector button:hover {
-        background: #333;
-        color: #aaa;
-    }
-
-    .mode-selector button.active {
-        background: #4CAF50;
-        color: #000;
-        border-color: #4CAF50;
-    }
-
-    label {
+    nav label,
+    .mode-selector label {
         display: flex;
         align-items: center;
         padding: 0px 12px;
@@ -92,29 +77,34 @@
         transition: all 0.2s;
     }
 
-    label:first-child {
+    nav label:first-child,
+    .mode-selector label:first-child {
         border-radius: 6px 0 0 6px;
     }
 
-    label:last-child {
+    nav label:last-child,
+    .mode-selector label:last-child {
         border-radius: 0 6px 6px 0;
     }
 
-    label:has(:focus-visible) {
+    nav label:has(:focus-visible),
+    .mode-selector label:has(:focus-visible) {
         outline: 2px solid #4CAF50;
     }
 
-    label:has(input:checked) {
+    nav label:has(input:checked),
+    .mode-selector label:has(input:checked) {
         background: #1b5e20;
         color: #4CAF50;
     }
 
-    label:hover:not(:has(input:checked)) {
+    nav label:hover:not(:has(input:checked)),
+    .mode-selector label:hover:not(:has(input:checked)) {
         background: #333;
         color: #aaa;
     }
 
-    label :global(svg) {
+    nav label :global(svg) {
         width: 1.5em;
         height: 1.5em;
         margin-right: 6px;
