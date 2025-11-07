@@ -101,12 +101,23 @@ function processSignals(leftData, rightData, signalNoise) {
     return { processedLeft, processedRight };
 }
 
+// Apply exponential curve to AMPL/DIV for more natural control feel
+function applyExponentialAmplitude(amplDiv) {
+    // Use power of 2 for exponential response
+    // This gives finer control at lower amplifications
+    return Math.pow(amplDiv, 2);
+}
+
 // ============================================================================
 // STAGE B: INTERPRETATION
 // Convert processed signals to target coordinates based on mode
 // ============================================================================
 function interpretSignals(processedLeft, processedRight, mode, scale, centerX, centerY, canvasWidth, timeDiv, triggerLevel, amplDivA, positionA, amplDivB, positionB, xPosition) {
     const targets = [];
+
+    // Apply exponential curve to amplitude controls
+    const expAmplDivA = applyExponentialAmplitude(amplDivA);
+    const expAmplDivB = applyExponentialAmplitude(amplDivB);
 
     if (mode === 'xy') {
         // X/Y mode: left channel = X (with A controls), right channel = Y (with B controls)
@@ -116,11 +127,11 @@ function interpretSignals(processedLeft, processedRight, mode, scale, centerX, c
         for (let i = 0; i < processedLeft.length; i++) {
             // Left channel (A) controls horizontal with AMPL/DIV A and POSITION A
             const posOffsetA = positionA * scale * 2;
-            const targetX = processedLeft[i] * scale * amplDivA + posOffsetA + xOffset;
+            const targetX = processedLeft[i] * scale * expAmplDivA + posOffsetA + xOffset;
 
             // Right channel (B) controls vertical with AMPL/DIV B and POSITION B (but inverted for Y axis)
             const posOffsetB = positionB * scale * 2;
-            const targetY = -processedRight[i] * scale * amplDivB + posOffsetB;
+            const targetY = -processedRight[i] * scale * expAmplDivB + posOffsetB;
 
             targets.push({ x: targetX, y: targetY });
         }
@@ -128,8 +139,8 @@ function interpretSignals(processedLeft, processedRight, mode, scale, centerX, c
         // A or B mode: Time-based waveform with triggering
         const channelData = mode === 'a' ? processedLeft : processedRight;
 
-        // Use the appropriate channel controls
-        const amplDiv = mode === 'a' ? amplDivA : amplDivB;
+        // Use the appropriate channel controls (with exponential curve applied)
+        const amplDiv = mode === 'a' ? expAmplDivA : expAmplDivB;
         const position = mode === 'a' ? positionA : positionB;
 
         // Find trigger point
