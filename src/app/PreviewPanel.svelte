@@ -85,37 +85,38 @@
         if (!gridCanvas) return;
 
         const ctx = gridCanvas.getContext('2d');
-        const width = 400;
-        const height = 400;
-        const centerX = width / 2;
-        const centerY = height / 2;
+        const canvasWidth = 600; // Full canvas with overscan
+        const canvasHeight = 600;
+        const visibleWidth = 400; // Visible screen area
+        const visibleHeight = 400;
+        const overscan = (canvasWidth - visibleWidth) / 2; // 100px on each side
 
         // Clear canvas
-        ctx.clearRect(0, 0, width, height);
+        ctx.clearRect(0, 0, canvasWidth, canvasHeight);
 
         // Grid style - black lines
         ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
         ctx.lineWidth = 1;
 
-        // Draw 10x10 grid
+        // Draw 10x10 grid within the visible area (offset by overscan)
         const divisions = 10;
-        const divSize = width / divisions;
+        const divSize = visibleWidth / divisions;
 
         // Vertical lines
         for (let i = 0; i <= divisions; i++) {
-            const x = i * divSize;
+            const x = overscan + i * divSize;
             ctx.beginPath();
-            ctx.moveTo(x, 0);
-            ctx.lineTo(x, height);
+            ctx.moveTo(x, overscan);
+            ctx.lineTo(x, overscan + visibleHeight);
             ctx.stroke();
         }
 
         // Horizontal lines
         for (let i = 0; i <= divisions; i++) {
-            const y = i * divSize;
+            const y = overscan + i * divSize;
             ctx.beginPath();
-            ctx.moveTo(0, y);
-            ctx.lineTo(width, y);
+            ctx.moveTo(overscan, y);
+            ctx.lineTo(overscan + visibleWidth, y);
             ctx.stroke();
         }
 
@@ -123,13 +124,15 @@
         // 5 ticks per division = 0.2 step each
         const ticksPerDiv = 5;
         const tickLength = 4;
+        const centerX = overscan + visibleWidth / 2;
+        const centerY = overscan + visibleHeight / 2;
 
         ctx.strokeStyle = 'rgba(0, 0, 0, 0.7)';
         ctx.lineWidth = 1;
 
         // Horizontal center line ticks (Y = center)
         for (let i = 0; i <= divisions * ticksPerDiv; i++) {
-            const x = (i / ticksPerDiv) * divSize;
+            const x = overscan + (i / ticksPerDiv) * divSize;
             // Skip if this is a major grid line
             if (i % ticksPerDiv !== 0) {
                 ctx.beginPath();
@@ -141,7 +144,7 @@
 
         // Vertical center line ticks (X = center)
         for (let i = 0; i <= divisions * ticksPerDiv; i++) {
-            const y = (i / ticksPerDiv) * divSize;
+            const y = overscan + (i / ticksPerDiv) * divSize;
             // Skip if this is a major grid line
             if (i % ticksPerDiv !== 0) {
                 ctx.beginPath();
@@ -244,9 +247,12 @@
         analyserRight.getFloatTimeDomainData(rightData);
 
         // Send data to worker for physics calculation AND rendering
-        const centerX = 400 / 2;
-        const centerY = 400 / 2;
-        const scale = Math.min(400, 400) / 2.5;
+        // Use full canvas size (600x600) to allow overscan
+        const canvasWidth = 600;
+        const canvasHeight = 600;
+        const centerX = canvasWidth / 2;
+        const centerY = canvasHeight / 2;
+        const scale = Math.min(canvasWidth, canvasHeight) / 2.5;
         const basePower = 0.2 + (beamPower * 0.8);
 
         if (worker) {
@@ -274,8 +280,8 @@
                     amplDivB,
                     positionB,
                     xPosition,
-                    canvasWidth: 400,
-                    canvasHeight: 400
+                    canvasWidth,
+                    canvasHeight
                 }
             });
         }
@@ -310,15 +316,15 @@
     <div class="canvas-container">
         <canvas
             bind:this={canvas}
-            width="400"
-            height="400"
+            width="600"
+            height="600"
             class="scope-canvas"
             style="filter: blur({(1 - focus) * 3}px);"
         ></canvas>
         <canvas
             bind:this={gridCanvas}
-            width="400"
-            height="400"
+            width="600"
+            height="600"
             class="grid-canvas"
         ></canvas>
     </div>
@@ -354,6 +360,11 @@
                 <label>AMPL/DIV B</label>
                 <input type="range" min="0.1" max="2" step="0.1" bind:value={amplDivB} />
                 <span class="value">{amplDivB.toFixed(1)}</span>
+            </div>
+            <div class="slider-control">
+                <label>POSITION B</label>
+                <input type="range" min="-1" max="1" step="0.01" bind:value={positionB} />
+                <span class="value">{positionB.toFixed(2)}</span>
             </div>
             <div class="slider-control">
                 <label>X POS</label>
@@ -504,12 +515,14 @@
         border-radius: 4px;
         width: 400px;
         height: 400px;
+        overflow: hidden; /* Clip the overscan area */
     }
 
     .scope-canvas {
         position: absolute;
-        top: 0;
-        left: 0;
+        /* Offset by -100px to center the 400x400 visible area within the 600x600 canvas */
+        top: -100px;
+        left: -100px;
         display: block;
         background: #1a1f1a;
         border-radius: 4px;
@@ -517,8 +530,9 @@
 
     .grid-canvas {
         position: absolute;
-        top: 0;
-        left: 0;
+        /* Offset by -100px to align with scope canvas */
+        top: -100px;
+        left: -100px;
         display: block;
         background: transparent;
         pointer-events: none;
