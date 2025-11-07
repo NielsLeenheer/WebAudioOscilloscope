@@ -191,15 +191,20 @@
     });
 
     function startVisualization() {
+        // Initialize data buffers
+        const bufferLength = 2048; // Default FFT size
+
         const analysers = audioEngine.getAnalysers();
-
-        if (!analysers.left || !analysers.right) {
-            return;
+        if (analysers.left && analysers.right) {
+            // Use actual FFT size if analysers exist
+            const actualBufferLength = analysers.left.fftSize;
+            leftData = new Float32Array(actualBufferLength);
+            rightData = new Float32Array(actualBufferLength);
+        } else {
+            // Use default size if analysers don't exist yet
+            leftData = new Float32Array(bufferLength);
+            rightData = new Float32Array(bufferLength);
         }
-
-        const bufferLength = analysers.left.fftSize;
-        leftData = new Float32Array(bufferLength);
-        rightData = new Float32Array(bufferLength);
 
         draw();
     }
@@ -305,13 +310,14 @@
         }
     }
 
-    // React to isPlaying and isPowered changes
+    // React to isPowered changes
     $effect(() => {
-        if (isPowered && (isPlaying || inputSource === 'microphone')) {
+        if (isPowered) {
+            // Start visualization when powered on, regardless of generator state
             startVisualization();
         } else {
+            // Stop and reset when powered off
             stopVisualization();
-            // Reset physics state in worker
             if (worker) {
                 worker.postMessage({
                     type: 'reset'
