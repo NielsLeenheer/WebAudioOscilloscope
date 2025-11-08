@@ -2,7 +2,7 @@
     import { Icon } from 'svelte-icon';
     import microphoneIcon from '../../assets/icons/glyph/microphone.svg?raw';
     import generatorIcon from '../../assets/icons/glyph/generator.svg?raw';
-
+    import ModeSelector from './ModeSelector.svelte';
 
     let { inputSource = $bindable(), mode = $bindable() } = $props();
 </script>
@@ -22,24 +22,7 @@
         </label>
     </nav>
 
-    <div class="mode-selector">
-        <label>
-            <input type="radio" name="mode" value="a" bind:group={mode}>
-            A
-        </label>
-        <label>
-            <input type="radio" name="mode" value="b" bind:group={mode}>
-            B
-        </label>
-        <label>
-            <input type="radio" name="mode" value="ab" bind:group={mode}>
-            A/B
-        </label>
-        <label>
-            <input type="radio" name="mode" value="xy" bind:group={mode}>
-            X/Y
-        </label>
-    </div>
+    <ModeSelector bind:mode />
 </div>
 
 <style>
@@ -54,8 +37,7 @@
         padding-bottom: 15px;
     }
 
-    nav,
-    .mode-selector {
+    nav {
         border: none;
         border-radius: 6px;
         background: #2d2d2d;
@@ -67,8 +49,7 @@
         user-select: none;
     }
 
-    nav label,
-    .mode-selector label {
+    nav label {
         display: flex;
         align-items: center;
         padding: 0px 12px;
@@ -77,29 +58,24 @@
         transition: all 0.2s;
     }
 
-    nav label:first-child,
-    .mode-selector label:first-child {
+    nav label:first-child {
         border-radius: 6px 0 0 6px;
     }
 
-    nav label:last-child,
-    .mode-selector label:last-child {
+    nav label:last-child {
         border-radius: 0 6px 6px 0;
     }
 
-    nav label:has(:focus-visible),
-    .mode-selector label:has(:focus-visible) {
+    nav label:has(:focus-visible) {
         outline: 2px solid #4CAF50;
     }
 
-    nav label:has(input:checked),
-    .mode-selector label:has(input:checked) {
+    nav label:has(input:checked) {
         background: #1b5e20;
         color: #4CAF50;
     }
 
-    nav label:hover:not(:has(input:checked)),
-    .mode-selector label:hover:not(:has(input:checked)) {
+    nav label:hover:not(:has(input:checked)) {
         background: #333;
         color: #aaa;
     }
