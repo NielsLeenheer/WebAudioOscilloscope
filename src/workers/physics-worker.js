@@ -114,8 +114,8 @@ function interpretSignals(processedLeft, processedRight, mode, scale, visibleSca
 
     if (mode === 'xy') {
         // X/Y mode: left channel = X (with A controls), right channel = Y (with B controls)
-        // X position offset
-        const xOffset = xPosition * canvasWidth;
+        // X position offset - scale by visibleWidth so position control shifts within visible area
+        const xOffset = xPosition * visibleWidth;
 
         for (let i = 0; i < processedLeft.length; i++) {
             // Left channel (A) controls horizontal with AMPL/DIV A and POSITION A
@@ -154,14 +154,15 @@ function interpretSignals(processedLeft, processedRight, mode, scale, visibleSca
         const endIndex = Math.min(startIndex + samplesToDisplay, channelData.length);
 
         // X position offset (convert from -1 to 1 range to pixel offset)
-        const xOffset = xPosition * canvasWidth;
+        // Scale by visibleWidth so position control shifts within visible area
+        const xOffset = xPosition * visibleWidth;
 
         // Create target coordinates for the triggered portion
         for (let i = startIndex; i < endIndex; i++) {
             const relativeIndex = i - startIndex;
             // X position is based on time with position offset
-            // Use visibleWidth for TIME/DIV calculations (not canvasWidth which includes overscan)
-            const targetX = (relativeIndex / samplesToDisplay) * visibleWidth - centerX + xOffset;
+            // Use visibleWidth for TIME/DIV calculations and center on visible area
+            const targetX = (relativeIndex / samplesToDisplay) * visibleWidth - visibleWidth / 2 + xOffset;
             // Y position is based on amplitude with AMPL/DIV and Y position offset
             // Use visibleScale for amplitude calculations (based on visible 400px area)
             const yOffset = position * visibleScale * 2; // Scale the position offset
