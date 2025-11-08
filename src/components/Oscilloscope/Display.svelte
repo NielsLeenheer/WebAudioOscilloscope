@@ -38,9 +38,9 @@
     let timeDivFine = $state(1.0); // Fine adjustment multiplier (0.5 to 2.5)
     let triggerLevel = $state(0.0); // Trigger level: voltage threshold for triggering (-1.0 to 1.0)
 
-    // Calculate combined time division (normalized to 0-1 range where 1.0 = full buffer)
-    // Map the time values to zoom level: smaller time = more zoomed in = smaller timeDiv value
-    let timeDiv = $derived(Math.min(1.0, (timeDivSteps[timeDivBase] * timeDivFine) / 500000));
+    // Calculate combined time division (in microseconds)
+    // This value represents microseconds per division on the oscilloscope screen
+    let timeDiv = $derived(timeDivSteps[timeDivBase] * timeDivFine);
 
     // Base amplification steps (like real oscilloscope)
     const amplSteps = [0.002, 0.005, 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10];
@@ -301,6 +301,14 @@
             rightData.fill(0);
         }
 
+        // Get sample rate from the appropriate AudioContext
+        let sampleRate = 48000; // Default fallback
+        if (inputSource === 'microphone' && micAudioContext) {
+            sampleRate = micAudioContext.sampleRate;
+        } else if (audioEngine?.audioContext) {
+            sampleRate = audioEngine.audioContext.sampleRate;
+        }
+
         // Send data to worker for physics calculation AND rendering
         // Use full canvas size (600x600) to allow overscan
         const canvasWidth = 600;
@@ -336,7 +344,8 @@
                     positionB,
                     xPosition,
                     canvasWidth,
-                    canvasHeight
+                    canvasHeight,
+                    sampleRate
                 }
             });
         }
