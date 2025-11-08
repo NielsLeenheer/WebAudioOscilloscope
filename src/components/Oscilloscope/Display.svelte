@@ -315,9 +315,12 @@
         const canvasHeight = 600;
         // Visible screen area is 400x400 (clipped by CSS overflow: hidden)
         const visibleWidth = 400;
+        const visibleHeight = 400;
         const centerX = canvasWidth / 2;
         const centerY = canvasHeight / 2;
         const scale = Math.min(canvasWidth, canvasHeight) / 2.5;
+        // Scale for AMPL/DIV based on visible area (not canvas with overscan)
+        const visibleScale = Math.min(visibleWidth, visibleHeight) / 2.5;
         const basePower = 0.2 + (beamPower * 1.4); // Allow up to 3.0 max brightness
 
         if (worker) {
@@ -330,6 +333,7 @@
                     centerX,
                     centerY,
                     scale,
+                    visibleScale,
                     forceMultiplier,
                     damping,
                     mass,

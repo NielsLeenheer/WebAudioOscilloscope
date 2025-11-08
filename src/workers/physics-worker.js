@@ -105,7 +105,7 @@ function processSignals(leftData, rightData, signalNoise) {
 // STAGE B: INTERPRETATION
 // Convert processed signals to target coordinates based on mode
 // ============================================================================
-function interpretSignals(processedLeft, processedRight, mode, scale, centerX, centerY, canvasWidth, timeDiv, triggerLevel, amplDivA, positionA, amplDivB, positionB, xPosition, visibleWidth, sampleRate) {
+function interpretSignals(processedLeft, processedRight, mode, scale, visibleScale, centerX, centerY, canvasWidth, timeDiv, triggerLevel, amplDivA, positionA, amplDivB, positionB, xPosition, visibleWidth, sampleRate) {
     const targets = [];
 
     // Use amplitude directly (already calculated from base * fine in UI)
@@ -119,12 +119,13 @@ function interpretSignals(processedLeft, processedRight, mode, scale, centerX, c
 
         for (let i = 0; i < processedLeft.length; i++) {
             // Left channel (A) controls horizontal with AMPL/DIV A and POSITION A
-            const posOffsetA = positionA * scale * 2;
-            const targetX = processedLeft[i] * scale / expAmplDivA + posOffsetA + xOffset;
+            // Use visibleScale for amplitude calculations (based on visible 400px area)
+            const posOffsetA = positionA * visibleScale * 2;
+            const targetX = processedLeft[i] * visibleScale / expAmplDivA + posOffsetA + xOffset;
 
             // Right channel (B) controls vertical with AMPL/DIV B and POSITION B (but inverted for Y axis)
-            const posOffsetB = positionB * scale * 2;
-            const targetY = -processedRight[i] * scale / expAmplDivB + posOffsetB;
+            const posOffsetB = positionB * visibleScale * 2;
+            const targetY = -processedRight[i] * visibleScale / expAmplDivB + posOffsetB;
 
             targets.push({ x: targetX, y: targetY });
         }
@@ -167,8 +168,9 @@ function interpretSignals(processedLeft, processedRight, mode, scale, centerX, c
             // Use visibleWidth for TIME/DIV calculations (not canvasWidth which includes overscan)
             const targetX = (relativeIndex / samplesToDisplay) * visibleWidth - centerX + xOffset;
             // Y position is based on amplitude with AMPL/DIV and Y position offset
-            const yOffset = position * scale * 2; // Scale the position offset
-            const targetY = -channelData[i] * scale / amplDiv + yOffset;
+            // Use visibleScale for amplitude calculations (based on visible 400px area)
+            const yOffset = position * visibleScale * 2; // Scale the position offset
+            const targetY = -channelData[i] * visibleScale / amplDiv + yOffset;
             targets.push({ x: targetX, y: targetY });
         }
     }
@@ -374,6 +376,7 @@ self.onmessage = function(e) {
             centerX,
             centerY,
             scale,
+            visibleScale,
             forceMultiplier,
             damping,
             mass,
@@ -414,7 +417,7 @@ self.onmessage = function(e) {
 
         for (const currentMode of modesToRender) {
             // STAGE B: Interpretation - Convert signals to target coordinates based on mode
-            const targets = interpretSignals(processedLeft, processedRight, currentMode, scale, centerX, centerY, canvasWidth, timeDiv, triggerLevel, amplDivA, positionA, amplDivB, positionB, xPosition, visibleWidth, sampleRate);
+            const targets = interpretSignals(processedLeft, processedRight, currentMode, scale, visibleScale, centerX, centerY, canvasWidth, timeDiv, triggerLevel, amplDivA, positionA, amplDivB, positionB, xPosition, visibleWidth, sampleRate);
 
             // Teleport beam to first target to prevent spurious lines from previous frame
             // This eliminates the line that would be drawn from the last position of the
