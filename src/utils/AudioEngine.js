@@ -28,8 +28,10 @@ export class AudioEngine {
             // Create analyser nodes for preview
             this.leftAnalyser = this.audioContext.createAnalyser();
             this.rightAnalyser = this.audioContext.createAnalyser();
-            this.leftAnalyser.fftSize = 2048;
-            this.rightAnalyser.fftSize = 2048;
+            // Use larger buffer to support longer TIME/DIV settings
+            // 16384 samples at 48kHz = 341ms, supporting up to ~34ms/div
+            this.leftAnalyser.fftSize = 16384;
+            this.rightAnalyser.fftSize = 16384;
 
             // Create channel merger for stereo output
             this.merger = this.audioContext.createChannelMerger(2);

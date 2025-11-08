@@ -78,11 +78,11 @@
 
             // Create analysers for left and right channels
             micAnalyserLeft = micAudioContext.createAnalyser();
-            micAnalyserLeft.fftSize = 2048;
+            micAnalyserLeft.fftSize = 16384;
             splitter.connect(micAnalyserLeft, 0);
 
             micAnalyserRight = micAudioContext.createAnalyser();
-            micAnalyserRight.fftSize = 2048;
+            micAnalyserRight.fftSize = 16384;
             splitter.connect(micAnalyserRight, 1);
 
             console.log('Microphone input started');
@@ -218,7 +218,7 @@
 
     function startVisualization() {
         // Initialize data buffers
-        const bufferLength = 2048; // Default FFT size
+        const bufferLength = 16384; // Default FFT size
 
         const analysers = audioEngine.getAnalysers();
         if (analysers.left && analysers.right) {
@@ -295,8 +295,8 @@
             analyserRight.getFloatTimeDomainData(rightData);
         } else {
             // Fill with zeros when no input (noise will be added in worker)
-            if (!leftData) leftData = new Float32Array(2048);
-            if (!rightData) rightData = new Float32Array(2048);
+            if (!leftData) leftData = new Float32Array(16384);
+            if (!rightData) rightData = new Float32Array(16384);
             leftData.fill(0);
             rightData.fill(0);
         }
