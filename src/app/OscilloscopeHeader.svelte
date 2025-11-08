@@ -11,7 +11,7 @@
 <header>
     <button id="power" class:powered={isPowered} onclick={togglePower}>
         <Icon data={powerIcon} />
-        {isPowered ? 'POWER ON' : 'POWER OFF'}
+        {isPowered ? 'POWER OFF' : 'POWER ON'}
     </button>
 
     <h1>Oscilloscope</h1>
