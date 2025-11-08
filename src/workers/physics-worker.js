@@ -153,11 +153,6 @@ function interpretSignals(processedLeft, processedRight, mode, scale, visibleSca
         const startIndex = triggerIndex;
         const endIndex = Math.min(startIndex + samplesToDisplay, channelData.length);
 
-        // Debug logging
-        if (Math.random() < 0.02) {
-            console.log(`TIME/DIV: ${timeDiv}µs, totalTime=${totalTime*1000}ms, samplesToDisplay=${samplesToDisplay}, startIndex=${startIndex}, endIndex=${endIndex}, actualSamples=${endIndex-startIndex}, bufferLength=${channelData.length}`);
-        }
-
         // X position offset (convert from -1 to 1 range to pixel offset)
         const xOffset = xPosition * canvasWidth;
 
