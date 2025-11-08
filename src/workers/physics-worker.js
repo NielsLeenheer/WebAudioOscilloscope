@@ -398,20 +398,21 @@ self.onmessage = function(e) {
         // Handle A/B mode: render both channels sequentially
         const modesToRender = mode === 'ab' ? ['a', 'b'] : [mode];
 
-        // Reset beam position at the start of each frame for time-based modes
-        // This prevents lines connecting the end of one frame to the start of the next
-        if (mode !== 'xy') {
-            beamX = 0;
-            beamY = 0;
-            velocityX = 0;
-            velocityY = 0;
-            smoothedBeamX = 0;
-            smoothedBeamY = 0;
-        }
-
         for (const currentMode of modesToRender) {
             // STAGE B: Interpretation - Convert signals to target coordinates based on mode
             const targets = interpretSignals(processedLeft, processedRight, currentMode, scale, centerX, centerY, canvasWidth, timeDiv, triggerLevel, amplDivA, positionA, amplDivB, positionB, xPosition);
+
+            // Teleport beam to first target to prevent spurious lines from previous frame
+            // This eliminates the line that would be drawn from the last position of the
+            // previous frame to the first position of the current frame
+            if (targets.length > 0) {
+                beamX = targets[0].x;
+                beamY = targets[0].y;
+                velocityX = 0;
+                velocityY = 0;
+                smoothedBeamX = targets[0].x;
+                smoothedBeamY = targets[0].y;
+            }
 
             // STAGE C: Physics Simulation - Apply electron beam physics uniformly
             const { points, speeds } = simulatePhysics(targets, forceMultiplier, damping, mass, scale, centerX, centerY);
@@ -421,16 +422,6 @@ self.onmessage = function(e) {
             // ========================================================================
 
             renderTrace(ctx, points, speeds, velocityDimming, basePower);
-
-            // Reset beam position between channels in A/B mode
-            if (mode === 'ab' && currentMode === 'a') {
-                beamX = 0;
-                beamY = 0;
-                velocityX = 0;
-                velocityY = 0;
-                smoothedBeamX = 0;
-                smoothedBeamY = 0;
-            }
         }
 
         // Send ready message back to main thread
