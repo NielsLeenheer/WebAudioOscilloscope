@@ -398,6 +398,17 @@ self.onmessage = function(e) {
         // Handle A/B mode: render both channels sequentially
         const modesToRender = mode === 'ab' ? ['a', 'b'] : [mode];
 
+        // Reset beam position at the start of each frame for time-based modes
+        // This prevents lines connecting the end of one frame to the start of the next
+        if (mode !== 'xy') {
+            beamX = 0;
+            beamY = 0;
+            velocityX = 0;
+            velocityY = 0;
+            smoothedBeamX = 0;
+            smoothedBeamY = 0;
+        }
+
         for (const currentMode of modesToRender) {
             // STAGE B: Interpretation - Convert signals to target coordinates based on mode
             const targets = interpretSignals(processedLeft, processedRight, currentMode, scale, centerX, centerY, canvasWidth, timeDiv, triggerLevel, amplDivA, positionA, amplDivB, positionB, xPosition);
