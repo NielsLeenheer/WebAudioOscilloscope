@@ -117,7 +117,12 @@ function interpretSignals(processedLeft, processedRight, mode, scale, visibleSca
         // X position offset - scale by visibleWidth so position control shifts within visible area
         const xOffset = xPosition * visibleWidth;
 
-        for (let i = 0; i < processedLeft.length; i++) {
+        // Use only the most recent samples to avoid overdraw from large buffer
+        // 2048 samples provides smooth shapes without excessive thickness
+        const maxSamplesXY = 2048;
+        const startIdx = Math.max(0, processedLeft.length - maxSamplesXY);
+
+        for (let i = startIdx; i < processedLeft.length; i++) {
             // Left channel (A) controls horizontal with AMPL/DIV A and POSITION A
             // Use visibleScale for amplitude calculations (based on visible 400px area)
             const posOffsetA = positionA * visibleScale * 2;
