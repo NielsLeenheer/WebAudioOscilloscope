@@ -119,9 +119,6 @@ export class AudioEngine {
         const duration = 1 / this.baseFrequency;
         const bufferSize = Math.ceil(sampleRate * duration);
 
-        // Debug logging
-        console.log(`AudioEngine: baseFrequency=${this.baseFrequency}Hz, sampleRate=${sampleRate}Hz, bufferSize=${bufferSize} samples, actualFreq=${sampleRate/bufferSize}Hz`);
-
         const leftBuffer = this.audioContext.createBuffer(1, bufferSize, sampleRate);
         const rightBuffer = this.audioContext.createBuffer(1, bufferSize, sampleRate);
 

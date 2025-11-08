@@ -148,11 +148,6 @@ function interpretSignals(processedLeft, processedRight, mode, scale, centerX, c
             channelData.length
         );
 
-        // Debug logging (remove after testing)
-        if (Math.random() < 0.01) { // Log occasionally to avoid spam
-            console.log(`TIME/DIV Debug: timeDiv=${timeDiv}µs, sampleRate=${sampleRate}Hz, totalTime=${totalTime*1000}ms, samplesToDisplay=${samplesToDisplay}`);
-        }
-
         // Determine start and end indices
         const startIndex = triggerIndex;
         const endIndex = Math.min(startIndex + samplesToDisplay, channelData.length);

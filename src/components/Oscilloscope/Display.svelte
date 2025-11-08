@@ -309,11 +309,6 @@
             sampleRate = audioEngine.audioContext.sampleRate;
         }
 
-        // Debug logging
-        if (Math.random() < 0.01) {
-            console.log(`Display.svelte: sampleRate=${sampleRate}, audioContext=${audioEngine?.audioContext?.sampleRate}, inputSource=${inputSource}, analyserLeft=${analysers?.left?.context?.sampleRate}`);
-        }
-
         // Send data to worker for physics calculation AND rendering
         // Use full canvas size (600x600) to allow overscan
         const canvasWidth = 600;

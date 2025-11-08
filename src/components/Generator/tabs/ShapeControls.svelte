@@ -18,29 +18,27 @@
     let lissX = $state(3);
     let lissY = $state(2);
 
-    function generateWave(type, freq, phase = 0) {
-        const sampleRate = 44100;
-        const duration = 1; // 1 second loop
-        const samples = sampleRate * duration;
+    function generateWave(type, phase = 0) {
+        // Generate ONE complete cycle of the waveform (not 1 second!)
+        const samples = 1000; // Use 1000 points for smooth waveform
         const points = [];
 
         for (let i = 0; i < samples; i++) {
-            const t = i / sampleRate;
+            const t = i / samples; // 0 to 1 over one complete cycle
             let value;
 
             switch(type) {
                 case 'sine':
-                    value = Math.sin(2 * Math.PI * freq * t + phase);
+                    value = Math.sin(2 * Math.PI * t + phase);
                     break;
                 case 'square':
-                    value = Math.sin(2 * Math.PI * freq * t + phase) >= 0 ? 1 : -1;
+                    value = Math.sin(2 * Math.PI * t + phase) >= 0 ? 1 : -1;
                     break;
                 case 'sawtooth':
-                    value = 2 * ((freq * t + phase / (2 * Math.PI)) % 1) - 1;
+                    value = 2 * (t - Math.floor(t + 0.5));
                     break;
                 case 'triangle':
-                    const sawValue = 2 * ((freq * t + phase / (2 * Math.PI)) % 1) - 1;
-                    value = 2 * Math.abs(sawValue) - 1;
+                    value = 4 * Math.abs(t - Math.floor(t + 0.5)) - 1;
                     break;
                 default:
                     value = 0;
@@ -55,8 +53,11 @@
     function updateWaves() {
         if (!isPlaying) return;
 
-        const leftPoints = generateWave(leftWave, frequency, 0);
-        const rightPoints = generateWave(rightWave, frequency, 0);
+        // Set the frequency in AudioEngine so it knows what frequency to play at
+        audioEngine.setFrequency(frequency);
+
+        const leftPoints = generateWave(leftWave, 0);
+        const rightPoints = generateWave(rightWave, 0);
 
         // Combine left and right into stereo points as [x, y] arrays
         const stereoPoints = leftPoints.map((leftVal, i) => [leftVal, rightPoints[i]]);
@@ -66,6 +67,8 @@
 
     function drawShape(shapeGenerator) {
         if (!isPlaying) return;
+        // Shapes also need the frequency to be set
+        audioEngine.setFrequency(frequency);
         const points = shapeGenerator();
         audioEngine.createWaveform(points);
     }
