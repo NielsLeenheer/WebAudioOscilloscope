@@ -161,8 +161,9 @@ function interpretSignals(processedLeft, processedRight, mode, scale, visibleSca
         for (let i = startIndex; i < endIndex; i++) {
             const relativeIndex = i - startIndex;
             // X position is based on time with position offset
-            // Use visibleWidth for TIME/DIV calculations and center on visible area
-            const targetX = (relativeIndex / samplesToDisplay) * visibleWidth - visibleWidth / 2 + xOffset;
+            // Spread waveform across full canvas width (600px) for overscan
+            // Visible area (400px) clips it, X POS shifts to reveal different portions
+            const targetX = (relativeIndex / samplesToDisplay) * canvasWidth - canvasWidth / 2 + xOffset;
             // Y position is based on amplitude with AMPL/DIV and Y position offset
             // Use visibleScale for amplitude calculations (based on visible 400px area)
             const yOffset = position * visibleScale * 2; // Scale the position offset
