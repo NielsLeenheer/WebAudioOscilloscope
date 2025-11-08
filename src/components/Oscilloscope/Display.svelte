@@ -29,6 +29,7 @@
     let beamPower = $state(0.75); // Beam power (affects opacity: high power = bright, low power = dim)
     let velocityDimming = $state(0.90); // How much fast movements dim (0=no dimming, 1=maximum dimming)
     let focus = $state(0.2); // Focus control (-1.0 to 1.0, 0.0 = perfect focus, abs value = blur amount)
+    let decay = $state(2048); // Maximum points to render (controls phosphor decay/overdraw)
 
     // Time division steps (like real oscilloscope) - stored in microseconds for easy calculation
     const timeDivSteps = [0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000, 50000, 100000, 200000, 500000];
@@ -341,6 +342,7 @@
                     basePower,
                     persistence,
                     velocityDimming,
+                    decay,
                     mode,
                     timeDiv,
                     triggerLevel,
@@ -439,6 +441,7 @@
     bind:persistence
     bind:signalNoise
     bind:velocityDimming
+    bind:decay
 />
 
 <style>

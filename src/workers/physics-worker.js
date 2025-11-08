@@ -105,7 +105,7 @@ function processSignals(leftData, rightData, signalNoise) {
 // STAGE B: INTERPRETATION
 // Convert processed signals to target coordinates based on mode
 // ============================================================================
-function interpretSignals(processedLeft, processedRight, mode, scale, visibleScale, centerX, centerY, canvasWidth, timeDiv, triggerLevel, amplDivA, positionA, amplDivB, positionB, xPosition, visibleWidth, sampleRate) {
+function interpretSignals(processedLeft, processedRight, mode, scale, visibleScale, centerX, centerY, canvasWidth, timeDiv, triggerLevel, amplDivA, positionA, amplDivB, positionB, xPosition, visibleWidth, sampleRate, decay) {
     const targets = [];
 
     // Use amplitude directly (already calculated from base * fine in UI)
@@ -118,9 +118,8 @@ function interpretSignals(processedLeft, processedRight, mode, scale, visibleSca
         const xOffset = xPosition * visibleWidth;
 
         // Use only the most recent samples to avoid overdraw from large buffer
-        // 2048 samples provides smooth shapes without excessive thickness
-        const maxSamplesXY = 2048;
-        const startIdx = Math.max(0, processedLeft.length - maxSamplesXY);
+        // Decay parameter controls how many points to render
+        const startIdx = Math.max(0, processedLeft.length - decay);
 
         for (let i = startIdx; i < processedLeft.length; i++) {
             // Left channel (A) controls horizontal with AMPL/DIV A and POSITION A
@@ -151,7 +150,8 @@ function interpretSignals(processedLeft, processedRight, mode, scale, visibleSca
         const totalTime = timePerDiv * 10; // 10 divisions across the screen
         const samplesToDisplay = Math.min(
             Math.floor(sampleRate * totalTime),
-            channelData.length
+            channelData.length,
+            decay // Limit by decay to prevent overdraw from large buffer
         );
 
         // Determine start and end indices
@@ -386,6 +386,7 @@ self.onmessage = function(e) {
             basePower,
             persistence,
             velocityDimming,
+            decay,
             mode,
             timeDiv,
             triggerLevel,
@@ -419,7 +420,7 @@ self.onmessage = function(e) {
 
         for (const currentMode of modesToRender) {
             // STAGE B: Interpretation - Convert signals to target coordinates based on mode
-            const targets = interpretSignals(processedLeft, processedRight, currentMode, scale, visibleScale, centerX, centerY, canvasWidth, timeDiv, triggerLevel, amplDivA, positionA, amplDivB, positionB, xPosition, visibleWidth, sampleRate);
+            const targets = interpretSignals(processedLeft, processedRight, currentMode, scale, visibleScale, centerX, centerY, canvasWidth, timeDiv, triggerLevel, amplDivA, positionA, amplDivB, positionB, xPosition, visibleWidth, sampleRate, decay);
 
             // Teleport beam to first target to prevent spurious lines from previous frame
             // This eliminates the line that would be drawn from the last position of the
