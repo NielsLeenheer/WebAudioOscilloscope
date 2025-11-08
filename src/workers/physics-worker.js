@@ -123,13 +123,13 @@ function interpretSignals(processedLeft, processedRight, mode, scale, visibleSca
 
         for (let i = startIdx; i < processedLeft.length; i++) {
             // Left channel (A) controls horizontal with AMPL/DIV A and POSITION A
-            // Use visibleScale for amplitude calculations (based on visible 400px area)
-            const posOffsetA = positionA * visibleScale * 2;
-            const targetX = processedLeft[i] * visibleScale / expAmplDivA + posOffsetA + xOffset;
+            // Use full scale for XY mode so shapes fill the canvas (viewport clips to visible area)
+            const posOffsetA = positionA * scale * 2;
+            const targetX = processedLeft[i] * scale / expAmplDivA + posOffsetA + xOffset;
 
             // Right channel (B) controls vertical with AMPL/DIV B and POSITION B (but inverted for Y axis)
-            const posOffsetB = positionB * visibleScale * 2;
-            const targetY = -processedRight[i] * visibleScale / expAmplDivB + posOffsetB;
+            const posOffsetB = positionB * scale * 2;
+            const targetY = -processedRight[i] * scale / expAmplDivB + posOffsetB;
 
             targets.push({ x: targetX, y: targetY });
         }

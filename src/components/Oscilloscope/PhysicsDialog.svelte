@@ -62,7 +62,7 @@
         </div>
         <div class="slider-control">
             <label>Decay</label>
-            <input type="range" min="512" max="16384" step="256" bind:value={decay} />
+            <input type="range" min="128" max="16384" step="128" bind:value={decay} />
             <span class="value">{decay}</span>
         </div>
     </div>
