@@ -120,11 +120,11 @@ function interpretSignals(processedLeft, processedRight, mode, scale, centerX, c
         for (let i = 0; i < processedLeft.length; i++) {
             // Left channel (A) controls horizontal with AMPL/DIV A and POSITION A
             const posOffsetA = positionA * scale * 2;
-            const targetX = processedLeft[i] * scale * expAmplDivA + posOffsetA + xOffset;
+            const targetX = processedLeft[i] * scale / expAmplDivA + posOffsetA + xOffset;
 
             // Right channel (B) controls vertical with AMPL/DIV B and POSITION B (but inverted for Y axis)
             const posOffsetB = positionB * scale * 2;
-            const targetY = -processedRight[i] * scale * expAmplDivB + posOffsetB;
+            const targetY = -processedRight[i] * scale / expAmplDivB + posOffsetB;
 
             targets.push({ x: targetX, y: targetY });
         }
@@ -156,7 +156,7 @@ function interpretSignals(processedLeft, processedRight, mode, scale, centerX, c
             const targetX = (relativeIndex / samplesToDisplay) * canvasWidth - centerX + xOffset;
             // Y position is based on amplitude with AMPL/DIV and Y position offset
             const yOffset = position * scale * 2; // Scale the position offset
-            const targetY = -channelData[i] * scale * amplDiv + yOffset;
+            const targetY = -channelData[i] * scale / amplDiv + yOffset;
             targets.push({ x: targetX, y: targetY });
         }
     }
