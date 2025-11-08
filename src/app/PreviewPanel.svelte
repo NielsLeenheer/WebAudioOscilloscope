@@ -436,14 +436,14 @@
         </div>
 
         <!-- Bottom Left: Channel A Controls -->
-        <div class="control-panel" class:disabled={mode === 'b'}>
+        <div class="control-panel">
             <div class="panel-label">CHANNEL A</div>
-            <div class="slider-control">
+            <div class="slider-control" class:disabled={mode === 'b'}>
                 <label>POSITION</label>
                 <input type="range" min="-1" max="1" step="0.01" bind:value={positionA} disabled={mode === 'b'} />
                 <span class="value">{positionA.toFixed(2)}</span>
             </div>
-            <div class="slider-control dual-slider">
+            <div class="slider-control dual-slider" class:disabled={mode === 'b'}>
                 <label>AMPL/DIV</label>
                 <input type="range" min="0" max="11" step="1" bind:value={amplBaseA} disabled={mode === 'b'} class="base-slider" />
                 <input type="range" min="0.5" max="2.5" step="0.01" bind:value={amplFineA} disabled={mode === 'b'} class="fine-slider" />
@@ -452,14 +452,14 @@
         </div>
 
         <!-- Bottom Right: Channel B Controls -->
-        <div class="control-panel" class:disabled={mode === 'a'}>
+        <div class="control-panel">
             <div class="panel-label">CHANNEL B</div>
-            <div class="slider-control">
+            <div class="slider-control" class:disabled={mode === 'a'}>
                 <label>POSITION</label>
                 <input type="range" min="-1" max="1" step="0.01" bind:value={positionB} disabled={mode === 'a'} />
                 <span class="value">{positionB.toFixed(2)}</span>
             </div>
-            <div class="slider-control dual-slider">
+            <div class="slider-control dual-slider" class:disabled={mode === 'a'}>
                 <label>AMPL/DIV</label>
                 <input type="range" min="0" max="11" step="1" bind:value={amplBaseB} disabled={mode === 'a'} class="base-slider" />
                 <input type="range" min="0.5" max="2.5" step="0.01" bind:value={amplFineB} disabled={mode === 'a'} class="fine-slider" />
@@ -598,11 +598,6 @@
         background: #1a1a1a;
         border-radius: 4px;
         min-height: 80px;
-        transition: opacity 0.2s;
-    }
-
-    .control-panel.disabled {
-        opacity: 0.4;
     }
 
     .panel-label {
@@ -614,10 +609,6 @@
         margin-bottom: 5px;
         padding-bottom: 8px;
         border-bottom: 1px solid #333;
-    }
-
-    .control-panel.disabled .panel-label {
-        color: #666;
     }
 
     .physics-dialog {
