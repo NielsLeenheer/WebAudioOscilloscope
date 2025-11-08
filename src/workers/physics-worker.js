@@ -105,7 +105,7 @@ function processSignals(leftData, rightData, signalNoise) {
 // STAGE B: INTERPRETATION
 // Convert processed signals to target coordinates based on mode
 // ============================================================================
-function interpretSignals(processedLeft, processedRight, mode, scale, centerX, centerY, canvasWidth, timeDiv, triggerLevel, amplDivA, positionA, amplDivB, positionB, xPosition, sampleRate) {
+function interpretSignals(processedLeft, processedRight, mode, scale, centerX, centerY, canvasWidth, timeDiv, triggerLevel, amplDivA, positionA, amplDivB, positionB, xPosition, visibleWidth, sampleRate) {
     const targets = [];
 
     // Use amplitude directly (already calculated from base * fine in UI)
@@ -164,7 +164,8 @@ function interpretSignals(processedLeft, processedRight, mode, scale, centerX, c
         for (let i = startIndex; i < endIndex; i++) {
             const relativeIndex = i - startIndex;
             // X position is based on time with position offset
-            const targetX = (relativeIndex / samplesToDisplay) * canvasWidth - centerX + xOffset;
+            // Use visibleWidth for TIME/DIV calculations (not canvasWidth which includes overscan)
+            const targetX = (relativeIndex / samplesToDisplay) * visibleWidth - centerX + xOffset;
             // Y position is based on amplitude with AMPL/DIV and Y position offset
             const yOffset = position * scale * 2; // Scale the position offset
             const targetY = -channelData[i] * scale / amplDiv + yOffset;
@@ -390,6 +391,7 @@ self.onmessage = function(e) {
             xPosition,
             canvasWidth,
             canvasHeight,
+            visibleWidth,
             sampleRate
         } = data;
 
@@ -412,7 +414,7 @@ self.onmessage = function(e) {
 
         for (const currentMode of modesToRender) {
             // STAGE B: Interpretation - Convert signals to target coordinates based on mode
-            const targets = interpretSignals(processedLeft, processedRight, currentMode, scale, centerX, centerY, canvasWidth, timeDiv, triggerLevel, amplDivA, positionA, amplDivB, positionB, xPosition, sampleRate);
+            const targets = interpretSignals(processedLeft, processedRight, currentMode, scale, centerX, centerY, canvasWidth, timeDiv, triggerLevel, amplDivA, positionA, amplDivB, positionB, xPosition, visibleWidth, sampleRate);
 
             // Teleport beam to first target to prevent spurious lines from previous frame
             // This eliminates the line that would be drawn from the last position of the

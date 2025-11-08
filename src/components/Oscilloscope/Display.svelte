@@ -313,6 +313,8 @@
         // Use full canvas size (600x600) to allow overscan
         const canvasWidth = 600;
         const canvasHeight = 600;
+        // Visible screen area is 400x400 (clipped by CSS overflow: hidden)
+        const visibleWidth = 400;
         const centerX = canvasWidth / 2;
         const centerY = canvasHeight / 2;
         const scale = Math.min(canvasWidth, canvasHeight) / 2.5;
@@ -345,6 +347,7 @@
                     xPosition,
                     canvasWidth,
                     canvasHeight,
+                    visibleWidth,
                     sampleRate
                 }
             });
