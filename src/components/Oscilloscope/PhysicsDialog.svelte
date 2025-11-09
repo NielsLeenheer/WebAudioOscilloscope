@@ -32,7 +32,7 @@
     <div class="sliders">
         <div class="slider-control">
             <label>Force</label>
-            <input type="range" min="0.01" max="2.0" step="0.01" bind:value={forceMultiplier} />
+            <input type="range" min="0.01" max="5.0" step="0.01" bind:value={forceMultiplier} />
             <span class="value">{forceMultiplier.toFixed(2)}</span>
         </div>
         <div class="slider-control">
