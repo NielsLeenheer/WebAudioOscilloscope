@@ -204,9 +204,9 @@ function simulatePhysics(targets, forceMultiplier, damping, mass, scale, centerX
         velocityX += accelX;
         velocityY += accelY;
 
-        // Clamp velocity to prevent instability with high force values
-        // Max velocity scales with sqrt(force/mass) to maintain oscillation frequency
-        const maxVelocity = Math.sqrt(forceMultiplier / mass) * scale * 0.5;
+        // Clamp velocity to prevent extreme instability with very high force values
+        // Max velocity scales with sqrt(force/mass) and allows very high speeds for CRT beam
+        const maxVelocity = Math.sqrt(forceMultiplier / mass) * scale * 5.0;
         const currentSpeed = Math.sqrt(velocityX * velocityX + velocityY * velocityY);
         if (currentSpeed > maxVelocity) {
             const scale_factor = maxVelocity / currentSpeed;
