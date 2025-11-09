@@ -22,8 +22,10 @@ export class AudioEngine {
             // Create gain nodes
             this.leftGain = this.audioContext.createGain();
             this.rightGain = this.audioContext.createGain();
+            this.leftGain.gain.value = 0.3; // Initial volume at 30% (matches Settings default)
+            this.rightGain.gain.value = 0.3;
             this.masterGain = this.audioContext.createGain();
-            this.masterGain.gain.value = 0.3; // Initial volume at 30%
+            this.masterGain.gain.value = 1.0; // Unity gain (volume controlled by left/right gains)
 
             // Create analyser nodes for preview
             this.leftAnalyser = this.audioContext.createAnalyser();
@@ -78,9 +80,15 @@ export class AudioEngine {
     }
 
     setVolume(value) {
-        if (this.masterGain) {
-            this.masterGain.gain.value = value / 100;
+        // Apply volume to channel gains (before analysers) so it affects both scope and speakers
+        const gainValue = value / 100;
+        if (this.leftGain) {
+            this.leftGain.gain.value = gainValue;
         }
+        if (this.rightGain) {
+            this.rightGain.gain.value = gainValue;
+        }
+        // masterGain stays at 0.3 as a fixed safety attenuation
     }
 
     setFrequency(value) {
