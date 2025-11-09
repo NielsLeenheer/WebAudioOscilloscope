@@ -148,10 +148,11 @@ function interpretSignals(processedLeft, processedRight, mode, scale, visibleSca
         // timeDiv is in microseconds, convert to seconds and multiply by 10 divisions
         const timePerDiv = timeDiv / 1000000; // Convert microseconds to seconds
         const totalTime = timePerDiv * 10; // 10 divisions across the screen
+        // For time domain, use exact samples needed for TIME/DIV (don't limit by decay)
+        // Decay is only for XY mode overdraw prevention
         const samplesToDisplay = Math.min(
             Math.floor(sampleRate * totalTime),
-            channelData.length,
-            decay // Limit by decay to prevent overdraw from large buffer
+            channelData.length
         );
 
         // Determine start and end indices
