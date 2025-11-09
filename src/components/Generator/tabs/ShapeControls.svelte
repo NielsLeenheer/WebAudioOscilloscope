@@ -67,8 +67,7 @@
 
     function drawShape(shapeGenerator) {
         if (!isPlaying) return;
-        // Shapes also need the frequency to be set
-        audioEngine.setFrequency(frequency);
+        // Shapes use the Settings tab frequency (baseFrequency), not the Wave tab frequency
         const points = shapeGenerator();
         audioEngine.createWaveform(points);
     }
