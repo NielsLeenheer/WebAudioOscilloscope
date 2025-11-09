@@ -24,6 +24,7 @@
     let forceMultiplier = $state(0.3);
     let damping = $state(0.60);
     let mass = $state(0.11);
+    let inductance = $state(0.0); // Deflection coil inductance (0=no lag, higher=more overshoot)
     let persistence = $state(0.100); // Afterglow/fade effect (0=instant fade, 1=long trail)
     let signalNoise = $state(0.005); // Random noise added to audio signal (0-1)
     let beamPower = $state(0.75); // Beam power (affects opacity: high power = bright, low power = dim)
@@ -344,6 +345,7 @@
                     forceMultiplier,
                     damping,
                     mass,
+                    inductance,
                     signalNoise,
                     basePower,
                     persistence,
@@ -444,6 +446,7 @@
     bind:forceMultiplier
     bind:damping
     bind:mass
+    bind:inductance
     bind:persistence
     bind:signalNoise
     bind:velocityDimming
