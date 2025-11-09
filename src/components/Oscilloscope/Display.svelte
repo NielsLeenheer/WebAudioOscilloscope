@@ -320,8 +320,14 @@
         const centerX = canvasWidth / 2;
         const centerY = canvasHeight / 2;
         const scale = Math.min(canvasWidth, canvasHeight) / 2.5;
-        // Scale for AMPL/DIV based on visible area (not canvas with overscan)
-        const visibleScale = Math.min(visibleWidth, visibleHeight) / 2.5;
+
+        // Scale for AMPL/DIV based on visible area and voltage calibration
+        // Measured: Web Audio ±1.0 corresponds to ~3Vpp (±1.5V) at full volume
+        const VOLTAGE_CALIBRATION = 1.5; // Web Audio ±1.0 = ±1.5V
+        const VERTICAL_DIVISIONS = 10;    // Standard oscilloscope vertical divisions
+        const pixelsPerDivision = visibleHeight / VERTICAL_DIVISIONS; // 40 pixels/division
+        const visibleScale = pixelsPerDivision * VOLTAGE_CALIBRATION; // 60
+
         const basePower = 0.2 + (beamPower * 1.4); // Allow up to 3.0 max brightness
 
         if (worker) {
