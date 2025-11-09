@@ -9,7 +9,8 @@ export class AudioEngine {
         this.merger = null;
         this.leftAnalyser = null;
         this.rightAnalyser = null;
-        this.baseFrequency = 100;
+        this.defaultFrequency = 100; // Settings tab default frequency
+        this.baseFrequency = 100; // Current playback frequency
         this.currentRotation = 0;
         this.isPlaying = false;
         this.clockInterval = null;
@@ -91,8 +92,20 @@ export class AudioEngine {
         // masterGain stays at 0.3 as a fixed safety attenuation
     }
 
-    setFrequency(value) {
+    setDefaultFrequency(value) {
+        // Called by Settings tab - updates both default and current
+        this.defaultFrequency = parseFloat(value);
         this.baseFrequency = parseFloat(value);
+    }
+
+    setFrequency(value) {
+        // Called by Waves tab - only updates current playback frequency
+        this.baseFrequency = parseFloat(value);
+    }
+
+    restoreDefaultFrequency() {
+        // Called by other tabs to restore Settings frequency
+        this.baseFrequency = this.defaultFrequency;
     }
 
     setRotation(value) {
@@ -168,6 +181,9 @@ export class AudioEngine {
     }
 
     startClock(generateClockPoints) {
+        // Restore Settings tab default frequency
+        this.restoreDefaultFrequency();
+
         // Clear any existing clock interval
         if (this.clockInterval) {
             clearInterval(this.clockInterval);

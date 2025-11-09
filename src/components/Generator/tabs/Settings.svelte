@@ -7,7 +7,7 @@
 
     function updateFrequency(value) {
         frequency = value;
-        audioEngine.setFrequency(value);
+        audioEngine.setDefaultFrequency(value);
     }
 
     function updateVolume(value) {

@@ -133,6 +133,9 @@
             return;
         }
 
+        // Restore Settings tab default frequency
+        audioEngine.restoreDefaultFrequency();
+
         // Convert canvas coordinates to normalized coordinates [-1, 1]
         const centerX = canvas.width / 2;
         const centerY = canvas.height / 2;

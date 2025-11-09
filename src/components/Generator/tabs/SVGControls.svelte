@@ -109,6 +109,9 @@
     function drawSVG() {
         if (!isPlaying) return;
 
+        // Restore Settings tab default frequency
+        audioEngine.restoreDefaultFrequency();
+
         try {
             if (validatePath()) {
                 let points;
