@@ -5,8 +5,6 @@ let velocityX = 0;
 let velocityY = 0;
 let smoothedBeamX = 0;
 let smoothedBeamY = 0;
-let targetX = 0; // Smoothed target position (simulates coil inductance)
-let targetY = 0;
 let offscreenCanvas = null;
 let ctx = null;
 
@@ -187,21 +185,16 @@ function interpretSignals(processedLeft, processedRight, mode, scale, visibleSca
 // STAGE C: PHYSICS SIMULATION
 // Apply electron beam physics uniformly to all target coordinates
 // ============================================================================
-function simulatePhysics(targets, forceMultiplier, damping, mass, inductance, scale, centerX, centerY) {
+function simulatePhysics(targets, forceMultiplier, damping, mass, scale, centerX, centerY) {
     const points = [];
     const speeds = [];
 
     for (let i = 0; i < targets.length; i++) {
         const target = targets[i];
 
-        // Smooth target position to simulate deflection coil inductance/capacitance
-        // This creates the electrical lag that causes initial overshoot
-        targetX += (target.x - targetX) * (1 - inductance);
-        targetY += (target.y - targetY) * (1 - inductance);
-
-        // Calculate force (like a spring pulling beam to smoothed target)
-        const forceX = (targetX - beamX) * forceMultiplier;
-        const forceY = (targetY - beamY) * forceMultiplier;
+        // Calculate force (like a spring pulling beam to target)
+        const forceX = (target.x - beamX) * forceMultiplier;
+        const forceY = (target.y - beamY) * forceMultiplier;
 
         // Calculate acceleration (F = ma, so a = F/m)
         const accelX = forceX / mass;
@@ -236,8 +229,6 @@ function simulatePhysics(targets, forceMultiplier, damping, mass, inductance, sc
             beamY = 0;
             velocityX = 0;
             velocityY = 0;
-            targetX = 0;
-            targetY = 0;
             smoothedBeamX = 0;
             smoothedBeamY = 0;
         } else {
@@ -386,8 +377,6 @@ self.onmessage = function(e) {
         beamY = 0;
         velocityX = 0;
         velocityY = 0;
-        targetX = 0;
-        targetY = 0;
         smoothedBeamX = 0;
         smoothedBeamY = 0;
         return;
@@ -404,7 +393,6 @@ self.onmessage = function(e) {
             forceMultiplier,
             damping,
             mass,
-            inductance,
             signalNoise,
             basePower,
             persistence,
@@ -453,14 +441,12 @@ self.onmessage = function(e) {
                 beamY = targets[0].y;
                 velocityX = 0;
                 velocityY = 0;
-                targetX = targets[0].x;
-                targetY = targets[0].y;
                 smoothedBeamX = targets[0].x;
                 smoothedBeamY = targets[0].y;
             }
 
             // STAGE C: Physics Simulation - Apply electron beam physics uniformly
-            const { points, speeds } = simulatePhysics(targets, forceMultiplier, damping, mass, inductance, scale, centerX, centerY);
+            const { points, speeds } = simulatePhysics(targets, forceMultiplier, damping, mass, scale, centerX, centerY);
 
             // ========================================================================
             // RENDERING - Draw the simulated beam path

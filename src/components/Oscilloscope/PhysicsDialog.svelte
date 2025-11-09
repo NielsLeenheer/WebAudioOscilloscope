@@ -3,7 +3,6 @@
         forceMultiplier = $bindable(),
         damping = $bindable(),
         mass = $bindable(),
-        inductance = $bindable(),
         persistence = $bindable(),
         signalNoise = $bindable(),
         velocityDimming = $bindable(),
@@ -45,11 +44,6 @@
             <label>Mass</label>
             <input type="range" min="0.01" max="5.0" step="0.01" bind:value={mass} />
             <span class="value">{mass.toFixed(2)}</span>
-        </div>
-        <div class="slider-control">
-            <label>Inductance</label>
-            <input type="range" min="0.0" max="0.95" step="0.01" bind:value={inductance} />
-            <span class="value">{inductance.toFixed(2)}</span>
         </div>
         <div class="slider-control">
             <label>Persistence</label>
