@@ -204,6 +204,16 @@ function simulatePhysics(targets, forceMultiplier, damping, mass, scale, centerX
         velocityX += accelX;
         velocityY += accelY;
 
+        // Clamp velocity to prevent instability with high force values
+        // Max velocity scales with sqrt(force/mass) to maintain oscillation frequency
+        const maxVelocity = Math.sqrt(forceMultiplier / mass) * scale * 0.5;
+        const currentSpeed = Math.sqrt(velocityX * velocityX + velocityY * velocityY);
+        if (currentSpeed > maxVelocity) {
+            const scale_factor = maxVelocity / currentSpeed;
+            velocityX *= scale_factor;
+            velocityY *= scale_factor;
+        }
+
         // Apply damping (friction/air resistance)
         velocityX *= damping;
         velocityY *= damping;
