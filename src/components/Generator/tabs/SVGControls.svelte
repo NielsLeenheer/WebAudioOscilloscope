@@ -232,10 +232,7 @@ M 0,0 L 50,50 L 0,100 L -50,50 Z"
             style="margin-top: 10px; {isValid ? '' : 'border: 2px solid #c62828;'}"
             placeholder="Paste full SVG markup here, e.g.:
 <svg viewBox='0 0 100 100'>
-  <style>
-    .shape {{ fill: none; stroke: black; }}
-  </style>
-  <circle cx='50' cy='50' r='40' class='shape'/>
+  <circle cx='50' cy='50' r='40'/>
   <rect x='30' y='30' width='40' height='40'/>
 </svg>"
         ></textarea>
