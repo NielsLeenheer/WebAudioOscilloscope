@@ -144,8 +144,11 @@
 
         ctx.beginPath();
         let firstPoint = true;
+        let prevCanvasX = 0;
+        let prevCanvasY = 0;
 
-        for (const [x, y] of points) {
+        for (let i = 0; i < points.length; i++) {
+            const [x, y] = points[i];
             const canvasX = canvasCenterX + (x - centerX) * scale;
             const canvasY = canvasCenterY + (y - centerY) * scale;
 
@@ -153,13 +156,44 @@
                 ctx.moveTo(canvasX, canvasY);
                 firstPoint = false;
             } else {
-                ctx.lineTo(canvasX, canvasY);
+                // Calculate distance from previous point
+                const dx = canvasX - prevCanvasX;
+                const dy = canvasY - prevCanvasY;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+
+                // If it's a huge leap (more than 50 pixels), draw with low opacity
+                if (distance > 50) {
+                    ctx.stroke(); // Finish current path
+                    ctx.strokeStyle = 'rgba(0, 255, 0, 0.2)';
+                    ctx.beginPath();
+                    ctx.moveTo(prevCanvasX, prevCanvasY);
+                    ctx.lineTo(canvasX, canvasY);
+                    ctx.stroke();
+                    ctx.strokeStyle = '#00ff00';
+                    ctx.beginPath();
+                    ctx.moveTo(canvasX, canvasY);
+                } else {
+                    ctx.lineTo(canvasX, canvasY);
+                }
             }
+
+            prevCanvasX = canvasX;
+            prevCanvasY = canvasY;
         }
 
         ctx.stroke();
 
-        // Draw start point
+        // Draw tiny dots at each sample point
+        ctx.fillStyle = '#00ff00';
+        for (const [x, y] of points) {
+            const canvasX = canvasCenterX + (x - centerX) * scale;
+            const canvasY = canvasCenterY + (y - centerY) * scale;
+            ctx.beginPath();
+            ctx.arc(canvasX, canvasY, 1.5, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        // Draw start point (larger red dot)
         if (points.length > 0) {
             const [x, y] = points[0];
             const canvasX = canvasCenterX + (x - centerX) * scale;
