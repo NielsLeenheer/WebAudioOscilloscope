@@ -146,29 +146,8 @@
         const canvasCenterX = canvas.width / 2;
         const canvasCenterY = canvas.height / 2;
 
-        // Draw grid
-        ctx.strokeStyle = '#000';
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.moveTo(canvasCenterX, 0);
-        ctx.lineTo(canvasCenterX, canvas.height);
-        ctx.moveTo(0, canvasCenterY);
-        ctx.lineTo(canvas.width, canvasCenterY);
-        ctx.stroke();
-
-        // Draw bounding box
-        ctx.strokeStyle = '#000';
-        ctx.lineWidth = 1;
-        ctx.strokeRect(
-            canvasCenterX + (bbox.x - centerX) * scale,
-            canvasCenterY + (bbox.y - centerY) * scale,
-            bboxWidth * scale,
-            bboxHeight * scale
-        );
-
-        // Draw points as a path
-        ctx.strokeStyle = '#000';
-        ctx.fillStyle = '#000';
+        // Draw points as a path with 70% opacity
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.7)';
         ctx.lineWidth = 1.5;
 
         ctx.beginPath();
@@ -190,15 +169,15 @@
                 const dy = canvasY - prevCanvasY;
                 const distance = Math.sqrt(dx * dx + dy * dy);
 
-                // If it's a huge leap (more than 50 pixels), draw with low opacity
+                // If it's a huge leap (more than 50 pixels), draw with 10% opacity
                 if (distance > 50) {
                     ctx.stroke(); // Finish current path
-                    ctx.strokeStyle = 'rgba(0, 0, 0, 0.2)';
+                    ctx.strokeStyle = 'rgba(0, 0, 0, 0.1)';
                     ctx.beginPath();
                     ctx.moveTo(prevCanvasX, prevCanvasY);
                     ctx.lineTo(canvasX, canvasY);
                     ctx.stroke();
-                    ctx.strokeStyle = '#000';
+                    ctx.strokeStyle = 'rgba(0, 0, 0, 0.7)';
                     ctx.beginPath();
                     ctx.moveTo(canvasX, canvasY);
                 } else {
@@ -211,27 +190,6 @@
         }
 
         ctx.stroke();
-
-        // Draw tiny dots at each sample point
-        ctx.fillStyle = '#000';
-        for (const [x, y] of points) {
-            const canvasX = canvasCenterX + (x - centerX) * scale;
-            const canvasY = canvasCenterY + (y - centerY) * scale;
-            ctx.beginPath();
-            ctx.arc(canvasX, canvasY, 1, 0, Math.PI * 2);
-            ctx.fill();
-        }
-
-        // Draw start point (larger red dot)
-        if (points.length > 0) {
-            const [x, y] = points[0];
-            const canvasX = canvasCenterX + (x - centerX) * scale;
-            const canvasY = canvasCenterY + (y - centerY) * scale;
-            ctx.fillStyle = '#f00';
-            ctx.beginPath();
-            ctx.arc(canvasX, canvasY, 3, 0, Math.PI * 2);
-            ctx.fill();
-        }
     }
 
     // Parse full SVG markup and extract all paths (static, no animation)
