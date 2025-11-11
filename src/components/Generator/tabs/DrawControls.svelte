@@ -297,9 +297,12 @@
         if (currentPath) {
             currentPath.remove();
             currentPath = null;
-            pathVersion++; // Trigger scope update
         }
         paper.view.draw();
+
+        // Clear the oscilloscope output
+        audioEngine.restoreDefaultFrequency();
+        audioEngine.createWaveform([]);
     }
 
     function exportSVG() {
