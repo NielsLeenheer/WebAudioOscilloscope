@@ -76,7 +76,12 @@
 
     // Draw extracted points on preview canvas
     function drawPreview(points, bbox) {
-        if (!previewCanvas || !previewCtx) return;
+        if (!previewCanvas) return;
+
+        // Initialize context if needed
+        if (!previewCtx) {
+            previewCtx = previewCanvas.getContext('2d');
+        }
 
         const canvas = previewCanvas;
         const ctx = previewCtx;
