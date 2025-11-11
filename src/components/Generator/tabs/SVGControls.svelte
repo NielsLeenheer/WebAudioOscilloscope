@@ -18,8 +18,10 @@
 
     // Animation settings
     let enableAnimation = $state(false);
+    let continuousSampling = $state(false);
     let animationFPS = $state(30);
     let animationDuration = $state(2.0); // seconds
+    let samplingInterval = null;
 
     // Extract points from an SVG element using browser APIs
     function extractPointsFromElement(element, samples) {
@@ -167,9 +169,84 @@
         return normalizedPoints;
     }
 
+    // Sample current frame from live animations
+    function sampleCurrentFrame(svgElement, elements, samples) {
+        // Force style recalculation to get current animated state
+        svgElement.getBoundingClientRect();
+
+        // Extract points from all elements at current animation state
+        let framePoints = [];
+        elements.forEach((element) => {
+            const elementPoints = extractPointsFromElement(element, Math.floor(samples / elements.length));
+            if (elementPoints.length > 0) {
+                framePoints = framePoints.concat(elementPoints);
+            }
+        });
+
+        return framePoints;
+    }
+
+    // Start continuous sampling of animations
+    function startContinuousSampling(markup, samples) {
+        // Stop any existing sampling
+        stopContinuousSampling();
+
+        if (!svgContainer) return;
+
+        // Setup SVG
+        svgContainer.innerHTML = markup;
+        const svgElement = svgContainer.querySelector('svg');
+        if (!svgElement) return;
+
+        const elements = svgElement.querySelectorAll('path, circle, ellipse, rect, polygon, polyline, line');
+        if (elements.length === 0) return;
+
+        // Get bounding box for normalization
+        const bbox = svgElement.getBBox();
+        const centerX = bbox.x + bbox.width / 2;
+        const centerY = bbox.y + bbox.height / 2;
+        const scale = Math.max(bbox.width, bbox.height);
+
+        const frameDuration = 1000 / animationFPS;
+
+        // Sample continuously at specified FPS
+        samplingInterval = setInterval(() => {
+            if (!isPlaying) {
+                stopContinuousSampling();
+                return;
+            }
+
+            try {
+                const framePoints = sampleCurrentFrame(svgElement, elements, samples);
+
+                if (framePoints.length === 0) return;
+
+                // Normalize points
+                const normalizedPoints = framePoints.map(([x, y]) => [
+                    ((x - centerX) / scale) * 2,
+                    -((y - centerY) / scale) * 2
+                ]);
+
+                // Update waveform with current frame
+                audioEngine.restoreDefaultFrequency();
+                audioEngine.createWaveform(normalizedPoints);
+            } catch (error) {
+                console.error('Error sampling animation frame:', error);
+            }
+        }, frameDuration);
+    }
+
+    // Stop continuous sampling
+    function stopContinuousSampling() {
+        if (samplingInterval) {
+            clearInterval(samplingInterval);
+            samplingInterval = null;
+        }
+    }
+
     // Wrapper function that chooses between static and animated parsing
     async function parseSVGMarkup(markup, samples) {
-        if (enableAnimation) {
+        if (enableAnimation && !continuousSampling) {
             return await parseSVGMarkupAnimated(markup, samples, animationFPS, animationDuration);
         } else {
             return parseSVGMarkupStatic(markup, samples);
@@ -202,7 +279,22 @@
     }
 
     async function drawSVG() {
-        if (!isPlaying) return;
+        if (!isPlaying) {
+            stopContinuousSampling();
+            return;
+        }
+
+        // If continuous sampling is enabled for full SVG with animation
+        if (inputMode === 'full' && enableAnimation && continuousSampling) {
+            const markup = svgMarkup.trim();
+            if (markup) {
+                startContinuousSampling(markup, numSamples);
+            }
+            return;
+        }
+
+        // Stop any continuous sampling if switching away from that mode
+        stopContinuousSampling();
 
         // Restore Settings tab default frequency
         audioEngine.restoreDefaultFrequency();
@@ -282,6 +374,18 @@
     onMount(() => {
         // Load initial example
         handleSelectChange();
+
+        // Cleanup on unmount
+        return () => {
+            stopContinuousSampling();
+        };
+    });
+
+    // Stop continuous sampling when playback stops
+    $effect(() => {
+        if (!isPlaying) {
+            stopContinuousSampling();
+        }
     });
 </script>
 
@@ -351,18 +455,29 @@ M 0,0 L 50,50 L 0,100 L -50,50 Z"
             </label>
 
             {#if enableAnimation}
+                <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 10px;">
+                    <input type="checkbox" bind:checked={continuousSampling} onchange={drawSVG} />
+                    Continuous Sampling
+                </label>
+
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px;">
                     <div>
                         <label for="animFPS">FPS:</label>
-                        <input type="number" id="animFPS" bind:value={animationFPS} min="10" max="60" step="5" style="width: 100%;">
+                        <input type="number" id="animFPS" bind:value={animationFPS} min="10" max="60" step="5" style="width: 100%;" onchange={drawSVG}>
                     </div>
-                    <div>
-                        <label for="animDuration">Duration (s):</label>
-                        <input type="number" id="animDuration" bind:value={animationDuration} min="0.5" max="10" step="0.5" style="width: 100%;">
-                    </div>
+                    {#if !continuousSampling}
+                        <div>
+                            <label for="animDuration">Duration (s):</label>
+                            <input type="number" id="animDuration" bind:value={animationDuration} min="0.5" max="10" step="0.5" style="width: 100%;">
+                        </div>
+                    {/if}
                 </div>
                 <div class="value-display" style="margin-top: 8px; font-size: 11px;">
-                    Animation will be sampled at {animationFPS} FPS over {animationDuration}s ({Math.ceil(animationFPS * animationDuration)} frames)
+                    {#if continuousSampling}
+                        Continuously sampling animation at {animationFPS} FPS in real-time
+                    {:else}
+                        Animation will be sampled at {animationFPS} FPS over {animationDuration}s ({Math.ceil(animationFPS * animationDuration)} frames)
+                    {/if}
                 </div>
             {/if}
         </div>
@@ -377,8 +492,10 @@ M 0,0 L 50,50 L 0,100 L -50,50 Z"
             💡 Tip: Export paths from Inkscape, Illustrator, or use online SVG editors. Complex paths work best with more sample points.
         {:else if !enableAnimation}
             💡 Tip: Paste complete SVG with styling. All shapes (paths, circles, rects, polygons) will be traced automatically.
+        {:else if continuousSampling}
+            💡 Tip: Continuous mode samples animations in real-time, perfect for infinite loops. The waveform updates live at the specified FPS.
         {:else}
-            💡 Tip: CSS animations using @keyframes and animation property are supported. The animation will be sampled at specified FPS and duration.
+            💡 Tip: Fixed duration mode captures a complete animation sequence. CSS animations using @keyframes and animation property are fully supported.
         {/if}
     </div>
 </div>
