@@ -1,48 +1,83 @@
 <script>
-    import { onMount } from 'svelte';
+    import { onMount, onDestroy } from 'svelte';
+    import paper from 'paper';
 
     let { audioEngine, isPlaying } = $props();
 
     let canvas;
-    let ctx;
-    let drawPoints = $state([]);
     let backgroundImage = $state(null);
     let backgroundOpacity = $state(30);
+    let currentPath = null;
+    let backgroundRaster = null;
+    let tool = null;
 
     onMount(() => {
-        ctx = canvas.getContext('2d');
-        redrawCanvas();
+        // Setup paper.js
+        paper.setup(canvas);
+
+        // Create pen tool
+        tool = new paper.Tool();
+        let currentSegment = null;
+        let isDragging = false;
+
+        tool.onMouseDown = (event) => {
+            if (!currentPath) {
+                // Start new path
+                currentPath = new paper.Path();
+                currentPath.strokeColor = '#1976d2';
+                currentPath.strokeWidth = 2;
+                currentPath.fullySelected = false;
+            }
+
+            // Add point
+            const segment = currentPath.add(event.point);
+            currentSegment = segment;
+            isDragging = false;
+        };
+
+        tool.onMouseDrag = (event) => {
+            if (currentSegment) {
+                isDragging = true;
+                // Create bezier handles by dragging
+                const delta = event.point.subtract(currentSegment.point);
+                currentSegment.handleOut = delta.divide(3);
+                currentSegment.handleIn = delta.divide(-3);
+            }
+        };
+
+        tool.onMouseUp = (event) => {
+            if (!isDragging && currentSegment) {
+                // If not dragging, create a straight line (no handles)
+                currentSegment.handleIn = null;
+                currentSegment.handleOut = null;
+            }
+            currentSegment = null;
+        };
+
+        // Activate the tool
+        tool.activate();
+
+        // Draw initial view
+        paper.view.draw();
     });
 
-    function handleCanvasClick(e) {
-        const rect = canvas.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
-
-        // Convert to canvas coordinates (accounting for any scaling)
-        const canvasX = (x / rect.width) * canvas.width;
-        const canvasY = (y / rect.height) * canvas.height;
-
-        drawPoints = [...drawPoints, { x: canvasX, y: canvasY }];
-        redrawCanvas();
-    }
+    onDestroy(() => {
+        if (tool) {
+            tool.remove();
+        }
+        if (paper.project) {
+            paper.project.clear();
+        }
+    });
 
     function handleDragOver(e) {
         e.preventDefault();
         e.stopPropagation();
-        canvas.style.borderColor = '#1976d2';
-    }
-
-    function handleDragLeave(e) {
-        e.preventDefault();
-        e.stopPropagation();
-        canvas.style.borderColor = '#1976d2';
     }
 
     function handleDrop(e) {
         e.preventDefault();
         e.stopPropagation();
-        canvas.style.borderColor = '#1976d2';
 
         const file = e.dataTransfer.files[0];
         if (file && file.type.startsWith('image/')) {
@@ -51,7 +86,7 @@
                 const img = new Image();
                 img.onload = () => {
                     backgroundImage = img;
-                    redrawCanvas();
+                    updateBackgroundImage();
                 };
                 img.src = event.target.result;
             };
@@ -59,106 +94,127 @@
         }
     }
 
-    function redrawCanvas() {
-        if (!ctx) return;
+    function updateBackgroundImage() {
+        if (!paper.project) return;
 
-        // Clear canvas
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        // Remove old background
+        if (backgroundRaster) {
+            backgroundRaster.remove();
+            backgroundRaster = null;
+        }
 
-        // Draw background image if present
         if (backgroundImage) {
-            ctx.globalAlpha = backgroundOpacity / 100;
+            // Create raster from image
+            backgroundRaster = new paper.Raster(backgroundImage);
 
-            // Scale image to fit canvas while maintaining aspect ratio
+            // Scale to fit canvas
             const scale = Math.min(
-                canvas.width / backgroundImage.width,
-                canvas.height / backgroundImage.height
+                paper.view.size.width / backgroundRaster.width,
+                paper.view.size.height / backgroundRaster.height
             );
-            const x = (canvas.width - backgroundImage.width * scale) / 2;
-            const y = (canvas.height - backgroundImage.height * scale) / 2;
+            backgroundRaster.scale(scale);
 
-            ctx.drawImage(
-                backgroundImage,
-                x, y,
-                backgroundImage.width * scale,
-                backgroundImage.height * scale
-            );
+            // Center the image
+            backgroundRaster.position = paper.view.center;
 
-            ctx.globalAlpha = 1.0;
+            // Set opacity
+            backgroundRaster.opacity = backgroundOpacity / 100;
+
+            // Send to back
+            backgroundRaster.sendToBack();
         }
 
-        // Draw points and lines
-        if (drawPoints.length > 0) {
-            ctx.strokeStyle = '#1976d2';
-            ctx.fillStyle = '#1976d2';
-            ctx.lineWidth = 2;
-
-            // Draw lines between points
-            ctx.beginPath();
-            ctx.moveTo(drawPoints[0].x, drawPoints[0].y);
-            for (let i = 1; i < drawPoints.length; i++) {
-                ctx.lineTo(drawPoints[i].x, drawPoints[i].y);
-            }
-            ctx.stroke();
-
-            // Draw points as circles
-            drawPoints.forEach((point, index) => {
-                ctx.beginPath();
-                ctx.arc(point.x, point.y, 4, 0, 2 * Math.PI);
-                ctx.fill();
-
-                // Draw point number
-                ctx.fillStyle = '#333';
-                ctx.font = '12px monospace';
-                ctx.fillText(index + 1, point.x + 8, point.y - 8);
-                ctx.fillStyle = '#1976d2';
-            });
-        }
+        paper.view.draw();
     }
 
-    function undoPoint() {
-        drawPoints = drawPoints.slice(0, -1);
-        redrawCanvas();
+    function updateOpacity(value) {
+        backgroundOpacity = value;
+        if (backgroundRaster) {
+            backgroundRaster.opacity = backgroundOpacity / 100;
+            paper.view.draw();
+        }
     }
 
     function clearCanvas() {
-        drawPoints = [];
-        redrawCanvas();
+        if (currentPath) {
+            currentPath.remove();
+            currentPath = null;
+        }
+        paper.view.draw();
     }
 
-    function drawCustomPath() {
+    function closePath() {
+        if (currentPath && currentPath.segments.length > 0) {
+            currentPath.closePath();
+            paper.view.draw();
+        }
+    }
+
+    function simplifyPath() {
+        if (currentPath) {
+            currentPath.simplify(10);
+            paper.view.draw();
+        }
+    }
+
+    function drawToScope() {
         if (!isPlaying) return;
-        if (drawPoints.length < 2) {
-            alert('Please add at least 2 points to create a path');
+        if (!currentPath || currentPath.segments.length < 2) {
+            alert('Please draw a path with at least 2 points');
             return;
         }
 
         // Restore Settings tab default frequency
         audioEngine.restoreDefaultFrequency();
 
-        // Convert canvas coordinates to normalized coordinates [-1, 1]
-        const centerX = canvas.width / 2;
-        const centerY = canvas.height / 2;
-        const scale = Math.max(canvas.width, canvas.height) / 2;
+        // Sample points along the path
+        const numSamples = 200;
+        const points = [];
 
-        const normalizedPoints = drawPoints.map(point => [
+        for (let i = 0; i <= numSamples; i++) {
+            const offset = (i / numSamples) * currentPath.length;
+            const point = currentPath.getPointAt(offset);
+            if (point) {
+                points.push(point);
+            }
+        }
+
+        // Get bounding box for normalization
+        const bounds = currentPath.bounds;
+        const centerX = bounds.center.x;
+        const centerY = bounds.center.y;
+        const scale = Math.max(bounds.width, bounds.height) / 2;
+
+        // Convert to normalized coordinates [-1, 1]
+        const normalizedPoints = points.map(point => [
             (point.x - centerX) / scale,
-            -(point.y - centerY) / scale  // Flip Y axis
+            -(point.y - centerY) / scale  // Flip Y axis for oscilloscope
         ]);
 
         audioEngine.createWaveform(normalizedPoints);
     }
 
-    function updateOpacity(value) {
-        backgroundOpacity = value;
-        redrawCanvas();
+    function exportSVG() {
+        if (!currentPath) {
+            alert('No path to export');
+            return;
+        }
+
+        const svg = paper.project.exportSVG({ asString: true });
+        const blob = new Blob([svg], { type: 'image/svg+xml' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'path.svg';
+        a.click();
+        URL.revokeObjectURL(url);
     }
 </script>
 
 <div class="control-group">
     <label>Draw Your Own Path:</label>
     <p style="color: #666; font-size: 14px; margin: 10px 0;">
-        Click on the canvas to add points and create your custom shape. Drag and drop an image to trace over it.
+        Click to add points. Drag while adding to create curved segments. Drag an image to trace over it.
     </p>
 
     <div style="text-align: center; margin: 20px 0;">
@@ -167,24 +223,25 @@
             width="600"
             height="600"
             style="border: 2px solid #1976d2; background: #fff; cursor: crosshair; max-width: 100%; border-radius: 6px;"
-            onclick={handleCanvasClick}
             ondragover={handleDragOver}
-            ondragleave={handleDragLeave}
             ondrop={handleDrop}
         ></canvas>
     </div>
 
-    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-top: 15px;">
-        <button onclick={() => undoPoint()}>↶ Undo Last Point</button>
-        <button onclick={() => clearCanvas()}>✕ Clear Canvas</button>
-        <button onclick={() => drawCustomPath()} style="background: #bbdefb; color: #1976d2;">▶ Draw on Scope</button>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; margin-top: 15px;">
+        <button onclick={() => closePath()}>⭘ Close Path</button>
+        <button onclick={() => simplifyPath()}>⌇ Simplify</button>
+        <button onclick={() => clearCanvas()}>✕ Clear</button>
+        <button onclick={() => exportSVG()}>⬇ Export SVG</button>
+        <button onclick={() => drawToScope()} style="background: #bbdefb; color: #1976d2; grid-column: span 2;">▶ Draw on Scope</button>
     </div>
 
     <div class="value-display" style="margin-top: 15px;">
         <strong>Instructions:</strong><br>
-        • Click to add points and create your path<br>
-        • Drag and drop an image onto the canvas to trace<br>
-        • Use Undo to remove the last point<br>
+        • Click to add points (straight segments)<br>
+        • Click and drag to create curved segments<br>
+        • Drag and drop an image to trace over it<br>
+        • Use Simplify to smooth the path<br>
         • Click "Draw on Scope" when ready
     </div>
 
