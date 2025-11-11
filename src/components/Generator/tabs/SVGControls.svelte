@@ -3,10 +3,9 @@
     import { svgExamples, complexShapes } from '../../../utils/svgExamples.js';
     import { onMount } from 'svelte';
 
-    let { audioEngine, isPlaying } = $props();
+    let { audioEngine, isPlaying, animationFPS = $bindable(30), numSamples = $bindable(200) } = $props();
 
     let svgInput = $state('');
-    let numSamples = $state(200);
     let selectedExample = $state('star');
     let validationError = $state('');
     let isValid = $state(true);
@@ -16,8 +15,7 @@
     let previewCanvas;
     let previewCtx;
 
-    // Animation settings
-    let animationFPS = $state(30);
+    // Animation interval
     let samplingInterval = null;
 
     // Auto-detect if input is full SVG markup or just path data
@@ -524,22 +522,6 @@ Full SVG example:
         </div>
     {/if}
 
-    {#if detectInputType(svgInput) === 'full'}
-        <div style="margin-top: 15px; padding: 10px; background: #f5f5f5; border-radius: 4px;">
-            <div>
-                <label for="animFPS">Animation FPS:</label>
-                <input type="number" id="animFPS" bind:value={animationFPS} min="10" max="60" step="5" style="width: 100%;" onchange={drawSVG}>
-            </div>
-            <div class="value-display" style="margin-top: 8px; font-size: 11px;">
-                Continuously sampling CSS animations at {animationFPS} FPS in real-time
-            </div>
-        </div>
-    {/if}
-
-    <div style="margin-top: 10px;">
-        <label for="svgSamples">Sample Points {detectInputType(svgInput) === 'full' ? 'per Frame' : ''}:</label>
-        <input type="number" id="svgSamples" bind:value={numSamples} min="50" max="1000" step="50" style="width: 5em;">
-    </div>
     <div class="value-display" style="margin-top: 10px;">
         {#if detectInputType(svgInput) === 'path'}
             💡 Tip: Export paths from Inkscape, Illustrator, or use online SVG editors. Complex paths work best with more sample points.

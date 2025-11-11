@@ -10,6 +10,10 @@
 
     let { audioEngine, isPlaying, start, stop } = $props();
     let activeTab = $state('waves');
+
+    // SVG settings shared between Settings tab and SVG tab
+    let svgAnimationFPS = $state(30);
+    let svgSamplePoints = $state(200);
 </script>
 
 <div class="generator">
@@ -25,9 +29,9 @@
         {:else if activeTab === 'draw'}
             <DrawControls {audioEngine} {isPlaying} />
         {:else if activeTab === 'svg'}
-            <SVGControls {audioEngine} {isPlaying} />
+            <SVGControls {audioEngine} {isPlaying} bind:animationFPS={svgAnimationFPS} bind:numSamples={svgSamplePoints} />
         {:else if activeTab === 'settings'}
-            <Settings {audioEngine} />
+            <Settings {audioEngine} bind:svgAnimationFPS bind:svgSamplePoints />
         {/if}
     </div>
 </div>
