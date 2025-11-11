@@ -15,6 +15,8 @@
     let validationTimeout = null;
     let applyTimeout = null;
     let svgContainer;
+    let previewCanvas;
+    let previewCtx;
 
     // Animation settings
     let enableAnimation = $state(true); // Enabled by default
@@ -70,6 +72,87 @@
         }
 
         return points;
+    }
+
+    // Draw extracted points on preview canvas
+    function drawPreview(points, bbox) {
+        if (!previewCanvas || !previewCtx) return;
+
+        const canvas = previewCanvas;
+        const ctx = previewCtx;
+
+        // Clear canvas
+        ctx.fillStyle = '#1a1a1a';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        if (points.length === 0) return;
+
+        // Calculate scaling to fit canvas while maintaining aspect ratio
+        const padding = 20;
+        const availableWidth = canvas.width - padding * 2;
+        const availableHeight = canvas.height - padding * 2;
+
+        const bboxWidth = bbox.width || 1;
+        const bboxHeight = bbox.height || 1;
+        const scale = Math.min(availableWidth / bboxWidth, availableHeight / bboxHeight);
+
+        const centerX = bbox.x + bboxWidth / 2;
+        const centerY = bbox.y + bboxHeight / 2;
+        const canvasCenterX = canvas.width / 2;
+        const canvasCenterY = canvas.height / 2;
+
+        // Draw grid
+        ctx.strokeStyle = '#333';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(canvasCenterX, 0);
+        ctx.lineTo(canvasCenterX, canvas.height);
+        ctx.moveTo(0, canvasCenterY);
+        ctx.lineTo(canvas.width, canvasCenterY);
+        ctx.stroke();
+
+        // Draw bounding box
+        ctx.strokeStyle = '#444';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(
+            canvasCenterX + (bbox.x - centerX) * scale,
+            canvasCenterY + (bbox.y - centerY) * scale,
+            bboxWidth * scale,
+            bboxHeight * scale
+        );
+
+        // Draw points as a path
+        ctx.strokeStyle = '#00ff00';
+        ctx.fillStyle = '#00ff00';
+        ctx.lineWidth = 2;
+
+        ctx.beginPath();
+        let firstPoint = true;
+
+        for (const [x, y] of points) {
+            const canvasX = canvasCenterX + (x - centerX) * scale;
+            const canvasY = canvasCenterY + (y - centerY) * scale;
+
+            if (firstPoint) {
+                ctx.moveTo(canvasX, canvasY);
+                firstPoint = false;
+            } else {
+                ctx.lineTo(canvasX, canvasY);
+            }
+        }
+
+        ctx.stroke();
+
+        // Draw start point
+        if (points.length > 0) {
+            const [x, y] = points[0];
+            const canvasX = canvasCenterX + (x - centerX) * scale;
+            const canvasY = canvasCenterY + (y - centerY) * scale;
+            ctx.fillStyle = '#ff0000';
+            ctx.beginPath();
+            ctx.arc(canvasX, canvasY, 4, 0, Math.PI * 2);
+            ctx.fill();
+        }
     }
 
     // Parse full SVG markup and extract all paths (static, no animation)
@@ -170,6 +253,9 @@
                 const framePoints = sampleCurrentFrame(svgElement, elements, samples);
 
                 if (framePoints.length === 0) return;
+
+                // Draw preview with raw points
+                drawPreview(framePoints, bbox);
 
                 // Normalize points
                 const normalizedPoints = framePoints.map(([x, y]) => [
@@ -314,6 +400,11 @@
     }
 
     onMount(() => {
+        // Initialize canvas context
+        if (previewCanvas) {
+            previewCtx = previewCanvas.getContext('2d');
+        }
+
         // Load initial example
         handleSelectChange();
 
@@ -406,6 +497,21 @@ M 0,0 L 50,50 L 0,100 L -50,50 Z"
                 </div>
             {/if}
         </div>
+
+        {#if enableAnimation}
+            <div style="margin-top: 15px;">
+                <div style="font-weight: bold; margin-bottom: 5px;">Preview (Extracted Points):</div>
+                <canvas
+                    bind:this={previewCanvas}
+                    width="400"
+                    height="400"
+                    style="border: 1px solid #ccc; background: #1a1a1a; width: 100%; max-width: 400px; display: block;"
+                ></canvas>
+                <div class="value-display" style="margin-top: 5px; font-size: 11px;">
+                    Green: sampled path | Red dot: start point | Gray box: bounding box
+                </div>
+            </div>
+        {/if}
     {/if}
 
     <div style="margin-top: 10px;">
