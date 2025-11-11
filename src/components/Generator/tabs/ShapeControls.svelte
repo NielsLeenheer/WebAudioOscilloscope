@@ -1,7 +1,20 @@
 <script>
     import { onMount } from 'svelte';
+    import Card from '../../Common/Card.svelte';
+    import TabBar from '../../Common/TabBar.svelte';
+    import SineIcon from '../../../assets/icons/wave-sine.svg?raw';
+    import SquareIcon from '../../../assets/icons/wave-square.svg?raw';
+    import SawtoothIcon from '../../../assets/icons/wave-sawtooth.svg?raw';
+    import TriangleIcon from '../../../assets/icons/wave-triangle.svg?raw';
 
     let { audioEngine, isPlaying } = $props();
+
+    const waveTabs = [
+        { id: 'sine', label: 'Sine', icon: SineIcon },
+        { id: 'square', label: 'Square', icon: SquareIcon },
+        { id: 'sawtooth', label: 'Sawtooth', icon: SawtoothIcon },
+        { id: 'triangle', label: 'Triangle', icon: TriangleIcon }
+    ];
 
     let leftFrequency = $state(440);
     let rightFrequency = $state(440);
@@ -71,71 +84,87 @@
     });
 </script>
 
-<div class="control-group">
-    <label>Left Channel Frequency:</label>
-    <div style="display: flex; gap: 10px; align-items: center;">
-        <input type="range" bind:value={leftFrequency} min="20" max="2000" step="1" style="flex: 1;">
-        <input type="number" bind:value={leftFrequency} min="20" max="2000" step="1" style="width: 80px;">
-        <span>Hz</span>
-    </div>
-</div>
+<div class="channels-container">
+    <Card title="Left Channel">
+        <div class="control-group">
+            <label>Frequency:</label>
+            <div class="frequency-control">
+                <input type="range" bind:value={leftFrequency} min="20" max="2000" step="1">
+                <input type="number" bind:value={leftFrequency} min="20" max="2000" step="1">
+                <span>Hz</span>
+            </div>
+        </div>
 
-<div class="control-group">
-    <label>Left Channel Waveform:</label>
-    <div class="wave-grid">
-        <button class:active={leftWave === 'sine'} onclick={() => { leftWave = 'sine'; updateWaves(); }}>Sine</button>
-        <button class:active={leftWave === 'square'} onclick={() => { leftWave = 'square'; updateWaves(); }}>Square</button>
-        <button class:active={leftWave === 'sawtooth'} onclick={() => { leftWave = 'sawtooth'; updateWaves(); }}>Sawtooth</button>
-        <button class:active={leftWave === 'triangle'} onclick={() => { leftWave = 'triangle'; updateWaves(); }}>Triangle</button>
-    </div>
-</div>
+        <div class="control-group">
+            <label>Waveform:</label>
+            <TabBar tabs={waveTabs} bind:activeTab={leftWave} />
+        </div>
+    </Card>
 
-<div class="control-group">
-    <label>Right Channel Frequency:</label>
-    <div style="display: flex; gap: 10px; align-items: center;">
-        <input type="range" bind:value={rightFrequency} min="20" max="2000" step="1" style="flex: 1;">
-        <input type="number" bind:value={rightFrequency} min="20" max="2000" step="1" style="width: 80px;">
-        <span>Hz</span>
-    </div>
-</div>
+    <Card title="Right Channel">
+        <div class="control-group">
+            <label>Frequency:</label>
+            <div class="frequency-control">
+                <input type="range" bind:value={rightFrequency} min="20" max="2000" step="1">
+                <input type="number" bind:value={rightFrequency} min="20" max="2000" step="1">
+                <span>Hz</span>
+            </div>
+        </div>
 
-<div class="control-group">
-    <label>Right Channel Waveform:</label>
-    <div class="wave-grid">
-        <button class:active={rightWave === 'sine'} onclick={() => { rightWave = 'sine'; updateWaves(); }}>Sine</button>
-        <button class:active={rightWave === 'square'} onclick={() => { rightWave = 'square'; updateWaves(); }}>Square</button>
-        <button class:active={rightWave === 'sawtooth'} onclick={() => { rightWave = 'sawtooth'; updateWaves(); }}>Sawtooth</button>
-        <button class:active={rightWave === 'triangle'} onclick={() => { rightWave = 'triangle'; updateWaves(); }}>Triangle</button>
-    </div>
+        <div class="control-group">
+            <label>Waveform:</label>
+            <TabBar tabs={waveTabs} bind:activeTab={rightWave} />
+        </div>
+    </Card>
 </div>
 
 <style>
-    .wave-grid {
+    .channels-container {
         display: grid;
         grid-template-columns: repeat(2, 1fr);
-        gap: 8px;
+        gap: 16px;
+        padding: 16px;
     }
 
-    .wave-grid button {
-        padding: 10px;
-        background: #f5f5f5;
-        border: 2px solid #ddd;
+    .control-group {
+        margin-bottom: 16px;
+    }
+
+    .control-group:last-child {
+        margin-bottom: 0;
+    }
+
+    .control-group label {
+        display: block;
+        margin-bottom: 8px;
+        font-size: 12px;
+        font-weight: 600;
+        color: #666;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .frequency-control {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+    }
+
+    .frequency-control input[type="range"] {
+        flex: 1;
+    }
+
+    .frequency-control input[type="number"] {
+        width: 80px;
+        padding: 6px 8px;
+        border: 1px solid #ddd;
         border-radius: 4px;
-        cursor: pointer;
         font-family: system-ui;
         font-size: 11pt;
-        transition: all 0.2s;
     }
 
-    .wave-grid button:hover {
-        background: #e8e8e8;
-        border-color: #999;
-    }
-
-    .wave-grid button.active {
-        background: #bbdefb;
-        border-color: #1976d2;
-        color: #1976d2;
-        font-weight: 600;
+    .frequency-control span {
+        font-size: 11pt;
+        color: #666;
     }
 </style>
