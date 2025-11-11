@@ -356,16 +356,18 @@
         • Path automatically updates on the oscilloscope as you draw
     </div>
 
-    <div style="margin-top: 15px;">
-        <label for="backgroundOpacity">Background Image Opacity: <span>{backgroundOpacity}</span>%</label>
-        <input
-            type="range"
-            id="backgroundOpacity"
-            min="0"
-            max="100"
-            value={backgroundOpacity}
-            step="5"
-            oninput={(e) => updateOpacity(e.target.value)}
-        >
-    </div>
+    {#if backgroundImage}
+        <div style="margin-top: 15px;">
+            <label for="backgroundOpacity">Background Image Opacity: <span>{backgroundOpacity}</span>%</label>
+            <input
+                type="range"
+                id="backgroundOpacity"
+                min="0"
+                max="100"
+                value={backgroundOpacity}
+                step="5"
+                oninput={(e) => updateOpacity(e.target.value)}
+            >
+        </div>
+    {/if}
 </div>
