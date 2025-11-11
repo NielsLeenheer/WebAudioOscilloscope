@@ -1,5 +1,5 @@
 <script>
-    import { onMount, onDestroy, $effect } from 'svelte';
+    import { onMount, onDestroy } from 'svelte';
     import paper from 'paper';
 
     let { audioEngine, isPlaying } = $props();
