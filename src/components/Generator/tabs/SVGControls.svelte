@@ -419,4 +419,4 @@ M 0,0 L 50,50 L 0,100 L -50,50 Z"
 </div>
 
 <!-- Hidden container for rendering and extracting SVG -->
-<div bind:this={svgContainer} style="position: absolute; left: 0; top: 0; width: 500px; height: 500px; visibility: hidden; pointer-events: none;"></div>
+<div bind:this={svgContainer} style="position: fixed; left: 0; top: 0; width: 500px; height: 500px; opacity: 0; pointer-events: none; z-index: -9999;"></div>
