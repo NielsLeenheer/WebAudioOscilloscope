@@ -16,6 +16,11 @@
     let applyTimeout = null;
     let svgContainer;
 
+    // Animation settings
+    let enableAnimation = $state(false);
+    let animationFPS = $state(30);
+    let animationDuration = $state(2.0); // seconds
+
     // Extract points from an SVG element using browser APIs
     function extractPointsFromElement(element, samples) {
         const points = [];
@@ -34,8 +39,8 @@
         return points;
     }
 
-    // Parse full SVG markup and extract all paths
-    function parseSVGMarkup(markup, samples) {
+    // Parse full SVG markup and extract all paths (static, no animation)
+    function parseSVGMarkupStatic(markup, samples) {
         if (!svgContainer) return [];
 
         // Clear container and inject SVG
@@ -81,7 +86,97 @@
         return normalizedPoints;
     }
 
-    function validatePath() {
+    // Parse SVG markup with CSS animation support
+    async function parseSVGMarkupAnimated(markup, samplesPerFrame, fps, duration) {
+        if (!svgContainer) return [];
+
+        // Clear container and inject SVG
+        svgContainer.innerHTML = markup;
+
+        const svgElement = svgContainer.querySelector('svg');
+        if (!svgElement) {
+            throw new Error('No <svg> element found in markup');
+        }
+
+        // Get all drawable elements
+        const elements = svgElement.querySelectorAll('path, circle, ellipse, rect, polygon, polyline, line');
+
+        if (elements.length === 0) {
+            throw new Error('No drawable shapes found in SVG');
+        }
+
+        // Get all animations using Web Animations API
+        const animations = [];
+        elements.forEach(element => {
+            const elementAnimations = element.getAnimations();
+            animations.push(...elementAnimations);
+        });
+
+        // Pause all animations so we can control time manually
+        animations.forEach(anim => {
+            anim.pause();
+        });
+
+        const frameCount = Math.ceil(fps * duration);
+        const frameDuration = 1000 / fps; // milliseconds
+        let allFramePoints = [];
+
+        // Sample at each frame
+        for (let frame = 0; frame < frameCount; frame++) {
+            const currentTime = frame * frameDuration;
+
+            // Set all animations to this time point
+            animations.forEach(anim => {
+                anim.currentTime = currentTime;
+            });
+
+            // Force style recalculation
+            svgElement.getBoundingClientRect();
+
+            // Extract points from all elements at this time
+            let framePoints = [];
+            elements.forEach((element) => {
+                const elementPoints = extractPointsFromElement(element, Math.floor(samplesPerFrame / elements.length));
+                if (elementPoints.length > 0) {
+                    framePoints = framePoints.concat(elementPoints);
+                }
+            });
+
+            allFramePoints = allFramePoints.concat(framePoints);
+        }
+
+        if (allFramePoints.length === 0) {
+            throw new Error('Could not extract points from animated SVG');
+        }
+
+        // Get overall bounding box for normalization (use first frame)
+        animations.forEach(anim => anim.currentTime = 0);
+        svgElement.getBoundingClientRect();
+
+        const bbox = svgElement.getBBox();
+        const centerX = bbox.x + bbox.width / 2;
+        const centerY = bbox.y + bbox.height / 2;
+        const scale = Math.max(bbox.width, bbox.height);
+
+        // Normalize to -1 to 1 range
+        const normalizedPoints = allFramePoints.map(([x, y]) => [
+            ((x - centerX) / scale) * 2,
+            -((y - centerY) / scale) * 2  // Flip Y for oscilloscope coordinates
+        ]);
+
+        return normalizedPoints;
+    }
+
+    // Wrapper function that chooses between static and animated parsing
+    async function parseSVGMarkup(markup, samples) {
+        if (enableAnimation) {
+            return await parseSVGMarkupAnimated(markup, samples, animationFPS, animationDuration);
+        } else {
+            return parseSVGMarkupStatic(markup, samples);
+        }
+    }
+
+    async function validatePath() {
         const data = inputMode === 'path' ? svgPath.trim() : svgMarkup.trim();
 
         if (!data) {
@@ -94,7 +189,7 @@
             if (inputMode === 'path') {
                 parseSVGPath(data, numSamples, true);
             } else {
-                parseSVGMarkup(data, numSamples);
+                await parseSVGMarkup(data, numSamples);
             }
             validationError = '';
             isValid = true;
@@ -106,19 +201,20 @@
         }
     }
 
-    function drawSVG() {
+    async function drawSVG() {
         if (!isPlaying) return;
 
         // Restore Settings tab default frequency
         audioEngine.restoreDefaultFrequency();
 
         try {
-            if (validatePath()) {
+            const valid = await validatePath();
+            if (valid) {
                 let points;
                 if (inputMode === 'path') {
                     points = parseSVGPath(svgPath.trim(), numSamples, true);
                 } else {
-                    points = parseSVGMarkup(svgMarkup.trim(), numSamples);
+                    points = await parseSVGMarkup(svgMarkup.trim(), numSamples);
                 }
                 audioEngine.createWaveform(points);
             }
@@ -246,15 +342,43 @@ M 0,0 L 50,50 L 0,100 L -50,50 Z"
             ⚠️ {validationError}
         </div>
     {/if}
+
+    {#if inputMode === 'full'}
+        <div style="margin-top: 15px; padding: 10px; background: #f5f5f5; border-radius: 4px;">
+            <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 10px;">
+                <input type="checkbox" bind:checked={enableAnimation} />
+                <strong>Enable CSS Animation</strong>
+            </label>
+
+            {#if enableAnimation}
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px;">
+                    <div>
+                        <label for="animFPS">FPS:</label>
+                        <input type="number" id="animFPS" bind:value={animationFPS} min="10" max="60" step="5" style="width: 100%;">
+                    </div>
+                    <div>
+                        <label for="animDuration">Duration (s):</label>
+                        <input type="number" id="animDuration" bind:value={animationDuration} min="0.5" max="10" step="0.5" style="width: 100%;">
+                    </div>
+                </div>
+                <div class="value-display" style="margin-top: 8px; font-size: 11px;">
+                    Animation will be sampled at {animationFPS} FPS over {animationDuration}s ({Math.ceil(animationFPS * animationDuration)} frames)
+                </div>
+            {/if}
+        </div>
+    {/if}
+
     <div style="margin-top: 10px;">
-        <label for="svgSamples">Sample Points:</label>
+        <label for="svgSamples">Sample Points {inputMode === 'full' && enableAnimation ? 'per Frame' : ''}:</label>
         <input type="number" id="svgSamples" bind:value={numSamples} min="50" max="1000" step="50" style="width: 5em;">
     </div>
     <div class="value-display" style="margin-top: 10px;">
         {#if inputMode === 'path'}
             💡 Tip: Export paths from Inkscape, Illustrator, or use online SVG editors. Complex paths work best with more sample points.
-        {:else}
+        {:else if !enableAnimation}
             💡 Tip: Paste complete SVG with styling. All shapes (paths, circles, rects, polygons) will be traced automatically.
+        {:else}
+            💡 Tip: CSS animations using @keyframes and animation property are supported. The animation will be sampled at specified FPS and duration.
         {/if}
     </div>
 </div>
