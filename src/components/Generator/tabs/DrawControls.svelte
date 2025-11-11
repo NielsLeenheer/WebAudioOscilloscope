@@ -15,6 +15,9 @@
         // Setup paper.js
         paper.setup(canvas);
 
+        // Set handle size larger for easier visibility
+        paper.settings.handleSize = 6;
+
         // Create tool
         tool = new paper.Tool();
         let currentSegment = null;
@@ -54,6 +57,7 @@
                 currentPath = new paper.Path();
                 currentPath.strokeColor = '#1976d2';
                 currentPath.strokeWidth = 2;
+                currentPath.selectedColor = 'black'; // Black handles and points
                 currentPath.fullySelected = true; // Always show handles
             }
 
