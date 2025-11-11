@@ -145,7 +145,7 @@
         const canvasCenterY = canvas.height / 2;
 
         // Draw points as a path with 70% opacity
-        ctx.strokeStyle = 'rgba(0, 0, 0, 0.7)';
+        ctx.strokeStyle = 'rgba(60, 60, 60, 0.7)';
         ctx.lineWidth = 1.5;
 
         ctx.beginPath();
@@ -170,12 +170,12 @@
                 // If it's a huge leap (more than 50 pixels), draw with 10% opacity
                 if (distance > 50) {
                     ctx.stroke(); // Finish current path
-                    ctx.strokeStyle = 'rgba(0, 0, 0, 0.1)';
+                    ctx.strokeStyle = 'rgba(60, 60, 60, 0.1)';
                     ctx.beginPath();
                     ctx.moveTo(prevCanvasX, prevCanvasY);
                     ctx.lineTo(canvasX, canvasY);
                     ctx.stroke();
-                    ctx.strokeStyle = 'rgba(0, 0, 0, 0.7)';
+                    ctx.strokeStyle = 'rgba(60, 60, 60, 0.7)';
                     ctx.beginPath();
                     ctx.moveTo(canvasX, canvasY);
                 } else {
@@ -477,13 +477,13 @@
     });
 </script>
 
-<div class="control-group" style="position: relative; background: transparent;">
+<div class="control-group">
     <!-- Preview canvas - absolutely positioned top right -->
     <canvas
         bind:this={previewCanvas}
         width="150"
         height="150"
-        style="position: absolute; top: 0; right: 0; width: 150px; height: 150px; pointer-events: none; border: 1px solid #ddd;"
+        style="position: absolute; top: 0; right: 0; width: 150px; height: 150px; pointer-events: none; right: 10px;"
     ></canvas>
 
     <select bind:value={selectedExample} onchange={handleSelectChange}>
@@ -500,11 +500,11 @@
         <option value="peace">Peace Sign</option>
         <option value="beyondtellerrand">Beyond Tellerrand</option>
     </select>
+
     <pre
         contenteditable="true"
         bind:textContent={svgInput}
         oninput={handleTextareaInput}
-        style="margin-top: 10px; min-height: 200px; padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-family: monospace; font-size: 13px; overflow: auto; white-space: pre-wrap; {isValid ? '' : 'border: 2px solid #c62828;'}"
         data-placeholder="Paste SVG path data or full SVG markup here.
 
 Path data example:
@@ -515,26 +515,37 @@ Full SVG example:
   <circle cx='50' cy='50' r='40'/>
 </svg>"
     ></pre>
-
-    {#if validationError}
-        <div style="color: #c62828; font-size: 12px; margin-top: 5px;">
-            ⚠️ {validationError}
-        </div>
-    {/if}
-
-    <div class="value-display" style="margin-top: 10px;">
-        {#if detectInputType(svgInput) === 'path'}
-            💡 Tip: Export paths from Inkscape, Illustrator, or use online SVG editors. Complex paths work best with more sample points.
-        {:else}
-            💡 Tip: Full SVG with CSS animations (@keyframes) are sampled in real-time. All shapes (paths, circles, rects, polygons) are traced automatically.
-        {/if}
-    </div>
 </div>
 
 <!-- Hidden container for rendering and extracting SVG -->
 <div bind:this={svgContainer} style="position: fixed; left: 0; top: 0; width: 500px; height: 500px; opacity: 0; pointer-events: none; z-index: -9999;"></div>
 
 <style>
+
+    .control-group {
+        background: none;
+        margin-top: 10px;
+    }
+
+    select {
+        border: 2px solid #ccc;
+    }
+
+    pre[contenteditable] {
+        margin-top: 30px; 
+        min-height: 200px; 
+        margin-right: 160px;
+        
+        font-family: monospace; 
+        font-size: 13px; 
+        color: #333;
+
+        overflow: auto; 
+        white-space: pre-wrap;
+
+        outline: none;
+    }
+
     pre[contenteditable]:empty:before {
         content: attr(data-placeholder);
         color: #999;
