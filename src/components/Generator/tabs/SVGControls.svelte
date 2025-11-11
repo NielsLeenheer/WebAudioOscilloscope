@@ -27,40 +27,45 @@
 
         // Check if element is an SVGGeometryElement (has getTotalLength)
         if (typeof element.getTotalLength === 'function') {
-            const totalLength = element.getTotalLength();
+            try {
+                const totalLength = element.getTotalLength();
 
-            // Get the SVG root
-            const svg = element.ownerSVGElement;
+                // Get the SVG root
+                const svg = element.ownerSVGElement;
 
-            // Get transformation matrix relative to SVG (not viewport)
-            // This avoids including the container's -9999px offset
-            let matrix = null;
-            if (svg) {
-                const elementCTM = element.getCTM();
-                const svgCTM = svg.getCTM();
+                // Get transformation matrix relative to SVG (not viewport)
+                // This avoids including the container's -9999px offset
+                let matrix = null;
+                if (svg) {
+                    const elementCTM = element.getCTM();
+                    const svgCTM = svg.getCTM();
 
-                if (elementCTM && svgCTM) {
-                    // Calculate element transform relative to SVG by removing SVG's screen transform
-                    // matrix = elementCTM × inverse(svgCTM)
-                    const svgCTMInverse = svgCTM.inverse();
-                    matrix = elementCTM.multiply(svgCTMInverse);
+                    if (elementCTM && svgCTM) {
+                        // Calculate element transform relative to SVG by removing SVG's screen transform
+                        // matrix = elementCTM × inverse(svgCTM)
+                        const svgCTMInverse = svgCTM.inverse();
+                        matrix = elementCTM.multiply(svgCTMInverse);
+                    }
                 }
-            }
 
-            for (let i = 0; i <= samples; i++) {
-                const distance = (i / samples) * totalLength;
-                const point = element.getPointAtLength(distance);
+                for (let i = 0; i <= samples; i++) {
+                    const distance = (i / samples) * totalLength;
+                    const point = element.getPointAtLength(distance);
 
-                // Apply transformation matrix if available
-                if (matrix && svg) {
-                    const svgPoint = svg.createSVGPoint();
-                    svgPoint.x = point.x;
-                    svgPoint.y = point.y;
-                    const transformedPoint = svgPoint.matrixTransform(matrix);
-                    points.push([transformedPoint.x, transformedPoint.y]);
-                } else {
-                    points.push([point.x, point.y]);
+                    // Apply transformation matrix if available
+                    if (matrix && svg) {
+                        const svgPoint = svg.createSVGPoint();
+                        svgPoint.x = point.x;
+                        svgPoint.y = point.y;
+                        const transformedPoint = svgPoint.matrixTransform(matrix);
+                        points.push([transformedPoint.x, transformedPoint.y]);
+                    } else {
+                        points.push([point.x, point.y]);
+                    }
                 }
+            } catch (error) {
+                // Skip elements that can't be sampled (e.g., display:none, inside <defs>, etc.)
+                console.warn('Could not extract points from element:', error.message);
             }
         }
 
