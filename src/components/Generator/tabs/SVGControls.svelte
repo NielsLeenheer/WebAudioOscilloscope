@@ -31,10 +31,26 @@
         if (typeof element.getTotalLength === 'function') {
             const totalLength = element.getTotalLength();
 
+            // Get the element's transformation matrix (includes CSS transforms)
+            const ctm = element.getCTM();
+
+            // Get the SVG root to create SVGPoint instances
+            const svg = element.ownerSVGElement;
+
             for (let i = 0; i <= samples; i++) {
                 const distance = (i / samples) * totalLength;
                 const point = element.getPointAtLength(distance);
-                points.push([point.x, point.y]);
+
+                // Apply transformation matrix if available
+                if (ctm && svg) {
+                    const svgPoint = svg.createSVGPoint();
+                    svgPoint.x = point.x;
+                    svgPoint.y = point.y;
+                    const transformedPoint = svgPoint.matrixTransform(ctm);
+                    points.push([transformedPoint.x, transformedPoint.y]);
+                } else {
+                    points.push([point.x, point.y]);
+                }
             }
         }
 
