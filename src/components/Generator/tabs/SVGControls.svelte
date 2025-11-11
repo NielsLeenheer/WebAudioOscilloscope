@@ -183,6 +183,16 @@
             throw new Error('No <svg> element found in markup');
         }
 
+        // Normalize SVG dimensions to match viewBox to avoid scaling issues with transform-origin
+        const viewBox = svgElement.getAttribute('viewBox');
+        if (viewBox) {
+            const [, , vbWidth, vbHeight] = viewBox.split(/\s+/).map(Number);
+            if (vbWidth && vbHeight) {
+                svgElement.setAttribute('width', vbWidth);
+                svgElement.setAttribute('height', vbHeight);
+            }
+        }
+
         // Get all drawable elements
         const elements = svgElement.querySelectorAll('path, circle, ellipse, rect, polygon, polyline, line');
 
@@ -246,6 +256,16 @@
         svgContainer.innerHTML = markup;
         const svgElement = svgContainer.querySelector('svg');
         if (!svgElement) return;
+
+        // Normalize SVG dimensions to match viewBox to avoid scaling issues with transform-origin
+        const viewBox = svgElement.getAttribute('viewBox');
+        if (viewBox) {
+            const [, , vbWidth, vbHeight] = viewBox.split(/\s+/).map(Number);
+            if (vbWidth && vbHeight) {
+                svgElement.setAttribute('width', vbWidth);
+                svgElement.setAttribute('height', vbHeight);
+            }
+        }
 
         const elements = svgElement.querySelectorAll('path, circle, ellipse, rect, polygon, polyline, line');
         if (elements.length === 0) return;
