@@ -477,7 +477,7 @@
     });
 </script>
 
-<div class="control-group" style="position: relative;">
+<div class="control-group" style="position: relative; background: transparent;">
     <!-- Preview canvas - absolutely positioned top right -->
     <canvas
         bind:this={previewCanvas}
@@ -500,12 +500,12 @@
         <option value="peace">Peace Sign</option>
         <option value="beyondtellerrand">Beyond Tellerrand</option>
     </select>
-    <textarea
-        bind:value={svgInput}
+    <pre
+        contenteditable="true"
+        bind:textContent={svgInput}
         oninput={handleTextareaInput}
-        rows="10"
-        style="margin-top: 10px; {isValid ? '' : 'border: 2px solid #c62828;'}"
-        placeholder="Paste SVG path data or full SVG markup here.
+        style="margin-top: 10px; min-height: 200px; padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-family: monospace; font-size: 13px; overflow: auto; white-space: pre-wrap; {isValid ? '' : 'border: 2px solid #c62828;'}"
+        data-placeholder="Paste SVG path data or full SVG markup here.
 
 Path data example:
 M 10,10 L 90,90 L 10,90 Z
@@ -514,7 +514,7 @@ Full SVG example:
 <svg viewBox='0 0 100 100'>
   <circle cx='50' cy='50' r='40'/>
 </svg>"
-    ></textarea>
+    ></pre>
 
     {#if validationError}
         <div style="color: #c62828; font-size: 12px; margin-top: 5px;">
@@ -533,3 +533,11 @@ Full SVG example:
 
 <!-- Hidden container for rendering and extracting SVG -->
 <div bind:this={svgContainer} style="position: fixed; left: 0; top: 0; width: 500px; height: 500px; opacity: 0; pointer-events: none; z-index: -9999;"></div>
+
+<style>
+    pre[contenteditable]:empty:before {
+        content: attr(data-placeholder);
+        color: #999;
+        pointer-events: none;
+    }
+</style>
