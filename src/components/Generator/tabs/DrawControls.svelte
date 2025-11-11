@@ -10,48 +10,89 @@
     let currentPath = null;
     let backgroundRaster = null;
     let tool = null;
+    let mode = $state('draw'); // 'draw' or 'edit'
 
     onMount(() => {
         // Setup paper.js
         paper.setup(canvas);
 
-        // Create pen tool
+        // Create tool
         tool = new paper.Tool();
         let currentSegment = null;
         let isDragging = false;
+        let hitItem = null;
+        let hitType = null;
 
         tool.onMouseDown = (event) => {
-            if (!currentPath) {
-                // Start new path
-                currentPath = new paper.Path();
-                currentPath.strokeColor = '#1976d2';
-                currentPath.strokeWidth = 2;
-                currentPath.fullySelected = false;
-            }
+            if (mode === 'draw') {
+                // Draw mode: add new points
+                if (!currentPath) {
+                    // Start new path
+                    currentPath = new paper.Path();
+                    currentPath.strokeColor = '#1976d2';
+                    currentPath.strokeWidth = 2;
+                    currentPath.fullySelected = false;
+                }
 
-            // Add point
-            const segment = currentPath.add(event.point);
-            currentSegment = segment;
-            isDragging = false;
+                // Add point
+                const segment = currentPath.add(event.point);
+                currentSegment = segment;
+                isDragging = false;
+            } else {
+                // Edit mode: select and prepare to drag
+                if (!currentPath) return;
+
+                const hitResult = currentPath.hitTest(event.point, {
+                    segments: true,
+                    handles: true,
+                    tolerance: 8
+                });
+
+                if (hitResult) {
+                    hitType = hitResult.type;
+                    if (hitResult.type === 'segment') {
+                        hitItem = hitResult.segment;
+                    } else if (hitResult.type === 'handle-in') {
+                        hitItem = hitResult.segment;
+                    } else if (hitResult.type === 'handle-out') {
+                        hitItem = hitResult.segment;
+                    }
+                }
+            }
         };
 
         tool.onMouseDrag = (event) => {
-            if (currentSegment) {
+            if (mode === 'draw' && currentSegment) {
                 isDragging = true;
                 // Create bezier handles by dragging
                 const delta = event.point.subtract(currentSegment.point);
                 currentSegment.handleOut = delta.divide(3);
                 currentSegment.handleIn = delta.divide(-3);
+            } else if (mode === 'edit' && hitItem) {
+                // Edit mode: drag segments or handles
+                if (hitType === 'segment') {
+                    hitItem.point = hitItem.point.add(event.delta);
+                } else if (hitType === 'handle-in') {
+                    hitItem.handleIn = hitItem.handleIn.add(event.delta);
+                } else if (hitType === 'handle-out') {
+                    hitItem.handleOut = hitItem.handleOut.add(event.delta);
+                }
             }
         };
 
         tool.onMouseUp = (event) => {
-            if (!isDragging && currentSegment) {
-                // If not dragging, create a straight line (no handles)
-                currentSegment.handleIn = null;
-                currentSegment.handleOut = null;
+            if (mode === 'draw') {
+                if (!isDragging && currentSegment) {
+                    // If not dragging, create a straight line (no handles)
+                    currentSegment.handleIn = null;
+                    currentSegment.handleOut = null;
+                }
+                currentSegment = null;
+            } else {
+                // Edit mode: clear drag state
+                hitItem = null;
+                hitType = null;
             }
-            currentSegment = null;
         };
 
         // Activate the tool
@@ -135,6 +176,24 @@
         }
     }
 
+    function toggleMode() {
+        if (mode === 'draw') {
+            mode = 'edit';
+            // Show handles and selection in edit mode
+            if (currentPath) {
+                currentPath.fullySelected = true;
+                paper.view.draw();
+            }
+        } else {
+            mode = 'draw';
+            // Hide handles in draw mode
+            if (currentPath) {
+                currentPath.fullySelected = false;
+                paper.view.draw();
+            }
+        }
+    }
+
     function clearCanvas() {
         if (currentPath) {
             currentPath.remove();
@@ -214,15 +273,25 @@
 <div class="control-group">
     <label>Draw Your Own Path:</label>
     <p style="color: #666; font-size: 14px; margin: 10px 0;">
-        Click to add points. Drag while adding to create curved segments. Drag an image to trace over it.
+        {#if mode === 'draw'}
+            Click to add points. Drag while adding to create curved segments. Drag an image to trace over it.
+        {:else}
+            Click and drag points to move them. Click and drag handles to adjust curves.
+        {/if}
     </p>
+
+    <div style="margin-bottom: 10px;">
+        <button onclick={toggleMode} style="background: {mode === 'edit' ? '#4caf50' : '#ff9800'}; color: white; padding: 8px 16px; font-weight: bold;">
+            {mode === 'draw' ? '✏️ Draw Mode' : '🔧 Edit Mode'}
+        </button>
+    </div>
 
     <div style="text-align: center; margin: 20px 0;">
         <canvas
             bind:this={canvas}
             width="600"
             height="600"
-            style="border: 2px solid #1976d2; background: #fff; cursor: crosshair; max-width: 100%; border-radius: 6px;"
+            style="border: 2px solid #1976d2; background: #fff; cursor: {mode === 'draw' ? 'crosshair' : 'default'}; max-width: 100%; border-radius: 6px;"
             ondragover={handleDragOver}
             ondrop={handleDrop}
         ></canvas>
@@ -238,11 +307,18 @@
 
     <div class="value-display" style="margin-top: 15px;">
         <strong>Instructions:</strong><br>
-        • Click to add points (straight segments)<br>
-        • Click and drag to create curved segments<br>
-        • Drag and drop an image to trace over it<br>
-        • Use Simplify to smooth the path<br>
-        • Click "Draw on Scope" when ready
+        {#if mode === 'draw'}
+            • Click to add points (straight segments)<br>
+            • Click and drag to create curved segments<br>
+            • Drag and drop an image to trace over it<br>
+            • Use Simplify to smooth the path<br>
+            • Switch to Edit Mode to adjust points
+        {:else}
+            • Click and drag points to reposition them<br>
+            • Click and drag bezier handles to adjust curves<br>
+            • Handles appear as small circles on selected segments<br>
+            • Switch to Draw Mode to add more points
+        {/if}
     </div>
 
     <div style="margin-top: 15px;">
