@@ -10,17 +10,13 @@
     let currentPath = null;
     let backgroundRaster = null;
     let tool = null;
+    let cursorStyle = $state('crosshair');
 
     onMount(() => {
         // Setup paper.js
         paper.setup(canvas);
 
-        // Configure selection appearance
-        paper.project.currentStyle = {
-            strokeColor: '#1976d2',
-            strokeWidth: 2,
-            selectedColor: 'black',
-        };
+        // Configure selection appearance with black color for handles
         paper.settings.handleSize = 8;
         paper.settings.hitTolerance = 8;
 
@@ -32,6 +28,23 @@
         let hitType = null;
         let isEditingExisting = false;
 
+        tool.onMouseMove = (event) => {
+            // Check if hovering over segment or handle
+            if (currentPath) {
+                const hitResult = currentPath.hitTest(event.point, {
+                    segments: true,
+                    handles: true,
+                    tolerance: 8
+                });
+
+                if (hitResult) {
+                    cursorStyle = 'pointer';
+                } else {
+                    cursorStyle = 'crosshair';
+                }
+            }
+        };
+
         tool.onMouseDown = (event) => {
             // First check if we're clicking on an existing segment or handle
             if (currentPath) {
@@ -42,6 +55,13 @@
                 });
 
                 if (hitResult) {
+                    // Check if clicking on first segment to close path
+                    if (hitResult.type === 'segment' && hitResult.segment.index === 0 && currentPath.segments.length > 2 && !currentPath.closed) {
+                        currentPath.closePath();
+                        paper.view.draw();
+                        return;
+                    }
+
                     // Editing existing geometry
                     isEditingExisting = true;
                     hitType = hitResult.type;
@@ -63,6 +83,7 @@
                 currentPath = new paper.Path();
                 currentPath.strokeColor = '#1976d2';
                 currentPath.strokeWidth = 2;
+                currentPath.selectedColor = 'black'; // Black handles and points
                 currentPath.fullySelected = true; // Always show handles
             }
 
@@ -279,7 +300,7 @@
             bind:this={canvas}
             width="600"
             height="600"
-            style="border: 2px solid #1976d2; background: #fff; cursor: crosshair; max-width: 100%; border-radius: 6px;"
+            style="border: 2px solid #1976d2; background: #fff; cursor: {cursorStyle}; max-width: 100%; border-radius: 6px;"
             ondragover={handleDragOver}
             ondrop={handleDrop}
         ></canvas>
@@ -297,6 +318,7 @@
         <strong>Instructions:</strong><br>
         • Click empty space to add points (straight segments)<br>
         • Click and drag while adding to create curved segments<br>
+        • Click the first point to close the path<br>
         • Click and drag existing points to reposition them<br>
         • Click and drag bezier handles (circles) to adjust curves<br>
         • Drag and drop an image to trace over it<br>
