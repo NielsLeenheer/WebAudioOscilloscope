@@ -15,15 +15,14 @@
     onMount(() => {
         // Setup paper.js with explicit sizing to prevent canvas resize
         paper.setup(canvas);
+
+        // Lock the view size and disable auto-resize
+        paper.view.autoUpdate = false;
         paper.view.viewSize = new paper.Size(600, 600);
 
         // Configure selection appearance with black color for handles
         paper.settings.handleSize = 8;
         paper.settings.hitTolerance = 8;
-
-        // Set project-wide selection color
-        paper.project.options.handleSize = 8;
-        paper.project.selectedColor = 'black';
 
         // Create tool
         tool = new paper.Tool();
@@ -63,7 +62,7 @@
                     // Check if clicking on first segment to close path
                     if (hitResult.type === 'segment' && hitResult.segment.index === 0 && currentPath.segments.length > 2 && !currentPath.closed) {
                         currentPath.closePath();
-                        paper.view.update();
+                        paper.view.draw();
                         return;
                     }
 
@@ -85,19 +84,19 @@
             isEditingExisting = false;
             if (!currentPath) {
                 // Start new path
-                currentPath = new paper.Path();
-                currentPath.strokeColor = '#1976d2';
-                currentPath.strokeWidth = 2;
-                currentPath.selectedColor = 'black'; // Black handles and points
-                currentPath.fullySelected = true; // Always show handles
-                currentPath.selected = true;
+                currentPath = new paper.Path({
+                    strokeColor: '#1976d2',
+                    strokeWidth: 2,
+                    selectedColor: 'black',
+                    fullySelected: true
+                });
             }
 
             // Add new point
             const segment = currentPath.add(event.point);
             currentSegment = segment;
             isDragging = false;
-            paper.view.update();
+            paper.view.draw();
         };
 
         tool.onMouseDrag = (event) => {
@@ -110,14 +109,14 @@
                 } else if (hitType === 'handle-out') {
                     hitItem.handleOut = hitItem.handleOut.add(event.delta);
                 }
-                paper.view.update();
+                paper.view.draw();
             } else if (currentSegment) {
                 // Creating bezier handles for new point
                 isDragging = true;
                 const delta = event.point.subtract(currentSegment.point);
                 currentSegment.handleOut = delta.divide(3);
                 currentSegment.handleIn = delta.divide(-3);
-                paper.view.update();
+                paper.view.draw();
             }
         };
 
@@ -136,14 +135,14 @@
                 }
                 currentSegment = null;
             }
-            paper.view.update();
+            paper.view.draw();
         };
 
         // Activate the tool
         tool.activate();
 
-        // Update initial view
-        paper.view.update();
+        // Draw initial view
+        paper.view.draw();
     });
 
     onDestroy(() => {
@@ -209,14 +208,14 @@
             backgroundRaster.sendToBack();
         }
 
-        paper.view.update();
+        paper.view.draw();
     }
 
     function updateOpacity(value) {
         backgroundOpacity = value;
         if (backgroundRaster) {
             backgroundRaster.opacity = backgroundOpacity / 100;
-            paper.view.update();
+            paper.view.draw();
         }
     }
 
@@ -225,20 +224,20 @@
             currentPath.remove();
             currentPath = null;
         }
-        paper.view.update();
+        paper.view.draw();
     }
 
     function closePath() {
         if (currentPath && currentPath.segments.length > 0) {
             currentPath.closePath();
-            paper.view.update();
+            paper.view.draw();
         }
     }
 
     function simplifyPath() {
         if (currentPath) {
             currentPath.simplify(10);
-            paper.view.update();
+            paper.view.draw();
         }
     }
 
@@ -307,7 +306,7 @@
             bind:this={canvas}
             width="600"
             height="600"
-            style="border: 2px solid #1976d2; background: #fff; cursor: {cursorStyle}; max-width: 100%; border-radius: 6px;"
+            style="border: 2px solid #1976d2; background: #fff; cursor: {cursorStyle}; max-width: 100%; border-radius: 6px; width: 600px; height: 600px;"
             ondragover={handleDragOver}
             ondrop={handleDrop}
         ></canvas>
