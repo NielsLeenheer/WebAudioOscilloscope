@@ -1,6 +1,8 @@
 <script>
     import { onMount, onDestroy } from 'svelte';
     import paper from 'paper';
+    import Button from '../../Common/Button.svelte';
+    import EraseIcon from '../../../assets/icons/erase.svg?raw';
 
     let { audioEngine, isPlaying } = $props();
 
@@ -328,20 +330,22 @@
         Click to add points, drag while adding to create curves. The path automatically updates on the oscilloscope as you draw.
     </p>
 
-    <div style="text-align: center; margin: 20px 0;">
+    <div style="display: flex; justify-content: center; margin: 15px 0;">
+        <Button variant="secondary" onclick={clearCanvas}>
+            {@html EraseIcon}
+            Clear
+        </Button>
+    </div>
+
+    <div style="display: flex; justify-content: center; margin: 20px 0;">
         <canvas
             bind:this={canvas}
             width="600"
             height="600"
-            style="border: 2px solid #1976d2; background: #fff; cursor: {cursorStyle}; max-width: 100%; border-radius: 6px; width: 600px; height: 600px;"
+            style="background: #fff; cursor: {cursorStyle}; width: 600px; height: 600px;"
             ondragover={handleDragOver}
             ondrop={handleDrop}
         ></canvas>
-    </div>
-
-    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 15px;">
-        <button onclick={() => clearCanvas()}>✕ Clear</button>
-        <button onclick={() => exportSVG()}>⬇ Export SVG</button>
     </div>
 
     <div class="value-display" style="margin-top: 15px;">
