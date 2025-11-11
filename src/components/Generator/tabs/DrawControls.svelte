@@ -15,8 +15,14 @@
         // Setup paper.js
         paper.setup(canvas);
 
-        // Set handle size larger for easier visibility
-        paper.settings.handleSize = 6;
+        // Configure selection appearance
+        paper.project.currentStyle = {
+            strokeColor: '#1976d2',
+            strokeWidth: 2,
+            selectedColor: 'black',
+        };
+        paper.settings.handleSize = 8;
+        paper.settings.hitTolerance = 8;
 
         // Create tool
         tool = new paper.Tool();
@@ -57,7 +63,6 @@
                 currentPath = new paper.Path();
                 currentPath.strokeColor = '#1976d2';
                 currentPath.strokeWidth = 2;
-                currentPath.selectedColor = 'black'; // Black handles and points
                 currentPath.fullySelected = true; // Always show handles
             }
 
@@ -77,12 +82,14 @@
                 } else if (hitType === 'handle-out') {
                     hitItem.handleOut = hitItem.handleOut.add(event.delta);
                 }
+                paper.view.draw();
             } else if (currentSegment) {
                 // Creating bezier handles for new point
                 isDragging = true;
                 const delta = event.point.subtract(currentSegment.point);
                 currentSegment.handleOut = delta.divide(3);
                 currentSegment.handleIn = delta.divide(-3);
+                paper.view.draw();
             }
         };
 
@@ -101,6 +108,7 @@
                 }
                 currentSegment = null;
             }
+            paper.view.draw();
         };
 
         // Activate the tool
