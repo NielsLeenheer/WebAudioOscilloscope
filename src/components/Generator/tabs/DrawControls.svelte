@@ -27,10 +27,28 @@
         // Create tool
         tool = new paper.Tool();
         let currentSegment = null;
+        let activeSegment = null;
         let isDragging = false;
         let hitItem = null;
         let hitType = null;
         let isEditingExisting = false;
+
+        function setActiveSegment(segment) {
+            // Deselect all segments first
+            if (currentPath) {
+                currentPath.fullySelected = false;
+                for (let seg of currentPath.segments) {
+                    seg.selected = false;
+                }
+            }
+
+            // Select only the active segment
+            activeSegment = segment;
+            if (activeSegment) {
+                activeSegment.selected = true;
+            }
+            paper.view.draw();
+        }
 
         tool.onMouseMove = (event) => {
             // Check if hovering over segment or handle
@@ -44,7 +62,8 @@
                 if (hitResult) {
                     cursorStyle = 'pointer';
                 } else {
-                    cursorStyle = 'crosshair';
+                    // Only show crosshair if path is not closed
+                    cursorStyle = currentPath.closed ? 'default' : 'crosshair';
                 }
             }
         };
@@ -66,12 +85,19 @@
                         return;
                     }
 
-                    // Editing existing geometry
+                    // If clicking on a segment point, make it active
+                    if (hitResult.type === 'segment') {
+                        setActiveSegment(hitResult.segment);
+                        hitItem = hitResult.segment;
+                        hitType = 'segment';
+                        isEditingExisting = true;
+                        return;
+                    }
+
+                    // Editing existing geometry (handles)
                     isEditingExisting = true;
                     hitType = hitResult.type;
-                    if (hitResult.type === 'segment') {
-                        hitItem = hitResult.segment;
-                    } else if (hitResult.type === 'handle-in') {
+                    if (hitResult.type === 'handle-in') {
                         hitItem = hitResult.segment;
                     } else if (hitResult.type === 'handle-out') {
                         hitItem = hitResult.segment;
@@ -80,23 +106,26 @@
                 }
             }
 
+            // Don't add new points if path is closed
+            if (currentPath && currentPath.closed) {
+                return;
+            }
+
             // Not clicking on existing geometry, so add new point
             isEditingExisting = false;
             if (!currentPath) {
                 // Start new path
-                currentPath = new paper.Path({
-                    strokeColor: '#1976d2',
-                    strokeWidth: 2,
-                    selectedColor: 'black',
-                    fullySelected: true
-                });
+                currentPath = new paper.Path();
+                currentPath.strokeColor = '#1976d2';
+                currentPath.strokeWidth = 2;
+                currentPath.selectedColor = 'black';
             }
 
             // Add new point
             const segment = currentPath.add(event.point);
             currentSegment = segment;
+            setActiveSegment(segment);
             isDragging = false;
-            paper.view.draw();
         };
 
         tool.onMouseDrag = (event) => {
@@ -298,7 +327,7 @@
 <div class="control-group">
     <label>Draw Your Own Path:</label>
     <p style="color: #666; font-size: 14px; margin: 10px 0;">
-        Click to add points, drag while adding to create curves. Click and drag existing points or handles to edit them.
+        Click to add points, drag while adding to create curves. Click any point to make it active and edit its handles.
     </p>
 
     <div style="text-align: center; margin: 20px 0;">
@@ -324,8 +353,9 @@
         <strong>Instructions:</strong><br>
         • Click empty space to add points (straight segments)<br>
         • Click and drag while adding to create curved segments<br>
-        • Click the first point to close the path<br>
-        • Click and drag existing points to reposition them<br>
+        • Click the first point to close the path (no more points can be added)<br>
+        • Click any point to make it active (only active point shows handles)<br>
+        • Click and drag the active point to reposition it<br>
         • Click and drag bezier handles (circles) to adjust curves<br>
         • Drag and drop an image to trace over it<br>
         • Use Simplify to smooth the path
