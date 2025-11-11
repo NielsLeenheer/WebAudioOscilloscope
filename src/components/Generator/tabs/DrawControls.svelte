@@ -13,12 +13,17 @@
     let cursorStyle = $state('crosshair');
 
     onMount(() => {
-        // Setup paper.js
+        // Setup paper.js with explicit sizing to prevent canvas resize
         paper.setup(canvas);
+        paper.view.viewSize = new paper.Size(600, 600);
 
         // Configure selection appearance with black color for handles
         paper.settings.handleSize = 8;
         paper.settings.hitTolerance = 8;
+
+        // Set project-wide selection color
+        paper.project.options.handleSize = 8;
+        paper.project.selectedColor = 'black';
 
         // Create tool
         tool = new paper.Tool();
@@ -58,7 +63,7 @@
                     // Check if clicking on first segment to close path
                     if (hitResult.type === 'segment' && hitResult.segment.index === 0 && currentPath.segments.length > 2 && !currentPath.closed) {
                         currentPath.closePath();
-                        paper.view.draw();
+                        paper.view.update();
                         return;
                     }
 
@@ -85,12 +90,14 @@
                 currentPath.strokeWidth = 2;
                 currentPath.selectedColor = 'black'; // Black handles and points
                 currentPath.fullySelected = true; // Always show handles
+                currentPath.selected = true;
             }
 
             // Add new point
             const segment = currentPath.add(event.point);
             currentSegment = segment;
             isDragging = false;
+            paper.view.update();
         };
 
         tool.onMouseDrag = (event) => {
@@ -103,14 +110,14 @@
                 } else if (hitType === 'handle-out') {
                     hitItem.handleOut = hitItem.handleOut.add(event.delta);
                 }
-                paper.view.draw();
+                paper.view.update();
             } else if (currentSegment) {
                 // Creating bezier handles for new point
                 isDragging = true;
                 const delta = event.point.subtract(currentSegment.point);
                 currentSegment.handleOut = delta.divide(3);
                 currentSegment.handleIn = delta.divide(-3);
-                paper.view.draw();
+                paper.view.update();
             }
         };
 
@@ -129,14 +136,14 @@
                 }
                 currentSegment = null;
             }
-            paper.view.draw();
+            paper.view.update();
         };
 
         // Activate the tool
         tool.activate();
 
-        // Draw initial view
-        paper.view.draw();
+        // Update initial view
+        paper.view.update();
     });
 
     onDestroy(() => {
@@ -202,14 +209,14 @@
             backgroundRaster.sendToBack();
         }
 
-        paper.view.draw();
+        paper.view.update();
     }
 
     function updateOpacity(value) {
         backgroundOpacity = value;
         if (backgroundRaster) {
             backgroundRaster.opacity = backgroundOpacity / 100;
-            paper.view.draw();
+            paper.view.update();
         }
     }
 
@@ -218,20 +225,20 @@
             currentPath.remove();
             currentPath = null;
         }
-        paper.view.draw();
+        paper.view.update();
     }
 
     function closePath() {
         if (currentPath && currentPath.segments.length > 0) {
             currentPath.closePath();
-            paper.view.draw();
+            paper.view.update();
         }
     }
 
     function simplifyPath() {
         if (currentPath) {
             currentPath.simplify(10);
-            paper.view.draw();
+            paper.view.update();
         }
     }
 
