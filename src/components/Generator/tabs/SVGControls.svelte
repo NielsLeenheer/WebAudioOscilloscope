@@ -17,7 +17,6 @@
     let previewCtx;
 
     // Animation settings
-    let enableAnimation = $state(true); // Enabled by default
     let animationFPS = $state(30);
     let samplingInterval = null;
 
@@ -25,6 +24,44 @@
     function detectInputType(input) {
         const trimmed = input.trim();
         return trimmed.includes('<svg') ? 'full' : 'path';
+    }
+
+    // Extract raw points and bbox from SVG path data for preview
+    function extractPathPoints(pathData, numSamples = 200) {
+        const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+
+        path.setAttribute('d', pathData);
+        svg.appendChild(path);
+
+        const totalLength = path.getTotalLength();
+        const points = [];
+
+        for (let i = 0; i < numSamples; i++) {
+            const distance = (i / numSamples) * totalLength;
+            const point = path.getPointAtLength(distance);
+            points.push([point.x, point.y]);
+        }
+
+        // Calculate bbox
+        let minX = Infinity, maxX = -Infinity;
+        let minY = Infinity, maxY = -Infinity;
+
+        points.forEach(([x, y]) => {
+            minX = Math.min(minX, x);
+            maxX = Math.max(maxX, x);
+            minY = Math.min(minY, y);
+            maxY = Math.max(maxY, y);
+        });
+
+        const bbox = {
+            x: minX,
+            y: minY,
+            width: maxX - minX,
+            height: maxY - minY
+        };
+
+        return { points, bbox };
     }
 
     // Extract points from an SVG element using browser APIs
@@ -90,14 +127,13 @@
         const canvas = previewCanvas;
         const ctx = previewCtx;
 
-        // Clear canvas
-        ctx.fillStyle = '#1a1a1a';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        // Clear canvas (transparent)
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
 
         if (points.length === 0) return;
 
         // Calculate scaling to fit canvas while maintaining aspect ratio
-        const padding = 20;
+        const padding = 10;
         const availableWidth = canvas.width - padding * 2;
         const availableHeight = canvas.height - padding * 2;
 
@@ -111,7 +147,7 @@
         const canvasCenterY = canvas.height / 2;
 
         // Draw grid
-        ctx.strokeStyle = '#333';
+        ctx.strokeStyle = '#000';
         ctx.lineWidth = 1;
         ctx.beginPath();
         ctx.moveTo(canvasCenterX, 0);
@@ -121,7 +157,7 @@
         ctx.stroke();
 
         // Draw bounding box
-        ctx.strokeStyle = '#444';
+        ctx.strokeStyle = '#000';
         ctx.lineWidth = 1;
         ctx.strokeRect(
             canvasCenterX + (bbox.x - centerX) * scale,
@@ -131,9 +167,9 @@
         );
 
         // Draw points as a path
-        ctx.strokeStyle = '#00ff00';
-        ctx.fillStyle = '#00ff00';
-        ctx.lineWidth = 2;
+        ctx.strokeStyle = '#000';
+        ctx.fillStyle = '#000';
+        ctx.lineWidth = 1.5;
 
         ctx.beginPath();
         let firstPoint = true;
@@ -157,12 +193,12 @@
                 // If it's a huge leap (more than 50 pixels), draw with low opacity
                 if (distance > 50) {
                     ctx.stroke(); // Finish current path
-                    ctx.strokeStyle = 'rgba(0, 255, 0, 0.2)';
+                    ctx.strokeStyle = 'rgba(0, 0, 0, 0.2)';
                     ctx.beginPath();
                     ctx.moveTo(prevCanvasX, prevCanvasY);
                     ctx.lineTo(canvasX, canvasY);
                     ctx.stroke();
-                    ctx.strokeStyle = '#00ff00';
+                    ctx.strokeStyle = '#000';
                     ctx.beginPath();
                     ctx.moveTo(canvasX, canvasY);
                 } else {
@@ -177,12 +213,12 @@
         ctx.stroke();
 
         // Draw tiny dots at each sample point
-        ctx.fillStyle = '#00ff00';
+        ctx.fillStyle = '#000';
         for (const [x, y] of points) {
             const canvasX = canvasCenterX + (x - centerX) * scale;
             const canvasY = canvasCenterY + (y - centerY) * scale;
             ctx.beginPath();
-            ctx.arc(canvasX, canvasY, 1.5, 0, Math.PI * 2);
+            ctx.arc(canvasX, canvasY, 1, 0, Math.PI * 2);
             ctx.fill();
         }
 
@@ -191,9 +227,9 @@
             const [x, y] = points[0];
             const canvasX = canvasCenterX + (x - centerX) * scale;
             const canvasY = canvasCenterY + (y - centerY) * scale;
-            ctx.fillStyle = '#ff0000';
+            ctx.fillStyle = '#f00';
             ctx.beginPath();
-            ctx.arc(canvasX, canvasY, 4, 0, Math.PI * 2);
+            ctx.arc(canvasX, canvasY, 3, 0, Math.PI * 2);
             ctx.fill();
         }
     }
@@ -242,6 +278,10 @@
 
         // Get bounding box to normalize coordinates
         const bbox = svgElement.getBBox();
+
+        // Draw preview with raw points
+        drawPreview(allPoints, bbox);
+
         const centerX = bbox.x + bbox.width / 2;
         const centerY = bbox.y + bbox.height / 2;
         const scale = Math.max(bbox.width, bbox.height);
@@ -357,6 +397,9 @@
             const inputType = detectInputType(data);
             if (inputType === 'path') {
                 parseSVGPath(data, numSamples, true);
+                // Update preview for path data
+                const { points, bbox } = extractPathPoints(data, numSamples);
+                drawPreview(points, bbox);
             } else {
                 parseSVGMarkupStatic(data, numSamples);
             }
@@ -381,13 +424,13 @@
 
         const inputType = detectInputType(data);
 
-        // If full SVG markup with animation enabled, use continuous sampling
-        if (inputType === 'full' && enableAnimation) {
+        // If full SVG markup, always use continuous sampling for CSS animations
+        if (inputType === 'full') {
             startContinuousSampling(data, numSamples);
             return;
         }
 
-        // Stop any continuous sampling if not in animation mode
+        // For path data, stop continuous sampling
         stopContinuousSampling();
 
         // Restore Settings tab default frequency
@@ -396,12 +439,7 @@
         try {
             const valid = await validateInput();
             if (valid) {
-                let points;
-                if (inputType === 'path') {
-                    points = parseSVGPath(data, numSamples, true);
-                } else {
-                    points = parseSVGMarkupStatic(data, numSamples);
-                }
+                const points = parseSVGPath(data, numSamples, true);
                 audioEngine.createWaveform(points);
             }
         } catch (error) {
@@ -483,7 +521,15 @@
     });
 </script>
 
-<div class="control-group">
+<div class="control-group" style="position: relative;">
+    <!-- Preview canvas - absolutely positioned top right -->
+    <canvas
+        bind:this={previewCanvas}
+        width="150"
+        height="150"
+        style="position: absolute; top: 0; right: 0; width: 150px; height: 150px; pointer-events: none; border: 1px solid #ddd;"
+    ></canvas>
+
     <select bind:value={selectedExample} onchange={handleSelectChange}>
         <option value="custom">Custom...</option>
         <option value="star">Star</option>
@@ -522,49 +568,25 @@ Full SVG example:
 
     {#if detectInputType(svgInput) === 'full'}
         <div style="margin-top: 15px; padding: 10px; background: #f5f5f5; border-radius: 4px;">
-            <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 10px;">
-                <input type="checkbox" bind:checked={enableAnimation} onchange={drawSVG} />
-                <strong>Enable CSS Animation</strong>
-            </label>
-
-            {#if enableAnimation}
-                <div style="margin-top: 10px;">
-                    <label for="animFPS">FPS:</label>
-                    <input type="number" id="animFPS" bind:value={animationFPS} min="10" max="60" step="5" style="width: 100%;" onchange={drawSVG}>
-                </div>
-                <div class="value-display" style="margin-top: 8px; font-size: 11px;">
-                    Continuously sampling animation at {animationFPS} FPS in real-time
-                </div>
-            {/if}
-        </div>
-
-        {#if enableAnimation}
-            <div style="margin-top: 15px;">
-                <div style="font-weight: bold; margin-bottom: 5px;">Preview (Extracted Points):</div>
-                <canvas
-                    bind:this={previewCanvas}
-                    width="400"
-                    height="400"
-                    style="border: 1px solid #ccc; background: #1a1a1a; width: 100%; max-width: 400px; display: block;"
-                ></canvas>
-                <div class="value-display" style="margin-top: 5px; font-size: 11px;">
-                    Green: sampled path | Red dot: start point | Gray box: bounding box
-                </div>
+            <div>
+                <label for="animFPS">Animation FPS:</label>
+                <input type="number" id="animFPS" bind:value={animationFPS} min="10" max="60" step="5" style="width: 100%;" onchange={drawSVG}>
             </div>
-        {/if}
+            <div class="value-display" style="margin-top: 8px; font-size: 11px;">
+                Continuously sampling CSS animations at {animationFPS} FPS in real-time
+            </div>
+        </div>
     {/if}
 
     <div style="margin-top: 10px;">
-        <label for="svgSamples">Sample Points {detectInputType(svgInput) === 'full' && enableAnimation ? 'per Frame' : ''}:</label>
+        <label for="svgSamples">Sample Points {detectInputType(svgInput) === 'full' ? 'per Frame' : ''}:</label>
         <input type="number" id="svgSamples" bind:value={numSamples} min="50" max="1000" step="50" style="width: 5em;">
     </div>
     <div class="value-display" style="margin-top: 10px;">
         {#if detectInputType(svgInput) === 'path'}
             💡 Tip: Export paths from Inkscape, Illustrator, or use online SVG editors. Complex paths work best with more sample points.
-        {:else if enableAnimation}
-            💡 Tip: CSS animations using @keyframes are sampled in real-time, perfect for infinite loops. The waveform updates live at the specified FPS.
         {:else}
-            💡 Tip: Paste complete SVG with styling. All shapes (paths, circles, rects, polygons) will be traced automatically.
+            💡 Tip: Full SVG with CSS animations (@keyframes) are sampled in real-time. All shapes (paths, circles, rects, polygons) are traced automatically.
         {/if}
     </div>
 </div>
