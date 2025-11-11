@@ -35,12 +35,6 @@
                 // Get the SVG root
                 const svg = element.ownerSVGElement;
 
-                // For debugging: check computed transform-origin
-                const computedStyle = window.getComputedStyle(element);
-                const transformOrigin = computedStyle.transformOrigin;
-                console.log('Element transform-origin:', transformOrigin);
-                console.log('Element transform:', computedStyle.transform);
-
                 // Get transformation matrix - use getScreenCTM for CSS transforms
                 let matrix = null;
                 if (svg) {
@@ -53,11 +47,6 @@
                         // matrix = elementCTM × inverse(svgCTM)
                         const svgCTMInverse = svgCTM.inverse();
                         matrix = elementCTM.multiply(svgCTMInverse);
-
-                        console.log('Matrix:', {
-                            a: matrix.a, b: matrix.b, c: matrix.c,
-                            d: matrix.d, e: matrix.e, f: matrix.f
-                        });
                     }
                 }
 
