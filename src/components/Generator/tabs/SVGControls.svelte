@@ -5,9 +5,7 @@
 
     let { audioEngine, isPlaying } = $props();
 
-    let inputMode = $state('path'); // 'path' or 'full'
-    let svgPath = $state('');
-    let svgMarkup = $state('');
+    let svgInput = $state('');
     let numSamples = $state(200);
     let selectedExample = $state('star');
     let validationError = $state('');
@@ -22,6 +20,12 @@
     let enableAnimation = $state(true); // Enabled by default
     let animationFPS = $state(30);
     let samplingInterval = null;
+
+    // Auto-detect if input is full SVG markup or just path data
+    function detectInputType(input) {
+        const trimmed = input.trim();
+        return trimmed.includes('<svg') ? 'full' : 'path';
+    }
 
     // Extract points from an SVG element using browser APIs
     function extractPointsFromElement(element, samples) {
@@ -340,8 +344,8 @@
     }
 
 
-    async function validatePath() {
-        const data = inputMode === 'path' ? svgPath.trim() : svgMarkup.trim();
+    async function validateInput() {
+        const data = svgInput.trim();
 
         if (!data) {
             validationError = '';
@@ -350,7 +354,8 @@
         }
 
         try {
-            if (inputMode === 'path') {
+            const inputType = detectInputType(data);
+            if (inputType === 'path') {
                 parseSVGPath(data, numSamples, true);
             } else {
                 parseSVGMarkupStatic(data, numSamples);
@@ -371,12 +376,14 @@
             return;
         }
 
-        // If full SVG mode with animation enabled, use continuous sampling
-        if (inputMode === 'full' && enableAnimation) {
-            const markup = svgMarkup.trim();
-            if (markup) {
-                startContinuousSampling(markup, numSamples);
-            }
+        const data = svgInput.trim();
+        if (!data) return;
+
+        const inputType = detectInputType(data);
+
+        // If full SVG markup with animation enabled, use continuous sampling
+        if (inputType === 'full' && enableAnimation) {
+            startContinuousSampling(data, numSamples);
             return;
         }
 
@@ -387,13 +394,13 @@
         audioEngine.restoreDefaultFrequency();
 
         try {
-            const valid = await validatePath();
+            const valid = await validateInput();
             if (valid) {
                 let points;
-                if (inputMode === 'path') {
-                    points = parseSVGPath(svgPath.trim(), numSamples, true);
+                if (inputType === 'path') {
+                    points = parseSVGPath(data, numSamples, true);
                 } else {
-                    points = parseSVGMarkupStatic(svgMarkup.trim(), numSamples);
+                    points = parseSVGMarkupStatic(data, numSamples);
                 }
                 audioEngine.createWaveform(points);
             }
@@ -413,7 +420,7 @@
             clearTimeout(validationTimeout);
         }
         validationTimeout = setTimeout(() => {
-            validatePath();
+            validateInput();
         }, 300);
 
         // Debounce auto-apply
@@ -436,8 +443,7 @@
         const pathData = svgExamples[selectedExample];
 
         if (pathData) {
-            svgPath = pathData;
-            inputMode = 'path'; // Switch to path mode for examples
+            svgInput = pathData;
 
             // Adjust sample points based on complexity
             if (complexShapes.includes(selectedExample)) {
@@ -446,16 +452,12 @@
                 numSamples = 200;
             }
 
-            validatePath();
+            validateInput();
 
             if (isPlaying && isValid) {
                 drawSVG();
             }
         }
-    }
-
-    function handleModeChange() {
-        validatePath();
     }
 
     onMount(() => {
@@ -482,56 +484,35 @@
 </script>
 
 <div class="control-group">
-    <div style="display: flex; gap: 10px; margin-bottom: 10px;">
-        <label>
-            <input type="radio" bind:group={inputMode} value="path" onchange={handleModeChange} />
-            Path Data
-        </label>
-        <label>
-            <input type="radio" bind:group={inputMode} value="full" onchange={handleModeChange} />
-            Full SVG Markup
-        </label>
-    </div>
+    <select bind:value={selectedExample} onchange={handleSelectChange}>
+        <option value="custom">Custom...</option>
+        <option value="star">Star</option>
+        <option value="html5">HTML5 Logo</option>
+        <option value="heart_svg">Heart (SVG)</option>
+        <option value="lightning">Lightning Bolt</option>
+        <option value="music">Music Note</option>
+        <option value="rocket">Rocket</option>
+        <option value="house">House</option>
+        <option value="smiley">Smiley Face</option>
+        <option value="infinity">Infinity Symbol</option>
+        <option value="peace">Peace Sign</option>
+        <option value="beyondtellerrand">Beyond Tellerrand</option>
+    </select>
+    <textarea
+        bind:value={svgInput}
+        oninput={handleTextareaInput}
+        rows="10"
+        style="margin-top: 10px; {isValid ? '' : 'border: 2px solid #c62828;'}"
+        placeholder="Paste SVG path data or full SVG markup here.
 
-    {#if inputMode === 'path'}
-        <select bind:value={selectedExample} onchange={handleSelectChange}>
-            <option value="custom">Custom...</option>
-            <option value="star">Star</option>
-            <option value="html5">HTML5 Logo</option>
-            <option value="heart_svg">Heart (SVG)</option>
-            <option value="lightning">Lightning Bolt</option>
-            <option value="music">Music Note</option>
-            <option value="rocket">Rocket</option>
-            <option value="house">House</option>
-            <option value="smiley">Smiley Face</option>
-            <option value="infinity">Infinity Symbol</option>
-            <option value="peace">Peace Sign</option>
-            <option value="beyondtellerrand">Beyond Tellerrand</option>
-        </select>
-        <textarea
-            bind:value={svgPath}
-            oninput={handleTextareaInput}
-            rows="8"
-            style="margin-top: 10px; {isValid ? '' : 'border: 2px solid #c62828;'}"
-            placeholder="Paste SVG path data here, e.g.:
+Path data example:
 M 10,10 L 90,90 L 10,90 Z
 
-Or try a simple example:
-M 0,0 L 50,50 L 0,100 L -50,50 Z"
-        ></textarea>
-    {:else}
-        <textarea
-            bind:value={svgMarkup}
-            oninput={handleTextareaInput}
-            rows="12"
-            style="margin-top: 10px; {isValid ? '' : 'border: 2px solid #c62828;'}"
-            placeholder="Paste full SVG markup here, e.g.:
+Full SVG example:
 <svg viewBox='0 0 100 100'>
   <circle cx='50' cy='50' r='40'/>
-  <rect x='30' y='30' width='40' height='40'/>
 </svg>"
-        ></textarea>
-    {/if}
+    ></textarea>
 
     {#if validationError}
         <div style="color: #c62828; font-size: 12px; margin-top: 5px;">
@@ -539,7 +520,7 @@ M 0,0 L 50,50 L 0,100 L -50,50 Z"
         </div>
     {/if}
 
-    {#if inputMode === 'full'}
+    {#if detectInputType(svgInput) === 'full'}
         <div style="margin-top: 15px; padding: 10px; background: #f5f5f5; border-radius: 4px;">
             <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 10px;">
                 <input type="checkbox" bind:checked={enableAnimation} onchange={drawSVG} />
@@ -574,11 +555,11 @@ M 0,0 L 50,50 L 0,100 L -50,50 Z"
     {/if}
 
     <div style="margin-top: 10px;">
-        <label for="svgSamples">Sample Points {inputMode === 'full' && enableAnimation ? 'per Frame' : ''}:</label>
+        <label for="svgSamples">Sample Points {detectInputType(svgInput) === 'full' && enableAnimation ? 'per Frame' : ''}:</label>
         <input type="number" id="svgSamples" bind:value={numSamples} min="50" max="1000" step="50" style="width: 5em;">
     </div>
     <div class="value-display" style="margin-top: 10px;">
-        {#if inputMode === 'path'}
+        {#if detectInputType(svgInput) === 'path'}
             💡 Tip: Export paths from Inkscape, Illustrator, or use online SVG editors. Complex paths work best with more sample points.
         {:else if enableAnimation}
             💡 Tip: CSS animations using @keyframes are sampled in real-time, perfect for infinite loops. The waveform updates live at the specified FPS.
