@@ -35,18 +35,29 @@
                 // Get the SVG root
                 const svg = element.ownerSVGElement;
 
-                // Get transformation matrix relative to SVG (not viewport)
-                // This avoids including the container's -9999px offset
+                // For debugging: check computed transform-origin
+                const computedStyle = window.getComputedStyle(element);
+                const transformOrigin = computedStyle.transformOrigin;
+                console.log('Element transform-origin:', transformOrigin);
+                console.log('Element transform:', computedStyle.transform);
+
+                // Get transformation matrix - use getScreenCTM for CSS transforms
                 let matrix = null;
                 if (svg) {
-                    const elementCTM = element.getCTM();
-                    const svgCTM = svg.getCTM();
+                    // getScreenCTM includes CSS transforms, getCTM does not in some browsers
+                    const elementCTM = element.getScreenCTM();
+                    const svgCTM = svg.getScreenCTM();
 
                     if (elementCTM && svgCTM) {
                         // Calculate element transform relative to SVG by removing SVG's screen transform
                         // matrix = elementCTM × inverse(svgCTM)
                         const svgCTMInverse = svgCTM.inverse();
                         matrix = elementCTM.multiply(svgCTMInverse);
+
+                        console.log('Matrix:', {
+                            a: matrix.a, b: matrix.b, c: matrix.c,
+                            d: matrix.d, e: matrix.e, f: matrix.f
+                        });
                     }
                 }
 
