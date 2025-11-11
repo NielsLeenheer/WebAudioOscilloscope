@@ -1,5 +1,5 @@
 <script>
-    import { onMount, onDestroy } from 'svelte';
+    import { onMount, onDestroy, $effect } from 'svelte';
     import paper from 'paper';
 
     let { audioEngine, isPlaying } = $props();
@@ -11,6 +11,7 @@
     let backgroundRaster = null;
     let tool = null;
     let cursorStyle = $state('crosshair');
+    let pathVersion = $state(0); // Track path changes for auto-update
 
     onMount(() => {
         // Setup paper.js with explicit sizing to prevent canvas resize
@@ -82,6 +83,7 @@
                     if (hitResult.type === 'segment' && hitResult.segment.index === 0 && currentPath.segments.length > 2 && !currentPath.closed) {
                         currentPath.closePath();
                         paper.view.draw();
+                        pathVersion++; // Trigger scope update
                         return;
                     }
 
@@ -155,6 +157,7 @@
                 hitItem = null;
                 hitType = null;
                 isEditingExisting = false;
+                pathVersion++; // Update scope after editing
             } else {
                 // Finished adding new point
                 if (!isDragging && currentSegment) {
@@ -163,6 +166,7 @@
                     currentSegment.handleOut = null;
                 }
                 currentSegment = null;
+                pathVersion++; // Update scope after adding point
             }
             paper.view.draw();
         };
@@ -173,6 +177,47 @@
         // Draw initial view
         paper.view.draw();
     });
+
+    // Auto-update scope whenever path changes
+    $effect(() => {
+        pathVersion; // Track dependency
+        if (isPlaying && currentPath && currentPath.segments.length >= 2) {
+            updateScope();
+        }
+    });
+
+    function updateScope() {
+        if (!currentPath || currentPath.segments.length < 2) return;
+
+        // Restore Settings tab default frequency
+        audioEngine.restoreDefaultFrequency();
+
+        // Sample points along the path
+        const numSamples = 200;
+        const points = [];
+
+        for (let i = 0; i <= numSamples; i++) {
+            const offset = (i / numSamples) * currentPath.length;
+            const point = currentPath.getPointAt(offset);
+            if (point) {
+                points.push(point);
+            }
+        }
+
+        // Get bounding box for normalization
+        const bounds = currentPath.bounds;
+        const centerX = bounds.center.x;
+        const centerY = bounds.center.y;
+        const scale = Math.max(bounds.width, bounds.height) / 2;
+
+        // Convert to normalized coordinates [-1, 1]
+        const normalizedPoints = points.map(point => [
+            (point.x - centerX) / scale,
+            -(point.y - centerY) / scale  // Flip Y axis for oscilloscope
+        ]);
+
+        audioEngine.createWaveform(normalizedPoints);
+    }
 
     onDestroy(() => {
         if (tool) {
@@ -252,59 +297,9 @@
         if (currentPath) {
             currentPath.remove();
             currentPath = null;
+            pathVersion++; // Trigger scope update
         }
         paper.view.draw();
-    }
-
-    function closePath() {
-        if (currentPath && currentPath.segments.length > 0) {
-            currentPath.closePath();
-            paper.view.draw();
-        }
-    }
-
-    function simplifyPath() {
-        if (currentPath) {
-            currentPath.simplify(10);
-            paper.view.draw();
-        }
-    }
-
-    function drawToScope() {
-        if (!isPlaying) return;
-        if (!currentPath || currentPath.segments.length < 2) {
-            alert('Please draw a path with at least 2 points');
-            return;
-        }
-
-        // Restore Settings tab default frequency
-        audioEngine.restoreDefaultFrequency();
-
-        // Sample points along the path
-        const numSamples = 200;
-        const points = [];
-
-        for (let i = 0; i <= numSamples; i++) {
-            const offset = (i / numSamples) * currentPath.length;
-            const point = currentPath.getPointAt(offset);
-            if (point) {
-                points.push(point);
-            }
-        }
-
-        // Get bounding box for normalization
-        const bounds = currentPath.bounds;
-        const centerX = bounds.center.x;
-        const centerY = bounds.center.y;
-        const scale = Math.max(bounds.width, bounds.height) / 2;
-
-        // Convert to normalized coordinates [-1, 1]
-        const normalizedPoints = points.map(point => [
-            (point.x - centerX) / scale,
-            -(point.y - centerY) / scale  // Flip Y axis for oscilloscope
-        ]);
-
-        audioEngine.createWaveform(normalizedPoints);
     }
 
     function exportSVG() {
@@ -327,7 +322,7 @@
 <div class="control-group">
     <label>Draw Your Own Path:</label>
     <p style="color: #666; font-size: 14px; margin: 10px 0;">
-        Click to add points, drag while adding to create curves. Click any point to make it active and edit its handles.
+        Click to add points, drag while adding to create curves. The path automatically updates on the oscilloscope as you draw.
     </p>
 
     <div style="text-align: center; margin: 20px 0;">
@@ -341,12 +336,9 @@
         ></canvas>
     </div>
 
-    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; margin-top: 15px;">
-        <button onclick={() => closePath()}>⭘ Close Path</button>
-        <button onclick={() => simplifyPath()}>⌇ Simplify</button>
+    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 15px;">
         <button onclick={() => clearCanvas()}>✕ Clear</button>
         <button onclick={() => exportSVG()}>⬇ Export SVG</button>
-        <button onclick={() => drawToScope()} style="background: #bbdefb; color: #1976d2; grid-column: span 2;">▶ Draw on Scope</button>
     </div>
 
     <div class="value-display" style="margin-top: 15px;">
@@ -358,7 +350,7 @@
         • Click and drag the active point to reposition it<br>
         • Click and drag bezier handles (circles) to adjust curves<br>
         • Drag and drop an image to trace over it<br>
-        • Use Simplify to smooth the path
+        • Path automatically updates on the oscilloscope as you draw
     </div>
 
     <div style="margin-top: 15px;">
