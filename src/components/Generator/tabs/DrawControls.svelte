@@ -1,6 +1,7 @@
 <script>
     import Button from '../../Common/Button.svelte';
     import PathEditor from '../../Common/PathEditor.svelte';
+    import ImageUpload from '../../Common/ImageUpload.svelte';
     import EraseIcon from '../../../assets/icons/erase.svg?raw';
 
     let { audioEngine, isPlaying } = $props();
@@ -32,29 +33,6 @@
 
         // Use the normalized points from PathEditor
         audioEngine.createWaveform(currentNormalizedPoints);
-    }
-
-    function handleDragOver(e) {
-        e.preventDefault();
-        e.stopPropagation();
-    }
-
-    function handleDrop(e) {
-        e.preventDefault();
-        e.stopPropagation();
-
-        const file = e.dataTransfer.files[0];
-        if (file && file.type.startsWith('image/')) {
-            const reader = new FileReader();
-            reader.onload = (event) => {
-                const img = new Image();
-                img.onload = () => {
-                    backgroundImage = img;
-                };
-                img.src = event.target.result;
-            };
-            reader.readAsDataURL(file);
-        }
     }
 
     function clearCanvas() {
@@ -94,32 +72,16 @@
         </Button>
     </div>
 
-    <div
-        style="display: flex; justify-content: center; margin: 20px 0;"
-        ondragover={handleDragOver}
-        ondrop={handleDrop}
-    >
-        <PathEditor
-            bind:this={pathEditor}
-            bind:backgroundImage
-            bind:backgroundOpacity
-            onPathChange={handlePathChange}
-        />
+    <div style="display: flex; justify-content: center; margin: 20px 0;">
+        <ImageUpload bind:image={backgroundImage} bind:opacity={backgroundOpacity}>
+            <PathEditor
+                bind:this={pathEditor}
+                bind:backgroundImage
+                bind:backgroundOpacity
+                onPathChange={handlePathChange}
+            />
+        </ImageUpload>
     </div>
-
-    {#if backgroundImage}
-        <div style="margin-top: 15px;">
-            <label for="backgroundOpacity">Background Image Opacity: <span>{backgroundOpacity}</span>%</label>
-            <input
-                type="range"
-                id="backgroundOpacity"
-                min="0"
-                max="100"
-                bind:value={backgroundOpacity}
-                step="5"
-            >
-        </div>
-    {/if}
 </div>
 
 <style>
