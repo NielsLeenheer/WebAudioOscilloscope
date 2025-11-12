@@ -22,7 +22,7 @@
     import Lissajous54Icon from '../../../assets/icons/shape-lissajous-5-4.svg?raw';
     import LissajousCustomIcon from '../../../assets/icons/shape-lissajous-custom.svg?raw';
 
-    let { audioEngine, isActive = false } = $props();
+    let { audioEngine } = $props();
     let isPlaying = audioEngine.isPlaying;
 
     let selectedShape = $state('circle');
@@ -76,13 +76,11 @@
         }
     }
 
-    // Auto-draw circle when tab becomes active
+    // Auto-draw circle when component mounts and audio is playing
     $effect(() => {
-        if (isActive && !hasAutoDrawn && $isPlaying) {
+        if (!hasAutoDrawn && $isPlaying) {
             hasAutoDrawn = true;
             handleShapeChange('circle');
-        } else if (!isActive) {
-            hasAutoDrawn = false;
         }
     });
 

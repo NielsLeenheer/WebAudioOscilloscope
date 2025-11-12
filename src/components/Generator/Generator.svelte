@@ -23,9 +23,9 @@
         {#if activeTab === 'waves'}
             <WaveControls {audioEngine} />
         {:else if activeTab === 'shapes'}
-            <ShapeControls {audioEngine} isActive={activeTab === 'shapes'} />
+            <ShapeControls {audioEngine} />
         {:else if activeTab === 'clock'}
-            <ClockControls {audioEngine} isActive={activeTab === 'clock'} />
+            <ClockControls {audioEngine} />
         {:else if activeTab === 'draw'}
             <DrawControls {audioEngine} />
         {:else if activeTab === 'svg'}
