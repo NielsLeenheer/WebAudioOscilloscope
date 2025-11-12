@@ -6,12 +6,13 @@
     import PhysicsDialog from './PhysicsDialog.svelte';
     import Grid from './Grid.svelte';
     import Visualiser from './Visualiser.svelte';
+    import { MicrophoneInput } from '../../utils/microphoneInput.js';
 
     let { audioEngine, isPlaying, inputSource, isPowered, mode = $bindable() } = $props();
 
     let visualiser;
     let physicsDialog;
-    let micStream = null;
+    let micInput = new MicrophoneInput();
     let micAudioContext = $state(null);
     let micAnalyserLeft = $state(null);
     let micAnalyserRight = $state(null);
@@ -59,31 +60,16 @@
 
     async function startMicrophoneInput() {
         try {
-            micStream = await navigator.mediaDevices.getUserMedia({
-                audio: {
-                    echoCancellation: false,
-                    noiseSuppression: false,
-                    autoGainControl: false
-                }
+            const result = await micInput.start({
+                fftSize: 16384,
+                echoCancellation: false,
+                noiseSuppression: false,
+                autoGainControl: false
             });
 
-            micAudioContext = new AudioContext();
-            const source = micAudioContext.createMediaStreamSource(micStream);
-
-            // Create a stereo splitter
-            const splitter = micAudioContext.createChannelSplitter(2);
-            source.connect(splitter);
-
-            // Create analysers for left and right channels
-            micAnalyserLeft = micAudioContext.createAnalyser();
-            micAnalyserLeft.fftSize = 16384;
-            splitter.connect(micAnalyserLeft, 0);
-
-            micAnalyserRight = micAudioContext.createAnalyser();
-            micAnalyserRight.fftSize = 16384;
-            splitter.connect(micAnalyserRight, 1);
-
-            console.log('Microphone input started');
+            micAudioContext = result.audioContext;
+            micAnalyserLeft = result.analyserLeft;
+            micAnalyserRight = result.analyserRight;
         } catch (error) {
             console.error('Error accessing microphone:', error);
             alert('Could not access microphone. Please check permissions.');
@@ -92,17 +78,10 @@
     }
 
     function stopMicrophoneInput() {
-        if (micStream) {
-            micStream.getTracks().forEach(track => track.stop());
-            micStream = null;
-        }
-        if (micAudioContext) {
-            micAudioContext.close();
-            micAudioContext = null;
-        }
+        micInput.stop();
+        micAudioContext = null;
         micAnalyserLeft = null;
         micAnalyserRight = null;
-        console.log('Microphone input stopped');
     }
 
     onMount(() => {
