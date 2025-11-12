@@ -40,13 +40,12 @@
         <label>
             <input type="radio" name="tab" value="svg" bind:group={activeTab}>
             <Icon data={pathsIcon} />
-            SVG Paths
+            SVG
         </label>
 
         <label>
             <input type="radio" name="tab" value="settings" bind:group={activeTab}>
             <Icon data={settingsIcon} />
-            Settings
         </label>
     </nav>
 </div>
@@ -63,6 +62,7 @@
     }
 
     nav {
+        width: 100%;
         border: none;
         font-family: system-ui;
         font-size: 10pt;
@@ -80,11 +80,8 @@
         border-radius: 6px;
         cursor: pointer;
     }
-    label:first-child {
-        border-radius: 6px 0 0 6px;
-    }
     label:last-child {
-        border-radius: 0 6px 6px 0;
+        margin-left: auto;
     }
     label:has(:focus-visible) {
         outline: -webkit-focus-ring-color auto 1px;
