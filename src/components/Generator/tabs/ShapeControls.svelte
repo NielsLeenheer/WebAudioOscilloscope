@@ -20,6 +20,10 @@
     let rightFrequency = $state(440);
     let leftWave = $state('sine');
     let rightWave = $state('sine');
+    let leftPhase = $state(0);
+    let rightPhase = $state(0);
+    let leftInvert = $state(false);
+    let rightInvert = $state(false);
 
     function updateWaves() {
         if (!isPlaying) return;
@@ -40,8 +44,8 @@
 
         for (let i = 0; i < samples; i++) {
             const t = i / samples;
-            leftPoints.push(generateWaveValue(leftWave, t * leftCycles));
-            rightPoints.push(generateWaveValue(rightWave, t * rightCycles));
+            leftPoints.push(generateWaveValue(leftWave, t * leftCycles, leftPhase, leftInvert));
+            rightPoints.push(generateWaveValue(rightWave, t * rightCycles, rightPhase, rightInvert));
         }
 
         // Combine left and right into stereo points as [x, y] arrays
@@ -50,23 +54,33 @@
         audioEngine.createWaveform(stereoPoints);
     }
 
-    function generateWaveValue(type, cycles) {
-        const phase = cycles * 2 * Math.PI;
+    function generateWaveValue(type, cycles, phaseShift = 0, invert = false) {
+        // Apply phase shift (convert degrees to cycles)
+        const shiftedCycles = cycles + (phaseShift / 360);
+        const phase = shiftedCycles * 2 * Math.PI;
 
+        let value;
         switch(type) {
             case 'sine':
-                return Math.sin(phase);
+                value = Math.sin(phase);
+                break;
             case 'square':
-                return Math.sin(phase) >= 0 ? 1 : -1;
+                value = Math.sin(phase) >= 0 ? 1 : -1;
+                break;
             case 'sawtooth':
-                const t = cycles - Math.floor(cycles);
-                return 2 * (t - 0.5);
+                const t = shiftedCycles - Math.floor(shiftedCycles);
+                value = 2 * (t - 0.5);
+                break;
             case 'triangle':
-                const t2 = cycles - Math.floor(cycles);
-                return 4 * Math.abs(t2 - 0.5) - 1;
+                const t2 = shiftedCycles - Math.floor(shiftedCycles);
+                value = 4 * Math.abs(t2 - 0.5) - 1;
+                break;
             default:
-                return 0;
+                value = 0;
         }
+
+        // Apply inversion
+        return invert ? -value : value;
     }
 
     // Generate default sine wave when component mounts and audio starts playing
@@ -99,6 +113,22 @@
             <label>Waveform:</label>
             <TabBar tabs={waveTabs} bind:activeTab={leftWave} />
         </div>
+
+        <div class="control-group">
+            <label>Phase Shift:</label>
+            <div class="frequency-control">
+                <input type="range" bind:value={leftPhase} min="0" max="360" step="1">
+                <input type="number" bind:value={leftPhase} min="0" max="360" step="1">
+                <span>°</span>
+            </div>
+        </div>
+
+        <div class="control-group">
+            <label class="checkbox-label">
+                <input type="checkbox" bind:checked={leftInvert}>
+                <span>Invert</span>
+            </label>
+        </div>
     </Card>
 
     <Card title="Right Channel">
@@ -114,6 +144,22 @@
         <div class="control-group">
             <label>Waveform:</label>
             <TabBar tabs={waveTabs} bind:activeTab={rightWave} />
+        </div>
+
+        <div class="control-group">
+            <label>Phase Shift:</label>
+            <div class="frequency-control">
+                <input type="range" bind:value={rightPhase} min="0" max="360" step="1">
+                <input type="number" bind:value={rightPhase} min="0" max="360" step="1">
+                <span>°</span>
+            </div>
+        </div>
+
+        <div class="control-group">
+            <label class="checkbox-label">
+                <input type="checkbox" bind:checked={rightInvert}>
+                <span>Invert</span>
+            </label>
         </div>
     </Card>
 </div>
@@ -166,5 +212,27 @@
     .frequency-control span {
         font-size: 11pt;
         color: #666;
+    }
+
+    .checkbox-label {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        cursor: pointer;
+        font-size: 11pt;
+        color: #333;
+        text-transform: none;
+        letter-spacing: normal;
+        font-weight: normal;
+    }
+
+    .checkbox-label input[type="checkbox"] {
+        width: 18px;
+        height: 18px;
+        cursor: pointer;
+    }
+
+    .checkbox-label span {
+        user-select: none;
     }
 </style>
