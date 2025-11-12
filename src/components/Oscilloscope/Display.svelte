@@ -38,6 +38,7 @@
     let timeDivBase = $state(13); // Index into timeDivSteps (default 1ms)
     let timeDivFine = $state(1.0); // Fine adjustment multiplier (0.5 to 2.5)
     let triggerLevel = $state(0.0); // Trigger level: voltage threshold for triggering (-1.0 to 1.0)
+    let triggerChannel = $state('a'); // Trigger channel: 'a' or 'b'
 
     // Calculate combined time division (in microseconds)
     // This value represents microseconds per division on the oscilloscope screen
@@ -429,6 +430,7 @@
         bind:timeDivFine
         {timeDivLabels}
         bind:triggerLevel
+        bind:triggerChannel
         bind:positionA
         bind:amplBaseA
         bind:amplFineA

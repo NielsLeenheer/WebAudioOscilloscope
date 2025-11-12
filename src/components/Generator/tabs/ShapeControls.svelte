@@ -24,12 +24,6 @@
     let rightPhase = $state(0);
     let leftInvert = $state(false);
     let rightInvert = $state(false);
-    let triggerChannel = $state('left');
-
-    const triggerTabs = [
-        { id: 'left', label: 'A (Left)' },
-        { id: 'right', label: 'B (Right)' }
-    ];
 
     function updateWaves() {
         if (!isPlaying) return;
@@ -104,13 +98,6 @@
     });
 </script>
 
-<div class="trigger-section">
-    <div class="trigger-control">
-        <label>Trigger Source:</label>
-        <TabBar tabs={triggerTabs} bind:activeTab={triggerChannel} />
-    </div>
-</div>
-
 <div class="channels-container">
     <Card title="Left Channel">
         <div class="control-group">
@@ -178,27 +165,6 @@
 </div>
 
 <style>
-    .trigger-section {
-        padding: 16px;
-        padding-bottom: 0;
-    }
-
-    .trigger-control {
-        max-width: 400px;
-        margin: 0 auto;
-    }
-
-    .trigger-control label {
-        display: block;
-        margin-bottom: 8px;
-        font-size: 12px;
-        font-weight: 600;
-        color: #666;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-        text-align: center;
-    }
-
     .channels-container {
         display: grid;
         grid-template-columns: repeat(2, 1fr);
