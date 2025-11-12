@@ -25,18 +25,38 @@
     let leftInvert = $state(false);
     let rightInvert = $state(false);
 
+    function gcd(a, b) {
+        a = Math.abs(Math.round(a));
+        b = Math.abs(Math.round(b));
+        while (b !== 0) {
+            const temp = b;
+            b = a % b;
+            a = temp;
+        }
+        return a;
+    }
+
     function updateWaves() {
         if (!isPlaying) return;
 
-        // Use the left frequency as the base frequency
-        audioEngine.setFrequency(leftFrequency);
+        // Find GCD of both frequencies to use as base frequency
+        // This makes both channels independent - they're both relative to the same base
+        const baseFreq = gcd(leftFrequency, rightFrequency);
+        audioEngine.setFrequency(baseFreq);
 
         const samples = 1000;
 
-        // Calculate how many cycles to generate for each channel based on frequency ratio
-        const frequencyRatio = rightFrequency / leftFrequency;
-        const leftCycles = 1;
-        const rightCycles = frequencyRatio;
+        // Calculate cycles for each channel independently
+        let leftCycles = Math.round(leftFrequency / baseFreq);
+        let rightCycles = Math.round(rightFrequency / baseFreq);
+
+        // Limit maximum cycles to keep pattern reasonable
+        const maxCycles = 20;
+        if (leftCycles > maxCycles || rightCycles > maxCycles) {
+            const scale = maxCycles / Math.max(leftCycles, rightCycles);
+            leftCycles = Math.max(1, Math.round(leftCycles * scale));
+            rightCycles = Math.max(1, Math.round(rightCycles * scale));
+        }
 
         // Generate waveforms
         const leftPoints = [];
