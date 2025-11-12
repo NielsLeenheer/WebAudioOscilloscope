@@ -3,6 +3,7 @@
     import { svgExamples } from '../../../utils/svgExamples/index.js';
     import { onMount } from 'svelte';
     import Preview from '../../Common/Preview.svelte';
+    import CodeEditor from '../../Common/CodeEditor.svelte';
     import {
         normalizePoints,
         extractPathPoints,
@@ -16,8 +17,6 @@
     let selectedExample = $state('star');
     let validationError = $state('');
     let isValid = $state(true);
-    let validationTimeout = null;
-    let applyTimeout = null;
     let svgContainer;
     let normalizedPoints = $state([]);
 
@@ -65,13 +64,13 @@
     }
 
 
-    async function validateInput() {
-        const data = svgInput.trim();
+    function validateInput(value) {
+        const data = value.trim();
 
         if (!data) {
             validationError = '';
             isValid = true;
-            return false;
+            return;
         }
 
         try {
@@ -86,21 +85,16 @@
             }
             validationError = '';
             isValid = true;
-            return true;
         } catch (error) {
             validationError = error.message || 'Invalid SVG';
             isValid = false;
-            return false;
         }
     }
 
-    async function drawSVG() {
-        if (!isPlaying) {
-            stopContinuousSampling();
-            return;
-        }
+    function applyInput(value) {
+        if (!isPlaying || !isValid) return;
 
-        const data = svgInput.trim();
+        const data = value.trim();
         if (!data) return;
 
         const inputType = detectInputType(data);
@@ -118,38 +112,17 @@
         audioEngine.restoreDefaultFrequency();
 
         try {
-            const valid = await validateInput();
-            if (valid && normalizedPoints.length > 0) {
+            if (normalizedPoints.length > 0) {
                 audioEngine.createWaveform(normalizedPoints);
             }
         } catch (error) {
-            console.error('Error drawing SVG:', error);
-            validationError = error.message || 'Error drawing SVG';
-            isValid = false;
+            console.error('Error applying SVG:', error);
         }
     }
 
-    function handleTextareaInput(event) {
+    function handleEditorInput(event) {
         // Switch to "custom" when user manually edits
         selectedExample = 'custom';
-
-        // Debounce validation
-        if (validationTimeout) {
-            clearTimeout(validationTimeout);
-        }
-        validationTimeout = setTimeout(() => {
-            validateInput();
-        }, 300);
-
-        // Debounce auto-apply
-        if (applyTimeout) {
-            clearTimeout(applyTimeout);
-        }
-        applyTimeout = setTimeout(() => {
-            if (isPlaying && isValid) {
-                drawSVG();
-            }
-        }, 800);
     }
 
     function handleSelectChange(event) {
@@ -170,10 +143,10 @@
                 numSamples = 200;
             }
 
-            validateInput();
+            validateInput(svgInput);
 
             if (isPlaying && isValid) {
-                drawSVG();
+                applyInput(svgInput);
             }
         }
     }
@@ -208,11 +181,15 @@
         </select>
     </div>
 
-    <pre
-        contenteditable="plaintext-only"
-        bind:textContent={svgInput}
-        oninput={handleTextareaInput}
-        data-placeholder="Paste SVG path data or full SVG markup here.
+    <CodeEditor
+        bind:value={svgInput}
+        bind:validationError
+        bind:isValid
+        oninput={handleEditorInput}
+        onvalidate={validateInput}
+        onapply={applyInput}
+        autoapply={true}
+        placeholder="Paste SVG path data or full SVG markup here.
 
 Path data example:
 M 10,10 L 90,90 L 10,90 Z
@@ -221,7 +198,7 @@ Full SVG example:
 <svg viewBox='0 0 100 100'>
   <circle cx='50' cy='50' r='40'/>
 </svg>"
-    ></pre>
+    />
 </div>
 
 <!-- Hidden container for rendering and extracting SVG -->
@@ -244,27 +221,5 @@ Full SVG example:
 
     select {
         border: 2px solid #ccc;
-    }
-
-    pre[contenteditable] {
-        padding: 20px;
-        margin: 0;
-
-        font-family: monospace;
-        font-size: 13px;
-        color: #666;
-        line-height: 1.6;
-
-        overflow-x: auto;
-        overflow-y: auto;
-        white-space: pre-wrap;
-
-        outline: none;
-    }
-
-    pre[contenteditable]:empty:before {
-        content: attr(data-placeholder);
-        color: #999;
-        pointer-events: none;
     }
 </style>
