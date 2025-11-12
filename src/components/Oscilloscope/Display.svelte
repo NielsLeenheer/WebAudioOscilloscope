@@ -81,8 +81,8 @@
         bind:velocityDimming
         bind:decay
     />
-    <div class="canvas-area">
-        <div class="canvas-container">
+    <div class="visualiser-area">
+        <div class="visualiser-container">
             <Visualiser
                 bind:this={visualiser}
                 {audioEngine}
@@ -136,7 +136,7 @@
         position: relative;
     }
 
-    .canvas-area {
+    .visualiser-area {
         flex: 1;
         display: flex;
         align-items: center;
@@ -144,7 +144,7 @@
         min-height: 0;
     }
 
-    .canvas-container {
+    .visualiser-container {
         position: relative;
         display: flex;
         justify-content: center;
