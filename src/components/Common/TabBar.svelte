@@ -48,7 +48,6 @@
         display: flex;
         gap: 4px;
         background: #eee;
-        /* padding: 4px; */
         border-radius: 6px;
     }
 
