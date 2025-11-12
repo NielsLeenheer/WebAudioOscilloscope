@@ -5,7 +5,7 @@
     import Display from './Display.svelte';
     import { MicrophoneInput } from '../../utils/microphoneInput.js';
 
-    let { audioEngine, isPlaying } = $props();
+    let { audioEngine } = $props();
 
     let isPowered = $state(false);
     let inputSource = $state('generated');
@@ -48,7 +48,7 @@
 <div class="oscilloscope">
     <Header bind:isPowered />
     <InputSelector bind:inputSource bind:mode />
-    <Display {audioEngine} {isPlaying} {inputSource} {isPowered} {micInput} bind:mode />
+    <Display {audioEngine} {inputSource} {isPowered} {micInput} bind:mode />
 </div>
 
 <style>

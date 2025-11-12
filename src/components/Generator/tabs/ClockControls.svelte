@@ -1,10 +1,10 @@
 <script>
     import { generateClockPoints } from '../../../utils/shapes.js';
 
-    let { audioEngine, isPlaying, isActive } = $props();
+    let { audioEngine, isActive } = $props();
 
     $effect(() => {
-        if (isActive && isPlaying) {
+        if (isActive && audioEngine.isPlaying) {
             audioEngine.startClock(generateClockPoints);
         }
     });

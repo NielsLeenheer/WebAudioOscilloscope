@@ -11,7 +11,7 @@
         createContinuousSampler
     } from '../../../utils/svgSampler.js';
 
-    let { audioEngine, isPlaying, animationFPS = $bindable(30), numSamples = $bindable(200) } = $props();
+    let { audioEngine, animationFPS = $bindable(30), numSamples = $bindable(200) } = $props();
 
     let svgInput = $state('');
     let selectedExample = $state('star');
@@ -44,7 +44,7 @@
                     audioEngine.restoreDefaultFrequency();
                     audioEngine.createWaveform(normalized);
                 },
-                () => isPlaying
+                () => audioEngine.isPlaying
             );
         } catch (error) {
             console.error('Error starting continuous sampling:', error);
@@ -88,7 +88,7 @@
     }
 
     function applyInput(value) {
-        if (!isPlaying || !isValid) return;
+        if (!audioEngine.isPlaying || !isValid) return;
 
         const data = value.trim();
         if (!data) return;
@@ -141,7 +141,7 @@
 
             validateInput(svgInput);
 
-            if (isPlaying && isValid) {
+            if (audioEngine.isPlaying && isValid) {
                 applyInput(svgInput);
             }
         }
@@ -159,7 +159,7 @@
 
     // Stop continuous sampling when playback stops
     $effect(() => {
-        if (!isPlaying) {
+        if (!audioEngine.isPlaying) {
             stopContinuousSampling();
         }
     });

@@ -4,28 +4,25 @@
     import { AudioEngine } from './utils/AudioEngine.js';
 
     let audioEngine = new AudioEngine();
-    let isPlaying = $state(false);
 
     function start() {
         audioEngine.start();
-        isPlaying = true;
     }
 
     function stop() {
         audioEngine.stop();
-        isPlaying = false;
     }
 </script>
 
 <div id="app-container">
     <!-- Left Side: Generator -->
     <div class="left-side">
-        <Generator {audioEngine} {isPlaying} {start} {stop} />
+        <Generator {audioEngine} {start} {stop} />
     </div>
 
     <!-- Right Side: Oscilloscope -->
     <div class="right-side">
-        <Oscilloscope {audioEngine} {isPlaying} />
+        <Oscilloscope {audioEngine} />
     </div>
 </div>
 

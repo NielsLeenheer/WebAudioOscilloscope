@@ -8,7 +8,7 @@
     import SawtoothIcon from '../../../assets/icons/wave-sawtooth.svg?raw';
     import TriangleIcon from '../../../assets/icons/wave-triangle.svg?raw';
 
-    let { audioEngine, isPlaying } = $props();
+    let { audioEngine } = $props();
 
     const waveTabs = [
         { id: 'sine', label: 'Sine', icon: SineIcon },
@@ -27,7 +27,7 @@
     let rightInvert = $state(false);
 
     function updateWaves() {
-        if (!isPlaying) return;
+        if (!audioEngine.isPlaying) return;
 
         // Generate stereo waveform using helper library
         const { stereoPoints, baseFrequency } = generateStereoWaveform({
@@ -48,14 +48,14 @@
 
     // Generate default sine wave when component mounts and audio starts playing
     onMount(() => {
-        if (isPlaying) {
+        if (audioEngine.isPlaying) {
             updateWaves();
         }
     });
 
     // Update waves when parameters change and audio is playing
     $effect(() => {
-        if (isPlaying) {
+        if (audioEngine.isPlaying) {
             updateWaves();
         }
     });

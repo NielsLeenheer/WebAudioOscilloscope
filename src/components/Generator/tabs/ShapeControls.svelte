@@ -21,7 +21,7 @@
     import Lissajous54Icon from '../../../assets/icons/shape-lissajous-5-4.svg?raw';
     import LissajousCustomIcon from '../../../assets/icons/shape-lissajous-custom.svg?raw';
 
-    let { audioEngine, isPlaying, isActive = false } = $props();
+    let { audioEngine, isActive = false } = $props();
 
     let selectedShape = $state('circle');
     let lissX = $state(3);
@@ -54,7 +54,7 @@
     };
 
     function drawShape(shapeGenerator) {
-        if (!isPlaying) return;
+        if (!audioEngine.isPlaying) return;
         // Restore Settings tab default frequency before generating
         audioEngine.restoreDefaultFrequency();
         const points = shapeGenerator();
@@ -76,7 +76,7 @@
 
     // Auto-draw circle when tab becomes active
     $effect(() => {
-        if (isActive && !hasAutoDrawn && isPlaying) {
+        if (isActive && !hasAutoDrawn && audioEngine.isPlaying) {
             hasAutoDrawn = true;
             handleShapeChange('circle');
         } else if (!isActive) {
@@ -86,7 +86,7 @@
 
     // Auto-apply custom lissajous when sliders change
     $effect(() => {
-        if (selectedShape === 'custom' && isPlaying) {
+        if (selectedShape === 'custom' && audioEngine.isPlaying) {
             const generator = shapeGenerators.custom;
             if (generator) {
                 drawShape(generator);

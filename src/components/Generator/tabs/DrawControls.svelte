@@ -4,7 +4,7 @@
     import ImageUpload from '../../Common/ImageUpload.svelte';
     import EraseIcon from '../../../assets/icons/erase.svg?raw';
 
-    let { audioEngine, isPlaying } = $props();
+    let { audioEngine } = $props();
 
     let pathEditor;
     let backgroundImage = $state(null);
@@ -13,14 +13,14 @@
 
     // Auto-update scope whenever path changes and playing
     $effect(() => {
-        if (isPlaying && currentNormalizedPoints) {
+        if (audioEngine.isPlaying && currentNormalizedPoints) {
             updateScope();
         }
     });
 
     function handlePathChange(normalizedPoints) {
         currentNormalizedPoints = normalizedPoints;
-        if (isPlaying && normalizedPoints) {
+        if (audioEngine.isPlaying && normalizedPoints) {
             updateScope();
         }
     }
