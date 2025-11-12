@@ -501,11 +501,10 @@
         <option value="beyondtellerrand">Beyond Tellerrand</option>
     </select>
 
-    <pre
-        contenteditable="true"
-        bind:textContent={svgInput}
+    <textarea
+        bind:value={svgInput}
         oninput={handleTextareaInput}
-        data-placeholder="Paste SVG path data or full SVG markup here.
+        placeholder="Paste SVG path data or full SVG markup here.
 
 Path data example:
 M 10,10 L 90,90 L 10,90 Z
@@ -514,41 +513,48 @@ Full SVG example:
 <svg viewBox='0 0 100 100'>
   <circle cx='50' cy='50' r='40'/>
 </svg>"
-    ></pre>
+    ></textarea>
 </div>
 
 <!-- Hidden container for rendering and extracting SVG -->
 <div bind:this={svgContainer} style="position: fixed; left: 0; top: 0; width: 500px; height: 500px; opacity: 0; pointer-events: none; z-index: -9999;"></div>
 
 <style>
-
     .control-group {
         background: none;
-        margin-top: 10px;
+        padding: 20px;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
     }
 
     select {
         border: 2px solid #ccc;
+        flex-shrink: 0;
     }
 
-    pre[contenteditable] {
-        margin-top: 30px; 
-        min-height: 200px; 
+    textarea {
+        flex: 1;
         margin-right: 160px;
-        
-        font-family: monospace; 
-        font-size: 13px; 
+
+        font-family: monospace;
+        font-size: 13px;
         color: #333;
 
-        overflow: auto; 
-        white-space: pre-wrap;
+        overflow-x: auto;
+        overflow-y: auto;
+        white-space: pre;
 
+        padding: 10px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        resize: none;
         outline: none;
     }
 
-    pre[contenteditable]:empty:before {
-        content: attr(data-placeholder);
+    textarea::placeholder {
         color: #999;
-        pointer-events: none;
+        white-space: pre;
     }
 </style>
