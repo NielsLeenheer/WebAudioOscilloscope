@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="400" height="400">
+  <style>
+    :root {
+      --hours: 10;
+      --minutes: 10;
+      --seconds: 30;
+    }
+    
+    .hand {
+      transform-origin: 100px 100px;
+    }
+    
+    .hour-hand {
+      animation: rotate-360 43200s linear infinite;
+      animation-delay: calc((var(--hours) * -3600s) + (var(--minutes) * -60s));
+    }
+    
+    .minute-hand {
+      animation: rotate-360 3600s linear infinite;
+      animation-delay: calc((var(--minutes) * -60s) + (var(--seconds) * -1s));
+    }
+    
+    .second-hand {
+      animation: rotate-360 60s linear infinite;
+      animation-delay: calc(var(--seconds) * -1s);
+    }
+    
+    @keyframes rotate-360 {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+  </style>
+  
+  <circle class="clock-face" cx="100" cy="100" r="90"/>
+  
+  <line class="hand hour-hand" x1="100" y1="100" x2="100" y2="50"/>
+  <line class="hand minute-hand" x1="100" y1="100" x2="100" y2="30"/>
+  <line class="hand second-hand" x1="100" y1="100" x2="100" y2="20"/>
+</svg>

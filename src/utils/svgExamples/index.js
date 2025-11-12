@@ -9,7 +9,10 @@ import housePath from './house.txt?raw';
 import smileyPath from './smiley.txt?raw';
 import infinityPath from './infinity.txt?raw';
 import peacePath from './peace.txt?raw';
+import chromePath from './chrome.txt?raw';
+import halfstackPath from './halfstack.txt?raw';
 import beyondtellerrandPath from './beyondtellerrand.txt?raw';
+import clockPath from './clock.txt?raw';
 
 // Export as array with id, label, path, and complexity
 export const svgExamples = [
@@ -23,5 +26,8 @@ export const svgExamples = [
     { id: 'smiley', label: 'Smiley Face', path: smileyPath.trim(), complex: true },
     { id: 'infinity', label: 'Infinity Symbol', path: infinityPath.trim(), complex: true },
     { id: 'peace', label: 'Peace Sign', path: peacePath.trim(), complex: true },
-    { id: 'beyondtellerrand', label: 'Beyond Tellerrand', path: beyondtellerrandPath.trim(), complex: true }
+    { id: 'chrome', label: 'Chrome', path: chromePath.trim(), complex: true },
+    { id: 'halfstack', label: 'Halfstack', path: halfstackPath.trim(), complex: true },
+    { id: 'beyondtellerrand', label: 'Beyond Tellerrand', path: beyondtellerrandPath.trim(), complex: true },
+    { id: 'clock', label: 'Clock', path: clockPath.trim(), complex: true },
 ];
