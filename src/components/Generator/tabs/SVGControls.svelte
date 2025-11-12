@@ -3,6 +3,12 @@
     import { svgExamples } from '../../../utils/svgExamples/index.js';
     import { onMount } from 'svelte';
     import Preview from '../../Common/Preview.svelte';
+    import {
+        normalizePoints,
+        extractPathPoints,
+        parseSVGMarkupStatic,
+        createContinuousSampler
+    } from '../../../utils/svgSampler.js';
 
     let { audioEngine, isPlaying, animationFPS = $bindable(30), numSamples = $bindable(200) } = $props();
 
@@ -15,181 +21,13 @@
     let svgContainer;
     let normalizedPoints = $state([]);
 
-    // Animation interval
-    let samplingInterval = null;
+    // Animation sampler
+    let sampler = null;
 
     // Auto-detect if input is full SVG markup or just path data
     function detectInputType(input) {
         const trimmed = input.trim();
         return trimmed.includes('<svg') ? 'full' : 'path';
-    }
-
-    // Extract raw points and bbox from SVG path data for preview
-    function extractPathPoints(pathData, numSamples = 200) {
-        const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-
-        path.setAttribute('d', pathData);
-        svg.appendChild(path);
-
-        const totalLength = path.getTotalLength();
-        const points = [];
-
-        for (let i = 0; i < numSamples; i++) {
-            const distance = (i / numSamples) * totalLength;
-            const point = path.getPointAtLength(distance);
-            points.push([point.x, point.y]);
-        }
-
-        // Calculate bbox
-        let minX = Infinity, maxX = -Infinity;
-        let minY = Infinity, maxY = -Infinity;
-
-        points.forEach(([x, y]) => {
-            minX = Math.min(minX, x);
-            maxX = Math.max(maxX, x);
-            minY = Math.min(minY, y);
-            maxY = Math.max(maxY, y);
-        });
-
-        const bbox = {
-            x: minX,
-            y: minY,
-            width: maxX - minX,
-            height: maxY - minY
-        };
-
-        return { points, bbox };
-    }
-
-    // Extract points from an SVG element using browser APIs
-    function extractPointsFromElement(element, samples) {
-        const points = [];
-
-        // Check if element is an SVGGeometryElement (has getTotalLength)
-        if (typeof element.getTotalLength === 'function') {
-            try {
-                const totalLength = element.getTotalLength();
-
-                // Get the SVG root
-                const svg = element.ownerSVGElement;
-
-                // Get transformation matrix - use getScreenCTM for CSS transforms
-                let matrix = null;
-                if (svg) {
-                    // getScreenCTM includes CSS transforms, getCTM does not in some browsers
-                    const elementCTM = element.getScreenCTM();
-                    const svgCTM = svg.getScreenCTM();
-
-                    if (elementCTM && svgCTM) {
-                        // Calculate element transform relative to SVG by removing SVG's screen transform
-                        // matrix = elementCTM × inverse(svgCTM)
-                        const svgCTMInverse = svgCTM.inverse();
-                        matrix = elementCTM.multiply(svgCTMInverse);
-                    }
-                }
-
-                for (let i = 0; i <= samples; i++) {
-                    const distance = (i / samples) * totalLength;
-                    const point = element.getPointAtLength(distance);
-
-                    // Apply transformation matrix if available
-                    if (matrix && svg) {
-                        const svgPoint = svg.createSVGPoint();
-                        svgPoint.x = point.x;
-                        svgPoint.y = point.y;
-                        const transformedPoint = svgPoint.matrixTransform(matrix);
-                        points.push([transformedPoint.x, transformedPoint.y]);
-                    } else {
-                        points.push([point.x, point.y]);
-                    }
-                }
-            } catch (error) {
-                // Skip elements that can't be sampled (e.g., display:none, inside <defs>, etc.)
-                console.warn('Could not extract points from element:', error.message);
-            }
-        }
-
-        return points;
-    }
-
-    // Convert raw points to normalized points for preview and audio engine
-    function normalizePoints(points, bbox) {
-        const centerX = bbox.x + bbox.width / 2;
-        const centerY = bbox.y + bbox.height / 2;
-        const scale = Math.max(bbox.width, bbox.height);
-
-        // Normalize to -1 to 1 range
-        return points.map(([x, y]) => [
-            ((x - centerX) / scale) * 2,
-            -((y - centerY) / scale) * 2  // Flip Y for oscilloscope coordinates
-        ]);
-    }
-
-    // Parse full SVG markup and extract all paths (static, no animation)
-    function parseSVGMarkupStatic(markup, samples) {
-        if (!svgContainer) return [];
-
-        // Clear container and inject SVG
-        svgContainer.innerHTML = markup;
-
-        const svgElement = svgContainer.querySelector('svg');
-        if (!svgElement) {
-            throw new Error('No <svg> element found in markup');
-        }
-
-        // Normalize SVG dimensions to match viewBox to avoid scaling issues with transform-origin
-        const viewBox = svgElement.getAttribute('viewBox');
-        if (viewBox) {
-            const [, , vbWidth, vbHeight] = viewBox.split(/\s+/).map(Number);
-            if (vbWidth && vbHeight) {
-                svgElement.setAttribute('width', vbWidth);
-                svgElement.setAttribute('height', vbHeight);
-            }
-        }
-
-        // Get all drawable elements
-        const elements = svgElement.querySelectorAll('path, circle, ellipse, rect, polygon, polyline, line');
-
-        if (elements.length === 0) {
-            throw new Error('No drawable shapes found in SVG');
-        }
-
-        // Extract points from all elements and combine
-        let allPoints = [];
-        elements.forEach((element) => {
-            const elementPoints = extractPointsFromElement(element, Math.floor(samples / elements.length));
-            if (elementPoints.length > 0) {
-                allPoints = allPoints.concat(elementPoints);
-            }
-        });
-
-        if (allPoints.length === 0) {
-            throw new Error('Could not extract points from SVG');
-        }
-
-        // Get bounding box to normalize coordinates
-        const bbox = svgElement.getBBox();
-
-        // Normalize points for preview and audio engine
-        return normalizePoints(allPoints, bbox);
-    }
-
-    // Sample current frame from live animations
-    function sampleCurrentFrame(svgElement, elements, samples) {
-        // Force style recalculation to get current animated state
-        svgElement.getBoundingClientRect();
-
-        // Extract points from all elements at current animation state
-        let framePoints = [];
-        elements.forEach((element) => {
-            const elementPoints = extractPointsFromElement(element, Math.floor(samples / elements.length));
-            if (elementPoints.length > 0) {
-                framePoints = framePoints.concat(elementPoints);
-            }
-        });
-
-        return framePoints;
     }
 
     // Start continuous sampling of animations
@@ -199,62 +37,30 @@
 
         if (!svgContainer) return;
 
-        // Setup SVG
-        svgContainer.innerHTML = markup;
-        const svgElement = svgContainer.querySelector('svg');
-        if (!svgElement) return;
-
-        // Normalize SVG dimensions to match viewBox to avoid scaling issues with transform-origin
-        const viewBox = svgElement.getAttribute('viewBox');
-        if (viewBox) {
-            const [, , vbWidth, vbHeight] = viewBox.split(/\s+/).map(Number);
-            if (vbWidth && vbHeight) {
-                svgElement.setAttribute('width', vbWidth);
-                svgElement.setAttribute('height', vbHeight);
-            }
+        try {
+            sampler = createContinuousSampler(
+                markup,
+                samples,
+                svgContainer,
+                animationFPS,
+                (normalized) => {
+                    normalizedPoints = normalized;
+                    // Update waveform with current frame
+                    audioEngine.restoreDefaultFrequency();
+                    audioEngine.createWaveform(normalized);
+                },
+                () => isPlaying
+            );
+        } catch (error) {
+            console.error('Error starting continuous sampling:', error);
         }
-
-        const elements = svgElement.querySelectorAll('path, circle, ellipse, rect, polygon, polyline, line');
-        if (elements.length === 0) return;
-
-        // Get bounding box for normalization
-        const bbox = svgElement.getBBox();
-        const centerX = bbox.x + bbox.width / 2;
-        const centerY = bbox.y + bbox.height / 2;
-        const scale = Math.max(bbox.width, bbox.height);
-
-        const frameDuration = 1000 / animationFPS;
-
-        // Sample continuously at specified FPS
-        samplingInterval = setInterval(() => {
-            if (!isPlaying) {
-                stopContinuousSampling();
-                return;
-            }
-
-            try {
-                const framePoints = sampleCurrentFrame(svgElement, elements, samples);
-
-                if (framePoints.length === 0) return;
-
-                // Normalize points for preview and audio engine
-                const normalized = normalizePoints(framePoints, bbox);
-                normalizedPoints = normalized;
-
-                // Update waveform with current frame
-                audioEngine.restoreDefaultFrequency();
-                audioEngine.createWaveform(normalized);
-            } catch (error) {
-                console.error('Error sampling animation frame:', error);
-            }
-        }, frameDuration);
     }
 
     // Stop continuous sampling
     function stopContinuousSampling() {
-        if (samplingInterval) {
-            clearInterval(samplingInterval);
-            samplingInterval = null;
+        if (sampler) {
+            sampler.stop();
+            sampler = null;
         }
     }
 
@@ -276,7 +82,7 @@
                 const { points, bbox } = extractPathPoints(data, numSamples);
                 normalizedPoints = normalizePoints(points, bbox);
             } else {
-                normalizedPoints = parseSVGMarkupStatic(data, numSamples);
+                normalizedPoints = parseSVGMarkupStatic(data, numSamples, svgContainer);
             }
             validationError = '';
             isValid = true;
