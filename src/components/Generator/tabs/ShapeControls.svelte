@@ -25,28 +25,6 @@
     let leftInvert = $state(false);
     let rightInvert = $state(false);
 
-    // Approximate a decimal as a fraction with limited denominator
-    function approximateFraction(decimal, maxDenominator = 20) {
-        let bestNumerator = 1;
-        let bestDenominator = 1;
-        let bestError = Math.abs(decimal - 1);
-
-        for (let denominator = 1; denominator <= maxDenominator; denominator++) {
-            const numerator = Math.round(decimal * denominator);
-            const error = Math.abs(decimal - numerator / denominator);
-
-            if (error < bestError) {
-                bestError = error;
-                bestNumerator = numerator;
-                bestDenominator = denominator;
-            }
-
-            if (error < 0.001) break; // Close enough
-        }
-
-        return { numerator: bestNumerator, denominator: bestDenominator };
-    }
-
     function updateWaves() {
         if (!isPlaying) return;
 
@@ -55,14 +33,10 @@
 
         const samples = 1000;
 
-        // Calculate cycle counts to ensure complete patterns
-        // Use ratio approximation to avoid huge cycle counts for similar frequencies
-        const ratio = rightFrequency / leftFrequency;
-        const fraction = approximateFraction(ratio, 20);
-
-        // Use the fraction to determine cycle counts
-        let leftCycles = fraction.denominator;
-        let rightCycles = fraction.numerator;
+        // Calculate how many cycles to generate for each channel based on frequency ratio
+        const frequencyRatio = rightFrequency / leftFrequency;
+        const leftCycles = 1;
+        const rightCycles = frequencyRatio;
 
         // Generate waveforms
         const leftPoints = [];
