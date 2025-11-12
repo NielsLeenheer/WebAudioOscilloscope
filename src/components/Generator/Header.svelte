@@ -1,6 +1,5 @@
 <script>
-    import { Icon } from 'svelte-icon';
-    import powerIcon from '../../assets/icons/power.svg?raw';
+    import PowerButton from '../Common/PowerButton.svelte';
     import audioPlayingGif from '../../assets/audio-playing.gif';
 
     let { audioEngine, start, stop } = $props();
@@ -8,17 +7,11 @@
 </script>
 
 <header>
-    {#if !$isPlaying}
-    <button id="start" onclick={() => start()}>
-        <Icon data={powerIcon} />
-        POWER ON
-    </button>
-    {:else}
-    <button id="stop" onclick={() => stop()}>
-        <Icon data={powerIcon} />
-        POWER OFF
-    </button>
-    {/if}
+    <PowerButton
+        variant="light"
+        isPowered={$isPlaying}
+        onclick={$isPlaying ? stop : start}
+    />
 
     <h1>Generator</h1>
 
@@ -35,41 +28,6 @@
         padding: 15px 20px;
         background: #fafafa;
         border-bottom: 1px solid #ddd;
-    }
-
-    button {
-        background-color: #fff;
-        color: #333;
-        border: 1px solid #ccc;
-        border-radius: 6px;
-        height: 36px;
-        padding: 0 16px;
-        font-family: system-ui;
-        font-size: 11pt;
-        font-weight: 600;
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        gap: 6px;
-        transition: all 0.2s;
-    }
-
-    button#start {
-        background-color: #bbdefb;
-        color: #1976d2;
-        border: none;
-    }
-
-    button#stop {
-        background-color: #1976d2;
-        color: #bbdefb;
-        border: none;
-    }
-
-    button :global(svg) {
-        height: 18px;
-        width: 18px;
-        stroke-width: 0;
     }
 
     .audio-playing {
