@@ -1,7 +1,7 @@
 <script>
     import Header from './Header.svelte';
     import Navigation from './Navigation.svelte';
-    import ShapeControls from './tabs/ShapeControls.svelte';
+    import WaveControls from './tabs/WaveControls.svelte';
     import ShapesTab from './tabs/ShapesTab.svelte';
     import ClockControls from './tabs/ClockControls.svelte';
     import DrawControls from './tabs/DrawControls.svelte';
@@ -21,7 +21,7 @@
     <Navigation bind:activeTab />
     <div class="content-area">
         {#if activeTab === 'waves'}
-            <ShapeControls {audioEngine} {isPlaying} />
+            <WaveControls {audioEngine} {isPlaying} />
         {:else if activeTab === 'shapes'}
             <ShapesTab {audioEngine} {isPlaying} isActive={activeTab === 'shapes'} />
         {:else if activeTab === 'clock'}
