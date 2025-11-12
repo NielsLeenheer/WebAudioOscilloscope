@@ -5,7 +5,8 @@
         mass = $bindable(),
         persistence = $bindable(),
         signalNoise = $bindable(),
-        velocityDimming = $bindable()
+        velocityDimming = $bindable(),
+        decay = $bindable()
     } = $props();
 
     let dialog;
@@ -31,7 +32,7 @@
     <div class="sliders">
         <div class="slider-control">
             <label>Force</label>
-            <input type="range" min="0.01" max="0.5" step="0.01" bind:value={forceMultiplier} />
+            <input type="range" min="0.01" max="5.0" step="0.01" bind:value={forceMultiplier} />
             <span class="value">{forceMultiplier.toFixed(2)}</span>
         </div>
         <div class="slider-control">
@@ -58,6 +59,11 @@
             <label>Dimming</label>
             <input type="range" min="0" max="1" step="0.01" bind:value={velocityDimming} />
             <span class="value">{velocityDimming.toFixed(2)}</span>
+        </div>
+        <div class="slider-control">
+            <label>Decay</label>
+            <input type="range" min="128" max="16384" step="128" bind:value={decay} />
+            <span class="value">{decay}</span>
         </div>
     </div>
 </dialog>

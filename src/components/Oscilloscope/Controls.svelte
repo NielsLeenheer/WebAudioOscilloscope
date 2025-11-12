@@ -8,6 +8,7 @@
         timeDivFine = $bindable(),
         timeDivLabels,
         triggerLevel = $bindable(),
+        triggerChannel = $bindable(),
         positionA = $bindable(),
         amplBaseA = $bindable(),
         amplFineA = $bindable(),
@@ -46,9 +47,23 @@
             <input type="range" min="0.5" max="2.5" step="0.01" bind:value={timeDivFine} disabled={mode === 'xy'} class="fine-slider" />
             <span class="value">{timeDivLabels[timeDivBase]}</span>
         </div>
-        <div class="slider-control" class:disabled={mode === 'xy'}>
+        <div class="slider-control trigger-control" class:disabled={mode === 'xy'}>
             <label>TRIGGER</label>
-            <input type="range" min="-1" max="1" step="0.01" bind:value={triggerLevel} disabled={mode === 'xy'} />
+            <input type="range" min="-1" max="1" step="0.01" bind:value={triggerLevel} disabled={mode === 'xy'} class="trigger-slider" />
+            <div class="trigger-channel-selector">
+                <button
+                    class="channel-btn"
+                    class:active={triggerChannel === 'a'}
+                    onclick={() => triggerChannel = 'a'}
+                    disabled={mode === 'xy'}
+                >A</button>
+                <button
+                    class="channel-btn"
+                    class:active={triggerChannel === 'b'}
+                    onclick={() => triggerChannel = 'b'}
+                    disabled={mode === 'xy'}
+                >B</button>
+            </div>
             <span class="value">{triggerLevel.toFixed(2)}</span>
         </div>
     </div>
@@ -235,5 +250,58 @@
 
     .slider-control.dual-slider .fine-slider {
         width: 100%;
+    }
+
+    .slider-control.trigger-control {
+        grid-template-columns: 80px 1fr 60px 50px;
+    }
+
+    .slider-control.trigger-control .trigger-slider {
+        width: 100%;
+    }
+
+    .trigger-channel-selector {
+        display: flex;
+        /* gap: 2px; */
+        background: #2d2d2d;
+        border-radius: 5px;
+        height: 24px;
+        align-items: center;
+    }
+
+    .channel-btn {
+        width: 50%;
+        background: transparent;
+        color: #666;
+        border: none;
+        border-radius: 5px;
+        font-family: system-ui;
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+        line-height: 1;
+        height: 100%;
+    }
+    .channel-btn:hover:not(:disabled) {
+        background: transparent;
+        color: #4CAF50;
+    }
+
+    /* .channel-btn:hover:not(:disabled) {
+        background: #333;
+        color: #4CAF50;
+    } */
+
+    .channel-btn.active, 
+    .channel-btn.active:hover:not(:disabled) {
+        background: #4CAF50;
+        color: #1a1a1a;
+    }
+
+    .channel-btn:disabled {
+        background: transparent;
+        color: #444;
+        cursor: not-allowed;
     }
 </style>

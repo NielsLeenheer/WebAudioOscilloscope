@@ -1,48 +1,243 @@
 <script>
-    import { onMount } from 'svelte';
+    import { onMount, onDestroy } from 'svelte';
+    import paper from 'paper';
+    import Button from '../../Common/Button.svelte';
+    import EraseIcon from '../../../assets/icons/erase.svg?raw';
 
     let { audioEngine, isPlaying } = $props();
 
     let canvas;
-    let ctx;
-    let drawPoints = $state([]);
     let backgroundImage = $state(null);
     let backgroundOpacity = $state(30);
+    let currentPath = null;
+    let backgroundRaster = null;
+    let tool = null;
+    let cursorStyle = $state('crosshair');
+    let pathVersion = $state(0); // Track path changes for auto-update
 
     onMount(() => {
-        ctx = canvas.getContext('2d');
-        redrawCanvas();
+        // Setup paper.js with explicit sizing to prevent canvas resize
+        paper.setup(canvas);
+
+        // Lock the view size and disable auto-resize
+        paper.view.autoUpdate = false;
+        paper.view.viewSize = new paper.Size(600, 600);
+
+        // Configure selection appearance with black color for handles
+        paper.settings.handleSize = 8;
+        paper.settings.hitTolerance = 8;
+
+        // Create tool
+        tool = new paper.Tool();
+        let currentSegment = null;
+        let activeSegment = null;
+        let isDragging = false;
+        let hitItem = null;
+        let hitType = null;
+        let isEditingExisting = false;
+
+        function setActiveSegment(segment) {
+            // Deselect all segments first
+            if (currentPath) {
+                currentPath.fullySelected = false;
+                for (let seg of currentPath.segments) {
+                    seg.selected = false;
+                }
+            }
+
+            // Select only the active segment
+            activeSegment = segment;
+            if (activeSegment) {
+                activeSegment.selected = true;
+            }
+            paper.view.draw();
+        }
+
+        tool.onMouseMove = (event) => {
+            // Check if hovering over segment or handle
+            if (currentPath) {
+                const hitResult = currentPath.hitTest(event.point, {
+                    segments: true,
+                    handles: true,
+                    tolerance: 8
+                });
+
+                if (hitResult) {
+                    cursorStyle = 'pointer';
+                } else {
+                    // Only show crosshair if path is not closed
+                    cursorStyle = currentPath.closed ? 'default' : 'crosshair';
+                }
+            }
+        };
+
+        tool.onMouseDown = (event) => {
+            // First check if we're clicking on an existing segment or handle
+            if (currentPath) {
+                const hitResult = currentPath.hitTest(event.point, {
+                    segments: true,
+                    handles: true,
+                    tolerance: 8
+                });
+
+                if (hitResult) {
+                    // Check if clicking on first segment to close path
+                    if (hitResult.type === 'segment' && hitResult.segment.index === 0 && currentPath.segments.length > 2 && !currentPath.closed) {
+                        currentPath.closePath();
+                        paper.view.draw();
+                        pathVersion++; // Trigger scope update
+                        return;
+                    }
+
+                    // If clicking on a segment point, make it active
+                    if (hitResult.type === 'segment') {
+                        setActiveSegment(hitResult.segment);
+                        hitItem = hitResult.segment;
+                        hitType = 'segment';
+                        isEditingExisting = true;
+                        return;
+                    }
+
+                    // Editing existing geometry (handles)
+                    isEditingExisting = true;
+                    hitType = hitResult.type;
+                    if (hitResult.type === 'handle-in') {
+                        hitItem = hitResult.segment;
+                    } else if (hitResult.type === 'handle-out') {
+                        hitItem = hitResult.segment;
+                    }
+                    return;
+                }
+            }
+
+            // Don't add new points if path is closed
+            if (currentPath && currentPath.closed) {
+                return;
+            }
+
+            // Not clicking on existing geometry, so add new point
+            isEditingExisting = false;
+            if (!currentPath) {
+                // Start new path
+                currentPath = new paper.Path();
+                currentPath.strokeColor = '#1976d2';
+                currentPath.strokeWidth = 2;
+                currentPath.selectedColor = 'black';
+            }
+
+            // Add new point
+            const segment = currentPath.add(event.point);
+            currentSegment = segment;
+            setActiveSegment(segment);
+            isDragging = false;
+        };
+
+        tool.onMouseDrag = (event) => {
+            if (isEditingExisting && hitItem) {
+                // Dragging existing segments or handles
+                if (hitType === 'segment') {
+                    hitItem.point = hitItem.point.add(event.delta);
+                } else if (hitType === 'handle-in') {
+                    hitItem.handleIn = hitItem.handleIn.add(event.delta);
+                } else if (hitType === 'handle-out') {
+                    hitItem.handleOut = hitItem.handleOut.add(event.delta);
+                }
+                paper.view.draw();
+            } else if (currentSegment) {
+                // Creating bezier handles for new point
+                isDragging = true;
+                const delta = event.point.subtract(currentSegment.point);
+                currentSegment.handleOut = delta.divide(3);
+                currentSegment.handleIn = delta.divide(-3);
+                paper.view.draw();
+            }
+        };
+
+        tool.onMouseUp = (event) => {
+            if (isEditingExisting) {
+                // Clear edit state
+                hitItem = null;
+                hitType = null;
+                isEditingExisting = false;
+                pathVersion++; // Update scope after editing
+            } else {
+                // Finished adding new point
+                if (!isDragging && currentSegment) {
+                    // If not dragging, create a straight line (no handles)
+                    currentSegment.handleIn = null;
+                    currentSegment.handleOut = null;
+                }
+                currentSegment = null;
+                pathVersion++; // Update scope after adding point
+            }
+            paper.view.draw();
+        };
+
+        // Activate the tool
+        tool.activate();
+
+        // Draw initial view
+        paper.view.draw();
     });
 
-    function handleCanvasClick(e) {
-        const rect = canvas.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
+    // Auto-update scope whenever path changes
+    $effect(() => {
+        pathVersion; // Track dependency
+        if (isPlaying && currentPath && currentPath.segments.length >= 2) {
+            updateScope();
+        }
+    });
 
-        // Convert to canvas coordinates (accounting for any scaling)
-        const canvasX = (x / rect.width) * canvas.width;
-        const canvasY = (y / rect.height) * canvas.height;
+    function updateScope() {
+        if (!currentPath || currentPath.segments.length < 2) return;
 
-        drawPoints = [...drawPoints, { x: canvasX, y: canvasY }];
-        redrawCanvas();
+        // Restore Settings tab default frequency
+        audioEngine.restoreDefaultFrequency();
+
+        // Sample points along the path
+        const numSamples = 200;
+        const points = [];
+
+        for (let i = 0; i <= numSamples; i++) {
+            const offset = (i / numSamples) * currentPath.length;
+            const point = currentPath.getPointAt(offset);
+            if (point) {
+                points.push(point);
+            }
+        }
+
+        // Get bounding box for normalization
+        const bounds = currentPath.bounds;
+        const centerX = bounds.center.x;
+        const centerY = bounds.center.y;
+        const scale = Math.max(bounds.width, bounds.height) / 2;
+
+        // Convert to normalized coordinates [-1, 1]
+        const normalizedPoints = points.map(point => [
+            (point.x - centerX) / scale,
+            -(point.y - centerY) / scale  // Flip Y axis for oscilloscope
+        ]);
+
+        audioEngine.createWaveform(normalizedPoints);
     }
+
+    onDestroy(() => {
+        if (tool) {
+            tool.remove();
+        }
+        if (paper.project) {
+            paper.project.clear();
+        }
+    });
 
     function handleDragOver(e) {
         e.preventDefault();
         e.stopPropagation();
-        canvas.style.borderColor = '#1976d2';
-    }
-
-    function handleDragLeave(e) {
-        e.preventDefault();
-        e.stopPropagation();
-        canvas.style.borderColor = '#1976d2';
     }
 
     function handleDrop(e) {
         e.preventDefault();
         e.stopPropagation();
-        canvas.style.borderColor = '#1976d2';
 
         const file = e.dataTransfer.files[0];
         if (file && file.type.startsWith('image/')) {
@@ -51,7 +246,7 @@
                 const img = new Image();
                 img.onload = () => {
                     backgroundImage = img;
-                    redrawCanvas();
+                    updateBackgroundImage();
                 };
                 img.src = event.target.result;
             };
@@ -59,142 +254,117 @@
         }
     }
 
-    function redrawCanvas() {
-        if (!ctx) return;
+    function updateBackgroundImage() {
+        if (!paper.project) return;
 
-        // Clear canvas
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        // Remove old background
+        if (backgroundRaster) {
+            backgroundRaster.remove();
+            backgroundRaster = null;
+        }
 
-        // Draw background image if present
         if (backgroundImage) {
-            ctx.globalAlpha = backgroundOpacity / 100;
+            // Create raster from image
+            backgroundRaster = new paper.Raster(backgroundImage);
 
-            // Scale image to fit canvas while maintaining aspect ratio
+            // Scale to fit canvas
             const scale = Math.min(
-                canvas.width / backgroundImage.width,
-                canvas.height / backgroundImage.height
+                paper.view.size.width / backgroundRaster.width,
+                paper.view.size.height / backgroundRaster.height
             );
-            const x = (canvas.width - backgroundImage.width * scale) / 2;
-            const y = (canvas.height - backgroundImage.height * scale) / 2;
+            backgroundRaster.scale(scale);
 
-            ctx.drawImage(
-                backgroundImage,
-                x, y,
-                backgroundImage.width * scale,
-                backgroundImage.height * scale
-            );
+            // Center the image
+            backgroundRaster.position = paper.view.center;
 
-            ctx.globalAlpha = 1.0;
+            // Set opacity
+            backgroundRaster.opacity = backgroundOpacity / 100;
+
+            // Send to back
+            backgroundRaster.sendToBack();
         }
 
-        // Draw points and lines
-        if (drawPoints.length > 0) {
-            ctx.strokeStyle = '#1976d2';
-            ctx.fillStyle = '#1976d2';
-            ctx.lineWidth = 2;
-
-            // Draw lines between points
-            ctx.beginPath();
-            ctx.moveTo(drawPoints[0].x, drawPoints[0].y);
-            for (let i = 1; i < drawPoints.length; i++) {
-                ctx.lineTo(drawPoints[i].x, drawPoints[i].y);
-            }
-            ctx.stroke();
-
-            // Draw points as circles
-            drawPoints.forEach((point, index) => {
-                ctx.beginPath();
-                ctx.arc(point.x, point.y, 4, 0, 2 * Math.PI);
-                ctx.fill();
-
-                // Draw point number
-                ctx.fillStyle = '#333';
-                ctx.font = '12px monospace';
-                ctx.fillText(index + 1, point.x + 8, point.y - 8);
-                ctx.fillStyle = '#1976d2';
-            });
-        }
-    }
-
-    function undoPoint() {
-        drawPoints = drawPoints.slice(0, -1);
-        redrawCanvas();
-    }
-
-    function clearCanvas() {
-        drawPoints = [];
-        redrawCanvas();
-    }
-
-    function drawCustomPath() {
-        if (!isPlaying) return;
-        if (drawPoints.length < 2) {
-            alert('Please add at least 2 points to create a path');
-            return;
-        }
-
-        // Convert canvas coordinates to normalized coordinates [-1, 1]
-        const centerX = canvas.width / 2;
-        const centerY = canvas.height / 2;
-        const scale = Math.max(canvas.width, canvas.height) / 2;
-
-        const normalizedPoints = drawPoints.map(point => [
-            (point.x - centerX) / scale,
-            -(point.y - centerY) / scale  // Flip Y axis
-        ]);
-
-        audioEngine.createWaveform(normalizedPoints);
+        paper.view.draw();
     }
 
     function updateOpacity(value) {
         backgroundOpacity = value;
-        redrawCanvas();
+        if (backgroundRaster) {
+            backgroundRaster.opacity = backgroundOpacity / 100;
+            paper.view.draw();
+        }
+    }
+
+    function clearCanvas() {
+        if (currentPath) {
+            currentPath.remove();
+            currentPath = null;
+        }
+        paper.view.draw();
+
+        // Clear the oscilloscope output
+        audioEngine.restoreDefaultFrequency();
+        audioEngine.createWaveform([]);
+    }
+
+    function exportSVG() {
+        if (!currentPath) {
+            alert('No path to export');
+            return;
+        }
+
+        const svg = paper.project.exportSVG({ asString: true });
+        const blob = new Blob([svg], { type: 'image/svg+xml' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'path.svg';
+        a.click();
+        URL.revokeObjectURL(url);
     }
 </script>
 
 <div class="control-group">
-    <label>Draw Your Own Path:</label>
-    <p style="color: #666; font-size: 14px; margin: 10px 0;">
-        Click on the canvas to add points and create your custom shape. Drag and drop an image to trace over it.
-    </p>
+    <div style="display: flex; justify-content: center; margin: 15px 0;">
+        <Button variant="secondary" onclick={clearCanvas}>
+            {@html EraseIcon}
+            Clear
+        </Button>
+    </div>
 
-    <div style="text-align: center; margin: 20px 0;">
+    <div style="display: flex; justify-content: center; margin: 20px 0;">
         <canvas
             bind:this={canvas}
             width="600"
             height="600"
-            style="border: 2px solid #1976d2; background: #fff; cursor: crosshair; max-width: 100%; border-radius: 6px;"
-            onclick={handleCanvasClick}
+            style="background: #fff; cursor: {cursorStyle}; width: 600px; height: 600px;"
             ondragover={handleDragOver}
-            ondragleave={handleDragLeave}
             ondrop={handleDrop}
         ></canvas>
     </div>
 
-    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-top: 15px;">
-        <button onclick={() => undoPoint()}>↶ Undo Last Point</button>
-        <button onclick={() => clearCanvas()}>✕ Clear Canvas</button>
-        <button onclick={() => drawCustomPath()} style="background: #bbdefb; color: #1976d2;">▶ Draw on Scope</button>
-    </div>
-
-    <div class="value-display" style="margin-top: 15px;">
-        <strong>Instructions:</strong><br>
-        • Click to add points and create your path<br>
-        • Drag and drop an image onto the canvas to trace<br>
-        • Use Undo to remove the last point<br>
-        • Click "Draw on Scope" when ready
-    </div>
-
-    <div style="margin-top: 15px;">
-        <label for="backgroundOpacity">Background Image Opacity: <span>{backgroundOpacity}</span>%</label>
-        <input
-            type="range"
-            id="backgroundOpacity"
-            min="0"
-            max="100"
-            value={backgroundOpacity}
-            step="5"
-            oninput={(e) => updateOpacity(e.target.value)}
-        >
-    </div>
+    {#if backgroundImage}
+        <div style="margin-top: 15px;">
+            <label for="backgroundOpacity">Background Image Opacity: <span>{backgroundOpacity}</span>%</label>
+            <input
+                type="range"
+                id="backgroundOpacity"
+                min="0"
+                max="100"
+                value={backgroundOpacity}
+                step="5"
+                oninput={(e) => updateOpacity(e.target.value)}
+            >
+        </div>
+    {/if}
 </div>
+
+<style>
+
+    .control-group {
+        background: none;
+        margin-top: 0px;
+        padding: 10px;
+    }
+
+</style>

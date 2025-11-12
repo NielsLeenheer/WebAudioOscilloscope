@@ -1,6 +1,7 @@
 <script>
     import { Icon } from 'svelte-icon';
 
+    import audioIcon from '../../assets/icons/audio.svg?raw';
     import shapesIcon from '../../assets/icons/shapes.svg?raw';
     import clockIcon from '../../assets/icons/clock.svg?raw';
     import drawIcon from '../../assets/icons/draw.svg?raw';
@@ -13,9 +14,15 @@
 <div class="navigation">
     <nav>
         <label>
+            <input type="radio" name="tab" value="waves" bind:group={activeTab}>
+            <Icon data={audioIcon} />
+            Waves
+        </label>
+
+        <label>
             <input type="radio" name="tab" value="shapes" bind:group={activeTab}>
             <Icon data={shapesIcon} />
-            Waves
+            Shapes
         </label>
 
         <label>

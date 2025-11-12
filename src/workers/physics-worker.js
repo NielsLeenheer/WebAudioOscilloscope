@@ -105,7 +105,7 @@ function processSignals(leftData, rightData, signalNoise) {
 // STAGE B: INTERPRETATION
 // Convert processed signals to target coordinates based on mode
 // ============================================================================
-function interpretSignals(processedLeft, processedRight, mode, scale, centerX, centerY, canvasWidth, timeDiv, triggerLevel, amplDivA, positionA, amplDivB, positionB, xPosition) {
+function interpretSignals(processedLeft, processedRight, mode, scale, visibleScale, centerX, centerY, canvasWidth, timeDiv, triggerLevel, triggerChannel, amplDivA, positionA, amplDivB, positionB, xPosition, visibleWidth, sampleRate, decay) {
     const targets = [];
 
     // Use amplitude directly (already calculated from base * fine in UI)
@@ -114,17 +114,22 @@ function interpretSignals(processedLeft, processedRight, mode, scale, centerX, c
 
     if (mode === 'xy') {
         // X/Y mode: left channel = X (with A controls), right channel = Y (with B controls)
-        // X position offset
-        const xOffset = xPosition * canvasWidth;
+        // X position offset - scale by visibleWidth so position control shifts within visible area
+        const xOffset = xPosition * visibleWidth;
 
-        for (let i = 0; i < processedLeft.length; i++) {
+        // Use only the most recent samples to avoid overdraw from large buffer
+        // Decay parameter controls how many points to render
+        const startIdx = Math.max(0, processedLeft.length - decay);
+
+        for (let i = startIdx; i < processedLeft.length; i++) {
             // Left channel (A) controls horizontal with AMPL/DIV A and POSITION A
-            const posOffsetA = positionA * scale * 2;
-            const targetX = processedLeft[i] * scale * expAmplDivA + posOffsetA + xOffset;
+            // Use visibleScale for XY mode to respect AMPL/DIV settings for visible viewport
+            const posOffsetA = positionA * visibleScale * 2;
+            const targetX = processedLeft[i] * visibleScale / expAmplDivA + posOffsetA + xOffset;
 
             // Right channel (B) controls vertical with AMPL/DIV B and POSITION B (but inverted for Y axis)
-            const posOffsetB = positionB * scale * 2;
-            const targetY = -processedRight[i] * scale * expAmplDivB + posOffsetB;
+            const posOffsetB = positionB * visibleScale * 2;
+            const targetY = -processedRight[i] * visibleScale / expAmplDivB + posOffsetB;
 
             targets.push({ x: targetX, y: targetY });
         }
@@ -136,27 +141,41 @@ function interpretSignals(processedLeft, processedRight, mode, scale, centerX, c
         const amplDiv = mode === 'a' ? expAmplDivA : expAmplDivB;
         const position = mode === 'a' ? positionA : positionB;
 
-        // Find trigger point
-        const triggerIndex = findTriggerPoint(channelData, triggerLevel);
+        // Find trigger point based on triggerChannel (not display mode)
+        // This allows both channels to sync to the same trigger source
+        const triggerData = triggerChannel === 'a' ? processedLeft : processedRight;
+        const triggerIndex = findTriggerPoint(triggerData, triggerLevel);
 
         // Calculate how many samples to display based on TIME/DIV
-        const samplesToDisplay = Math.floor(channelData.length * timeDiv);
+        // timeDiv is in microseconds, convert to seconds and multiply by 10 divisions
+        const timePerDiv = timeDiv / 1000000; // Convert microseconds to seconds
+        const totalTime = timePerDiv * 10; // 10 divisions across the screen
+        // For time domain, use exact samples needed for TIME/DIV (don't limit by decay)
+        // Decay is only for XY mode overdraw prevention
+        const samplesToDisplay = Math.min(
+            Math.floor(sampleRate * totalTime),
+            channelData.length
+        );
 
         // Determine start and end indices
         const startIndex = triggerIndex;
         const endIndex = Math.min(startIndex + samplesToDisplay, channelData.length);
 
         // X position offset (convert from -1 to 1 range to pixel offset)
-        const xOffset = xPosition * canvasWidth;
+        // Scale by visibleWidth so position control shifts within visible area
+        const xOffset = xPosition * visibleWidth;
 
         // Create target coordinates for the triggered portion
         for (let i = startIndex; i < endIndex; i++) {
             const relativeIndex = i - startIndex;
             // X position is based on time with position offset
-            const targetX = (relativeIndex / samplesToDisplay) * canvasWidth - centerX + xOffset;
+            // Spread waveform across visible width (400px) for accurate TIME/DIV calibration
+            // X POS offset shifts it left/right for alignment
+            const targetX = (relativeIndex / samplesToDisplay) * visibleWidth - visibleWidth / 2 + xOffset;
             // Y position is based on amplitude with AMPL/DIV and Y position offset
-            const yOffset = position * scale * 2; // Scale the position offset
-            const targetY = -channelData[i] * scale * amplDiv + yOffset;
+            // Use visibleScale for amplitude calculations (based on visible 400px area)
+            const yOffset = position * visibleScale * 2; // Scale the position offset
+            const targetY = -channelData[i] * visibleScale / amplDiv + yOffset;
             targets.push({ x: targetX, y: targetY });
         }
     }
@@ -186,6 +205,16 @@ function simulatePhysics(targets, forceMultiplier, damping, mass, scale, centerX
         // Update velocity
         velocityX += accelX;
         velocityY += accelY;
+
+        // Clamp velocity to prevent extreme instability with very high force values
+        // Max velocity scales with sqrt(force/mass) and allows very high speeds for CRT beam
+        const maxVelocity = Math.sqrt(forceMultiplier / mass) * scale * 5.0;
+        const currentSpeed = Math.sqrt(velocityX * velocityX + velocityY * velocityY);
+        if (currentSpeed > maxVelocity) {
+            const scale_factor = maxVelocity / currentSpeed;
+            velocityX *= scale_factor;
+            velocityY *= scale_factor;
+        }
 
         // Apply damping (friction/air resistance)
         velocityX *= damping;
@@ -362,6 +391,7 @@ self.onmessage = function(e) {
             centerX,
             centerY,
             scale,
+            visibleScale,
             forceMultiplier,
             damping,
             mass,
@@ -369,16 +399,20 @@ self.onmessage = function(e) {
             basePower,
             persistence,
             velocityDimming,
+            decay,
             mode,
             timeDiv,
             triggerLevel,
+            triggerChannel,
             amplDivA,
             positionA,
             amplDivB,
             positionB,
             xPosition,
             canvasWidth,
-            canvasHeight
+            canvasHeight,
+            visibleWidth,
+            sampleRate
         } = data;
 
         if (!ctx) return;
@@ -400,7 +434,7 @@ self.onmessage = function(e) {
 
         for (const currentMode of modesToRender) {
             // STAGE B: Interpretation - Convert signals to target coordinates based on mode
-            const targets = interpretSignals(processedLeft, processedRight, currentMode, scale, centerX, centerY, canvasWidth, timeDiv, triggerLevel, amplDivA, positionA, amplDivB, positionB, xPosition);
+            const targets = interpretSignals(processedLeft, processedRight, currentMode, scale, visibleScale, centerX, centerY, canvasWidth, timeDiv, triggerLevel, triggerChannel, amplDivA, positionA, amplDivB, positionB, xPosition, visibleWidth, sampleRate, decay);
 
             // Teleport beam to first target to prevent spurious lines from previous frame
             // This eliminates the line that would be drawn from the last position of the

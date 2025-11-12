@@ -21,14 +21,15 @@
     let micAnalyserRight = null;
 
     // Physics parameters (adjustable)
-    let forceMultiplier = $state(0.22);
-    let damping = $state(0.44);
+    let forceMultiplier = $state(0.3);
+    let damping = $state(0.60);
     let mass = $state(0.11);
-    let persistence = $state(0.030); // Afterglow/fade effect (0=instant fade, 1=long trail)
-    let signalNoise = $state(0.030); // Random noise added to audio signal (0-1)
+    let persistence = $state(0.100); // Afterglow/fade effect (0=instant fade, 1=long trail)
+    let signalNoise = $state(0.005); // Random noise added to audio signal (0-1)
     let beamPower = $state(0.75); // Beam power (affects opacity: high power = bright, low power = dim)
-    let velocityDimming = $state(0.90); // How much fast movements dim (0=no dimming, 1=maximum dimming)
+    let velocityDimming = $state(1.0); // How much fast movements dim (0=no dimming, 1=maximum dimming)
     let focus = $state(0.2); // Focus control (-1.0 to 1.0, 0.0 = perfect focus, abs value = blur amount)
+    let decay = $state(512); // Maximum points to render (controls phosphor decay/overdraw)
 
     // Time division steps (like real oscilloscope) - stored in microseconds for easy calculation
     const timeDivSteps = [0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000, 50000, 100000, 200000, 500000];
@@ -37,10 +38,11 @@
     let timeDivBase = $state(13); // Index into timeDivSteps (default 1ms)
     let timeDivFine = $state(1.0); // Fine adjustment multiplier (0.5 to 2.5)
     let triggerLevel = $state(0.0); // Trigger level: voltage threshold for triggering (-1.0 to 1.0)
+    let triggerChannel = $state('a'); // Trigger channel: 'a' or 'b'
 
-    // Calculate combined time division (normalized to 0-1 range where 1.0 = full buffer)
-    // Map the time values to zoom level: smaller time = more zoomed in = smaller timeDiv value
-    let timeDiv = $derived(Math.min(1.0, (timeDivSteps[timeDivBase] * timeDivFine) / 500000));
+    // Calculate combined time division (in microseconds)
+    // This value represents microseconds per division on the oscilloscope screen
+    let timeDiv = $derived(timeDivSteps[timeDivBase] * timeDivFine);
 
     // Base amplification steps (like real oscilloscope)
     const amplSteps = [0.002, 0.005, 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10];
@@ -78,11 +80,11 @@
 
             // Create analysers for left and right channels
             micAnalyserLeft = micAudioContext.createAnalyser();
-            micAnalyserLeft.fftSize = 2048;
+            micAnalyserLeft.fftSize = 16384;
             splitter.connect(micAnalyserLeft, 0);
 
             micAnalyserRight = micAudioContext.createAnalyser();
-            micAnalyserRight.fftSize = 2048;
+            micAnalyserRight.fftSize = 16384;
             splitter.connect(micAnalyserRight, 1);
 
             console.log('Microphone input started');
@@ -218,7 +220,7 @@
 
     function startVisualization() {
         // Initialize data buffers
-        const bufferLength = 2048; // Default FFT size
+        const bufferLength = 16384; // Default FFT size
 
         const analysers = audioEngine.getAnalysers();
         if (analysers.left && analysers.right) {
@@ -295,19 +297,38 @@
             analyserRight.getFloatTimeDomainData(rightData);
         } else {
             // Fill with zeros when no input (noise will be added in worker)
-            if (!leftData) leftData = new Float32Array(2048);
-            if (!rightData) rightData = new Float32Array(2048);
+            if (!leftData) leftData = new Float32Array(16384);
+            if (!rightData) rightData = new Float32Array(16384);
             leftData.fill(0);
             rightData.fill(0);
+        }
+
+        // Get sample rate from the appropriate AudioContext
+        let sampleRate = 48000; // Default fallback
+        if (inputSource === 'microphone' && micAudioContext) {
+            sampleRate = micAudioContext.sampleRate;
+        } else if (audioEngine?.audioContext) {
+            sampleRate = audioEngine.audioContext.sampleRate;
         }
 
         // Send data to worker for physics calculation AND rendering
         // Use full canvas size (600x600) to allow overscan
         const canvasWidth = 600;
         const canvasHeight = 600;
+        // Visible screen area is 400x400 (clipped by CSS overflow: hidden)
+        const visibleWidth = 400;
+        const visibleHeight = 400;
         const centerX = canvasWidth / 2;
         const centerY = canvasHeight / 2;
         const scale = Math.min(canvasWidth, canvasHeight) / 2.5;
+
+        // Scale for AMPL/DIV based on visible area and voltage calibration
+        // Measured: Web Audio ±1.0 corresponds to ~3Vpp (±1.5V) at full volume
+        const VOLTAGE_CALIBRATION = 1.5; // Web Audio ±1.0 = ±1.5V
+        const VERTICAL_DIVISIONS = 10;    // Standard oscilloscope vertical divisions
+        const pixelsPerDivision = visibleHeight / VERTICAL_DIVISIONS; // 40 pixels/division
+        const visibleScale = pixelsPerDivision * VOLTAGE_CALIBRATION; // 60
+
         const basePower = 0.2 + (beamPower * 1.4); // Allow up to 3.0 max brightness
 
         if (worker) {
@@ -320,6 +341,7 @@
                     centerX,
                     centerY,
                     scale,
+                    visibleScale,
                     forceMultiplier,
                     damping,
                     mass,
@@ -327,16 +349,20 @@
                     basePower,
                     persistence,
                     velocityDimming,
+                    decay,
                     mode,
                     timeDiv,
                     triggerLevel,
+                    triggerChannel,
                     amplDivA,
                     positionA,
                     amplDivB,
                     positionB,
                     xPosition,
                     canvasWidth,
-                    canvasHeight
+                    canvasHeight,
+                    visibleWidth,
+                    sampleRate
                 }
             });
         }
@@ -405,6 +431,7 @@
         bind:timeDivFine
         {timeDivLabels}
         bind:triggerLevel
+        bind:triggerChannel
         bind:positionA
         bind:amplBaseA
         bind:amplFineA
@@ -423,6 +450,7 @@
     bind:persistence
     bind:signalNoise
     bind:velocityDimming
+    bind:decay
 />
 
 <style>

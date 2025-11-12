@@ -9,7 +9,8 @@ export class AudioEngine {
         this.merger = null;
         this.leftAnalyser = null;
         this.rightAnalyser = null;
-        this.baseFrequency = 100;
+        this.defaultFrequency = 100; // Settings tab default frequency
+        this.baseFrequency = 100; // Current playback frequency
         this.currentRotation = 0;
         this.isPlaying = false;
         this.clockInterval = null;
@@ -22,14 +23,18 @@ export class AudioEngine {
             // Create gain nodes
             this.leftGain = this.audioContext.createGain();
             this.rightGain = this.audioContext.createGain();
+            this.leftGain.gain.value = 0.3; // Initial volume at 30% (matches Settings default)
+            this.rightGain.gain.value = 0.3;
             this.masterGain = this.audioContext.createGain();
-            this.masterGain.gain.value = 0.3; // Initial volume at 30%
+            this.masterGain.gain.value = 1.0; // Unity gain (volume controlled by left/right gains)
 
             // Create analyser nodes for preview
             this.leftAnalyser = this.audioContext.createAnalyser();
             this.rightAnalyser = this.audioContext.createAnalyser();
-            this.leftAnalyser.fftSize = 2048;
-            this.rightAnalyser.fftSize = 2048;
+            // Use larger buffer to support longer TIME/DIV settings
+            // 16384 samples at 48kHz = 341ms, supporting up to ~34ms/div
+            this.leftAnalyser.fftSize = 16384;
+            this.rightAnalyser.fftSize = 16384;
 
             // Create channel merger for stereo output
             this.merger = this.audioContext.createChannelMerger(2);
@@ -76,13 +81,31 @@ export class AudioEngine {
     }
 
     setVolume(value) {
-        if (this.masterGain) {
-            this.masterGain.gain.value = value / 100;
+        // Apply volume to channel gains (before analysers) so it affects both scope and speakers
+        const gainValue = value / 100;
+        if (this.leftGain) {
+            this.leftGain.gain.value = gainValue;
         }
+        if (this.rightGain) {
+            this.rightGain.gain.value = gainValue;
+        }
+        // masterGain stays at 0.3 as a fixed safety attenuation
+    }
+
+    setDefaultFrequency(value) {
+        // Called by Settings tab - updates both default and current
+        this.defaultFrequency = parseFloat(value);
+        this.baseFrequency = parseFloat(value);
     }
 
     setFrequency(value) {
+        // Called by Waves tab - only updates current playback frequency
         this.baseFrequency = parseFloat(value);
+    }
+
+    restoreDefaultFrequency() {
+        // Called by other tabs to restore Settings frequency
+        this.baseFrequency = this.defaultFrequency;
     }
 
     setRotation(value) {
@@ -158,6 +181,9 @@ export class AudioEngine {
     }
 
     startClock(generateClockPoints) {
+        // Restore Settings tab default frequency
+        this.restoreDefaultFrequency();
+
         // Clear any existing clock interval
         if (this.clockInterval) {
             clearInterval(this.clockInterval);

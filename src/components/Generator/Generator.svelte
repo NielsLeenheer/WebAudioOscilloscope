@@ -2,29 +2,36 @@
     import Header from './Header.svelte';
     import Navigation from './Navigation.svelte';
     import ShapeControls from './tabs/ShapeControls.svelte';
+    import ShapesTab from './tabs/ShapesTab.svelte';
     import ClockControls from './tabs/ClockControls.svelte';
     import DrawControls from './tabs/DrawControls.svelte';
     import SVGControls from './tabs/SVGControls.svelte';
     import Settings from './tabs/Settings.svelte';
 
     let { audioEngine, isPlaying, start, stop } = $props();
-    let activeTab = $state('shapes');
+    let activeTab = $state('waves');
+
+    // SVG settings shared between Settings tab and SVG tab
+    let svgAnimationFPS = $state(30);
+    let svgSamplePoints = $state(200);
 </script>
 
 <div class="generator">
     <Header {isPlaying} {start} {stop} />
     <Navigation bind:activeTab />
     <div class="content-area">
-        {#if activeTab === 'shapes'}
+        {#if activeTab === 'waves'}
             <ShapeControls {audioEngine} {isPlaying} />
+        {:else if activeTab === 'shapes'}
+            <ShapesTab {audioEngine} {isPlaying} />
         {:else if activeTab === 'clock'}
-            <ClockControls {audioEngine} {isPlaying} />
+            <ClockControls {audioEngine} {isPlaying} isActive={activeTab === 'clock'} />
         {:else if activeTab === 'draw'}
             <DrawControls {audioEngine} {isPlaying} />
         {:else if activeTab === 'svg'}
-            <SVGControls {audioEngine} {isPlaying} />
+            <SVGControls {audioEngine} {isPlaying} bind:animationFPS={svgAnimationFPS} bind:numSamples={svgSamplePoints} />
         {:else if activeTab === 'settings'}
-            <Settings {audioEngine} />
+            <Settings {audioEngine} bind:svgAnimationFPS bind:svgSamplePoints />
         {/if}
     </div>
 </div>
