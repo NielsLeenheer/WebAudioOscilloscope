@@ -42,8 +42,8 @@
         position: absolute;
         top: 20px;
         right: 20px;
-        width: 24px;
-        height: 24px;
+        width: 32px;
+        height: 32px;
         background: none;
         border: none;
         color: #4CAF50;
@@ -52,7 +52,10 @@
         align-items: center;
         justify-content: center;
         z-index: 10;
-        padding: 0;
+        padding: 4px;
+    }
+    .physics-button:hover {
+        background: #2d2d2d;
     }
 
     .physics-button :global(svg) {
