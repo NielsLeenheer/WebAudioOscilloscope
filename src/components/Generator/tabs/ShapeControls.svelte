@@ -25,6 +25,11 @@
     let leftInvert = $state(false);
     let rightInvert = $state(false);
 
+    // Calculate greatest common divisor
+    function gcd(a, b) {
+        return b === 0 ? a : gcd(b, a % b);
+    }
+
     function updateWaves() {
         if (!isPlaying) return;
 
@@ -33,10 +38,23 @@
 
         const samples = 1000;
 
-        // Calculate how many cycles to generate for each channel based on frequency ratio
-        const frequencyRatio = rightFrequency / leftFrequency;
-        const leftCycles = 1;
-        const rightCycles = frequencyRatio;
+        // Calculate cycle counts to ensure complete patterns
+        // For clean Lissajous figures, we need integer cycle ratios
+        const leftFreqInt = Math.round(leftFrequency);
+        const rightFreqInt = Math.round(rightFrequency);
+        const divisor = gcd(leftFreqInt, rightFreqInt);
+
+        // Simplify the ratio to smallest integers
+        let leftCycles = leftFreqInt / divisor;
+        let rightCycles = rightFreqInt / divisor;
+
+        // Limit maximum cycles to keep pattern reasonable
+        const maxCycles = 20;
+        if (leftCycles > maxCycles || rightCycles > maxCycles) {
+            const scale = maxCycles / Math.max(leftCycles, rightCycles);
+            leftCycles = Math.max(1, Math.round(leftCycles * scale));
+            rightCycles = Math.max(1, Math.round(rightCycles * scale));
+        }
 
         // Generate waveforms
         const leftPoints = [];
