@@ -1,106 +1,165 @@
 <script>
     /**
-     * Reusable Dialog component for anchored/floating dialogs
+     * Reusable Dialog component
      *
-     * @prop {boolean} open - Whether the dialog is open
-     * @prop {string} title - Dialog title
-     * @prop {Function} onClose - Callback when dialog is closed
+     * @prop {string} title - Dialog title (optional for anchored dialogs)
+     * @prop {Function} onclose - Close handler
+     * @prop {boolean} open - Bind to control dialog state
+     * @prop {boolean} anchored - Enable anchored positioning
+     * @prop {string} anchorId - Anchor name (CSS anchor-name value)
+     * @prop {boolean} showArrow - Show arrow pointing to anchor (default true for anchored)
+     * @prop {boolean} lightDismiss - Enable light dismiss on backdrop click (default true for anchored)
+     * @snippet tools - Optional snippet for tool buttons (e.g., Delete)
+     * @snippet buttons - Optional snippet for action buttons (e.g., Cancel, Save)
      */
     let {
-        open = $bindable(false),
-        title = '',
-        onClose = null
+        title = null,
+        onclose = null,
+        dialogRef = $bindable(null),
+        anchored = false,
+        anchorId = null,
+        showArrow = true,
+        lightDismiss = true,
+        children,
+        tools,
+        buttons
     } = $props();
 
     function handleClose() {
-        open = false;
-        if (onClose) {
-            onClose();
-        }
+        dialogRef?.close();
+        if (onclose) onclose();
     }
 
-    function handleBackdropClick(e) {
-        if (e.target === e.currentTarget) {
+    function handleClick(event) {
+        if (anchored && lightDismiss && event.target === dialogRef) {
             handleClose();
         }
     }
 </script>
 
-{#if open}
-    <div class="dialog-backdrop" onclick={handleBackdropClick}>
-        <div class="dialog">
-            <div class="dialog-header">
-                <h3>{title}</h3>
-                <button class="close-button" onclick={handleClose}>×</button>
+<dialog
+    bind:this={dialogRef}
+    class="dialog"
+    class:anchored
+    class:show-arrow={showArrow && anchored}
+    style={anchored && anchorId ? `position-anchor: --${anchorId}` : ''}
+    onclick={handleClick}
+>
+    {#if title}
+        <div class="dialog-header">
+            <h2>{title}</h2>
+        </div>
+    {/if}
+    <div class="dialog-body">
+        {@render children()}
+    </div>
+    {#if tools || buttons}
+        <div class="dialog-footer">
+            <div class="dialog-footer-tools">
+                {#if tools}
+                    {@render tools()}
+                {/if}
             </div>
-            <div class="dialog-content">
-                <slot></slot>
+            <div class="dialog-footer-buttons">
+                {#if buttons}
+                    {@render buttons()}
+                {/if}
             </div>
         </div>
-    </div>
-{/if}
+    {/if}
+</dialog>
 
 <style>
-    .dialog-backdrop {
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background: rgba(0, 0, 0, 0.5);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        z-index: 1000;
+    .dialog {
+        border: none;
+        border-radius: 8px;
+        padding: 0;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        min-width: 400px;
+        max-width: 90vw;
+        max-height: 90vh;
     }
 
-    .dialog {
-        background: white;
-        border-radius: 8px;
+    .dialog::backdrop {
+        background: rgba(0, 0, 0, 0.5);
+    }
+
+    /* Anchored dialog styles */
+    .dialog.anchored {
+        position: fixed;
+        position-anchor: var(--position-anchor);
+        top: anchor(bottom);
+        left: anchor(center);
+        translate: -50% 16px;
+        margin: 0;
+        z-index: 100;
         min-width: 300px;
-        max-width: 500px;
-        max-height: 80vh;
-        overflow: auto;
-        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        max-width: 400px;
+        overflow: visible;
+    }
+
+    .dialog.anchored::backdrop {
+        background: rgba(0, 0, 0, 0.3);
+    }
+
+    /* Arrow pointing up to anchor element */
+    .dialog.show-arrow::before {
+        content: '';
+        position: absolute;
+        top: -8px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 0;
+        height: 0;
+        border-left: 8px solid transparent;
+        border-right: 8px solid transparent;
+        border-bottom: 8px solid #fff;
+        filter: drop-shadow(0 -2px 2px rgba(0, 0, 0, 0.1));
     }
 
     .dialog-header {
         display: flex;
-        align-items: center;
         justify-content: space-between;
-        padding: 16px 20px;
-        border-bottom: 1px solid #ddd;
-    }
-
-    .dialog-header h3 {
-        margin: 0;
-        font-size: 14pt;
-        font-weight: 600;
-        color: #333;
-    }
-
-    .close-button {
-        background: none;
-        border: none;
-        font-size: 24px;
-        cursor: pointer;
-        color: #666;
-        padding: 0;
-        width: 32px;
-        height: 32px;
-        display: flex;
         align-items: center;
-        justify-content: center;
-        border-radius: 4px;
-        transition: all 0.2s;
+        padding: 16px 20px;
+        background: #f5f5f5;
+        border-top-left-radius: 8px;
+        border-top-right-radius: 8px;
     }
 
-    .close-button:hover {
-        background: #f0f0f0;
-        color: #333;
+    .dialog-header h2 {
+        margin: 0;
+        font-size: 12pt;
+        font-weight: 600;
     }
 
-    .dialog-content {
+    .dialog-body {
         padding: 20px;
+    }
+
+    .dialog-footer {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0 20px 20px 20px;
+        gap: 10px;
+    }
+
+    .dialog-footer-tools {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+    }
+
+    .dialog-footer-buttons {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+    }
+
+    .dialog-footer :global(svg) {
+        width: 16px;
+        height: 16px;
+        margin-right: 6px;
     }
 </style>
