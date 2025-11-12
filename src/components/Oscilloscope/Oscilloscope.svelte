@@ -52,7 +52,7 @@
         <InputSelector bind:inputSource />
         <ModeSelector bind:mode />
     </div>
-    <Display {isPowered} bind:mode {inputSource} {generatorInput} {micInput} />
+    <Display {isPowered} {mode} {inputSource} {generatorInput} {micInput} />
 </div>
 
 <style>

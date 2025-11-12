@@ -4,7 +4,7 @@
     import Grid from './Grid.svelte';
     import Visualiser from './Visualiser.svelte';
 
-    let { isPowered, mode = $bindable(), inputSource, generatorInput, micInput } = $props();
+    let { isPowered, mode, inputSource, generatorInput, micInput } = $props();
 
     let visualiser;
 
