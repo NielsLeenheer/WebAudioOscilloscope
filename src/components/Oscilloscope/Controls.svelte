@@ -81,7 +81,6 @@
         </div>
         <div class="slider-control trigger-control" class:disabled={mode === 'xy'}>
             <label>TRIGGER</label>
-            <input type="range" min="-1" max="1" step="0.01" bind:value={triggerLevel} disabled={mode === 'xy'} class="trigger-slider" />
             <div class="trigger-channel-selector">
                 <button
                     class="channel-btn"
@@ -96,6 +95,7 @@
                     disabled={mode === 'xy'}
                 >B</button>
             </div>
+            <input type="range" min="-1" max="1" step="0.01" bind:value={triggerLevel} disabled={mode === 'xy'} class="trigger-slider" />
             <span class="value">{triggerLevel.toFixed(2)}</span>
         </div>
     </div>
@@ -285,10 +285,14 @@
     }
 
     .slider-control.trigger-control {
-        grid-template-columns: 80px 1fr 60px 50px;
+        grid-template-columns: 80px 1fr 1fr 50px;
     }
 
     .slider-control.trigger-control .trigger-slider {
+        width: 100%;
+    }
+
+    .slider-control.trigger-control .trigger-channel-selector {
         width: 100%;
     }
 
