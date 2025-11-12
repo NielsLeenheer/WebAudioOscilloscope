@@ -2,7 +2,7 @@
     import Header from './Header.svelte';
     import Navigation from './Navigation.svelte';
     import WaveControls from './tabs/WaveControls.svelte';
-    import ShapesTab from './tabs/ShapesTab.svelte';
+    import ShapeControls from './tabs/ShapeControls.svelte';
     import ClockControls from './tabs/ClockControls.svelte';
     import DrawControls from './tabs/DrawControls.svelte';
     import SVGControls from './tabs/SVGControls.svelte';
@@ -23,7 +23,7 @@
         {#if activeTab === 'waves'}
             <WaveControls {audioEngine} {isPlaying} />
         {:else if activeTab === 'shapes'}
-            <ShapesTab {audioEngine} {isPlaying} isActive={activeTab === 'shapes'} />
+            <ShapeControls {audioEngine} {isPlaying} isActive={activeTab === 'shapes'} />
         {:else if activeTab === 'clock'}
             <ClockControls {audioEngine} {isPlaying} isActive={activeTab === 'clock'} />
         {:else if activeTab === 'draw'}
