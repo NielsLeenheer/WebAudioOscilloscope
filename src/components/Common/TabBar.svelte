@@ -2,7 +2,7 @@
     /**
      * Reusable TabBar component
      *
-     * @prop {Array} tabs - Array of tab objects with structure: { id: string, label: string, icon?: string }
+     * @prop {Array} tabs - Array of tab objects with structure: { id: string, label: string, icon?: string, anchorName?: string }
      * @prop {string} activeTab - Currently active tab ID
      * @prop {Function} onTabChange - Callback when tab changes, receives tab ID
      * @prop {boolean} wrap - Whether to wrap tabs when they overflow
@@ -29,6 +29,7 @@
             class:active={activeTab === tab.id}
             onclick={() => handleTabClick(tab.id)}
             title={tab.label}
+            style={tab.anchorName ? `anchor-name: --${tab.anchorName}` : ''}
         >
             {#if tab.icon}
                 <div class="tab-icon">

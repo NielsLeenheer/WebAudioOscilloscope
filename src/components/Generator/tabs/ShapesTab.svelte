@@ -17,7 +17,7 @@
     let selectedShape = $state('circle');
     let lissX = $state(3);
     let lissY = $state(2);
-    let showCustomDialog = $state(false);
+    let customDialog = $state(null);
     let hasAutoDrawn = $state(false);
 
     const shapeTabs = [
@@ -29,7 +29,7 @@
         { id: 'spiral', label: 'Spiral' },
         { id: 'liss32', label: 'Lissajous 3:2' },
         { id: 'liss54', label: 'Lissajous 5:4' },
-        { id: 'custom', label: 'Custom Lissajous' }
+        { id: 'custom', label: 'Custom Lissajous', anchorName: 'custom-liss-anchor' }
     ];
 
     const shapeGenerators = {
@@ -56,7 +56,7 @@
         selectedShape = shapeId;
 
         if (shapeId === 'custom') {
-            showCustomDialog = true;
+            customDialog?.showModal();
         } else {
             const generator = shapeGenerators[shapeId];
             if (generator) {
@@ -66,7 +66,7 @@
     }
 
     function applyCustomLissajous() {
-        showCustomDialog = false;
+        customDialog?.close();
         const generator = shapeGenerators.custom;
         if (generator) {
             drawShape(generator);
@@ -95,36 +95,38 @@
     </Card>
 </div>
 
-<Dialog bind:open={showCustomDialog} title="Custom Lissajous">
-    <div class="dialog-controls">
-        <div class="slider-group">
-            <label for="dialogLissX">X Frequency Ratio: {lissX}</label>
-            <input
-                type="range"
-                id="dialogLissX"
-                bind:value={lissX}
-                min="1"
-                max="10"
-                step="1"
-            >
-        </div>
+<Dialog bind:dialogRef={customDialog} anchored={true} anchorId="custom-liss-anchor">
+    {#snippet children()}
+        <div class="dialog-controls">
+            <div class="slider-group">
+                <label for="dialogLissX">X Frequency Ratio: {lissX}</label>
+                <input
+                    type="range"
+                    id="dialogLissX"
+                    bind:value={lissX}
+                    min="1"
+                    max="10"
+                    step="1"
+                >
+            </div>
 
-        <div class="slider-group">
-            <label for="dialogLissY">Y Frequency Ratio: {lissY}</label>
-            <input
-                type="range"
-                id="dialogLissY"
-                bind:value={lissY}
-                min="1"
-                max="10"
-                step="1"
-            >
-        </div>
+            <div class="slider-group">
+                <label for="dialogLissY">Y Frequency Ratio: {lissY}</label>
+                <input
+                    type="range"
+                    id="dialogLissY"
+                    bind:value={lissY}
+                    min="1"
+                    max="10"
+                    step="1"
+                >
+            </div>
 
-        <button class="apply-button" onclick={applyCustomLissajous}>
-            Apply
-        </button>
-    </div>
+            <button class="apply-button" onclick={applyCustomLissajous}>
+                Apply
+            </button>
+        </div>
+    {/snippet}
 </Dialog>
 
 <style>
