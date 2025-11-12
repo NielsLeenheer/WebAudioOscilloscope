@@ -100,66 +100,68 @@
 
 <div class="channels-container">
     <Card title="Left Channel">
-        <div class="control-group">
-            <label>Frequency:</label>
-            <div class="frequency-control">
-                <input type="range" bind:value={leftFrequency} min="20" max="2000" step="1">
-                <input type="number" bind:value={leftFrequency} min="20" max="2000" step="1">
-                <span>Hz</span>
+        <div class="card-grid">
+            <div class="wave-selector">
+                <TabBar tabs={waveTabs} bind:activeTab={leftWave} />
             </div>
-        </div>
 
-        <div class="control-group">
-            <label>Waveform:</label>
-            <TabBar tabs={waveTabs} bind:activeTab={leftWave} />
-        </div>
+            <div class="controls-row">
+                <div class="control-item">
+                    <label>Frequency:</label>
+                    <div class="slider-control">
+                        <input type="range" bind:value={leftFrequency} min="20" max="2000" step="1">
+                        <span class="value-display">{leftFrequency} Hz</span>
+                    </div>
+                </div>
 
-        <div class="control-group">
-            <label>Phase Shift:</label>
-            <div class="frequency-control">
-                <input type="range" bind:value={leftPhase} min="0" max="360" step="1">
-                <input type="number" bind:value={leftPhase} min="0" max="360" step="1">
-                <span>°</span>
+                <div class="control-item">
+                    <label>Phase Shift:</label>
+                    <div class="slider-control">
+                        <input type="range" bind:value={leftPhase} min="0" max="360" step="1">
+                        <span class="value-display">{leftPhase}°</span>
+                    </div>
+                </div>
+
+                <div class="control-item">
+                    <label>Invert:</label>
+                    <label class="checkbox-label">
+                        <input type="checkbox" bind:checked={leftInvert}>
+                    </label>
+                </div>
             </div>
-        </div>
-
-        <div class="control-group">
-            <label class="checkbox-label">
-                <input type="checkbox" bind:checked={leftInvert}>
-                <span>Invert</span>
-            </label>
         </div>
     </Card>
 
     <Card title="Right Channel">
-        <div class="control-group">
-            <label>Frequency:</label>
-            <div class="frequency-control">
-                <input type="range" bind:value={rightFrequency} min="20" max="2000" step="1">
-                <input type="number" bind:value={rightFrequency} min="20" max="2000" step="1">
-                <span>Hz</span>
+        <div class="card-grid">
+            <div class="wave-selector">
+                <TabBar tabs={waveTabs} bind:activeTab={rightWave} />
             </div>
-        </div>
 
-        <div class="control-group">
-            <label>Waveform:</label>
-            <TabBar tabs={waveTabs} bind:activeTab={rightWave} />
-        </div>
+            <div class="controls-row">
+                <div class="control-item">
+                    <label>Frequency:</label>
+                    <div class="slider-control">
+                        <input type="range" bind:value={rightFrequency} min="20" max="2000" step="1">
+                        <span class="value-display">{rightFrequency} Hz</span>
+                    </div>
+                </div>
 
-        <div class="control-group">
-            <label>Phase Shift:</label>
-            <div class="frequency-control">
-                <input type="range" bind:value={rightPhase} min="0" max="360" step="1">
-                <input type="number" bind:value={rightPhase} min="0" max="360" step="1">
-                <span>°</span>
+                <div class="control-item">
+                    <label>Phase Shift:</label>
+                    <div class="slider-control">
+                        <input type="range" bind:value={rightPhase} min="0" max="360" step="1">
+                        <span class="value-display">{rightPhase}°</span>
+                    </div>
+                </div>
+
+                <div class="control-item">
+                    <label>Invert:</label>
+                    <label class="checkbox-label">
+                        <input type="checkbox" bind:checked={rightInvert}>
+                    </label>
+                </div>
             </div>
-        </div>
-
-        <div class="control-group">
-            <label class="checkbox-label">
-                <input type="checkbox" bind:checked={rightInvert}>
-                <span>Invert</span>
-            </label>
         </div>
     </Card>
 </div>
@@ -172,12 +174,30 @@
         padding: 20px;
     }
 
-    .control-group {
-        margin: 0;
+    .card-grid {
+        display: grid;
+        grid-template-rows: auto 1fr;
+        gap: 20px;
     }
 
-    .control-group label {
-        display: block;
+    .wave-selector {
+        display: flex;
+        justify-content: center;
+    }
+
+    .controls-row {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 16px;
+    }
+
+    .control-item {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .control-item label {
         font-size: 12px;
         font-weight: 600;
         color: #666;
@@ -185,49 +205,33 @@
         letter-spacing: 0.5px;
     }
 
-    .frequency-control {
+    .slider-control {
         display: flex;
-        gap: 10px;
-        align-items: center;
+        flex-direction: column;
+        gap: 8px;
     }
 
-    .frequency-control input[type="range"] {
-        flex: 1;
+    .slider-control input[type="range"] {
+        width: 100%;
     }
 
-    .frequency-control input[type="number"] {
-        width: 80px;
-        padding: 6px 8px;
-        border: 1px solid #ddd;
-        border-radius: 4px;
-        font-family: system-ui;
-        font-size: 11pt;
-    }
-
-    .frequency-control span {
+    .value-display {
         font-size: 11pt;
         color: #666;
+        text-align: center;
     }
 
     .checkbox-label {
         display: flex;
         align-items: center;
-        gap: 8px;
+        justify-content: center;
         cursor: pointer;
-        font-size: 11pt;
-        color: #333;
-        text-transform: none;
-        letter-spacing: normal;
-        font-weight: normal;
+        margin-top: 8px;
     }
 
     .checkbox-label input[type="checkbox"] {
         width: 18px;
         height: 18px;
         cursor: pointer;
-    }
-
-    .checkbox-label span {
-        user-select: none;
     }
 </style>
