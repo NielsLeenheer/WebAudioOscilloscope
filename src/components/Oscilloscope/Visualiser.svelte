@@ -25,10 +25,8 @@
         positionB,
         xPosition,
         focus,
-        // Microphone analysers (optional)
-        micAnalyserLeft = null,
-        micAnalyserRight = null,
-        micAudioContext = null
+        // Microphone input helper (optional)
+        micInput = null
     } = $props();
 
     let canvas;
@@ -113,9 +111,9 @@
         let hasValidInput = false;
 
         if (inputSource === 'microphone') {
-            if (micAnalyserLeft && micAnalyserRight) {
-                analyserLeft = micAnalyserLeft;
-                analyserRight = micAnalyserRight;
+            if (micInput && micInput.isActive()) {
+                analyserLeft = micInput.getAnalyserLeft();
+                analyserRight = micInput.getAnalyserRight();
                 hasValidInput = true;
             }
         } else {
@@ -142,8 +140,11 @@
 
         // Get sample rate from the appropriate AudioContext
         let sampleRate = 48000; // Default fallback
-        if (inputSource === 'microphone' && micAudioContext) {
-            sampleRate = micAudioContext.sampleRate;
+        if (inputSource === 'microphone' && micInput && micInput.isActive()) {
+            const context = micInput.getAudioContext();
+            if (context) {
+                sampleRate = context.sampleRate;
+            }
         } else if (audioEngine?.audioContext) {
             sampleRate = audioEngine.audioContext.sampleRate;
         }
