@@ -31,13 +31,16 @@
     let customDialog = $state(null);
     let hasAutoDrawn = $state(false);
 
-    const shapeTabs = [
+    const xyShapeTabs = [
         { id: 'circle', label: 'Circle', icon: CircleIcon },
         { id: 'square', label: 'Square', icon: SquareIcon },
         { id: 'triangle', label: 'Triangle', icon: TriangleIcon },
         { id: 'star', label: 'Star', icon: StarIcon },
         { id: 'heart', label: 'Heart', icon: HeartIcon },
-        { id: 'spiral', label: 'Spiral', icon: SpiralIcon },
+        { id: 'spiral', label: 'Spiral', icon: SpiralIcon }
+    ];
+
+    const lissajousTabs = [
         { id: 'liss32', label: 'Lissajous 3:2', icon: Lissajous32Icon },
         { id: 'liss54', label: 'Lissajous 5:4', icon: Lissajous54Icon },
         { id: 'custom', label: 'Custom Lissajous', icon: LissajousCustomIcon, anchorName: 'custom-liss-anchor' }
@@ -98,7 +101,16 @@
 <div class="shapes-container">
     <Card title="X/Y Shapes">
         <TabBar
-            tabs={shapeTabs}
+            tabs={xyShapeTabs}
+            bind:activeTab={selectedShape}
+            onTabChange={handleShapeChange}
+            wrap={true}
+        />
+    </Card>
+
+    <Card title="Lissajous">
+        <TabBar
+            tabs={lissajousTabs}
             bind:activeTab={selectedShape}
             onTabChange={handleShapeChange}
             wrap={true}
@@ -139,6 +151,9 @@
 <style>
     .shapes-container {
         padding: 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
     }
 
     .dialog-controls {
