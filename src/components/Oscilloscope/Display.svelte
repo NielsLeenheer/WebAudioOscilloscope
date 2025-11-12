@@ -27,7 +27,6 @@
 
     // Time division steps (like real oscilloscope) - stored in microseconds for easy calculation
     const timeDivSteps = [0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000, 50000, 100000, 200000, 500000];
-    const timeDivLabels = ['0.05µs', '0.1µs', '0.2µs', '0.5µs', '1µs', '2µs', '5µs', '10µs', '20µs', '50µs', '0.1ms', '0.2ms', '0.5ms', '1ms', '2ms', '5ms', '10ms', '20ms', '50ms', '0.1s', '0.2s', '0.5s'];
 
     let timeDivBase = $state(13); // Index into timeDivSteps (default 1ms)
     let timeDivFine = $state(1.0); // Fine adjustment multiplier (0.5 to 2.5)
@@ -40,7 +39,6 @@
 
     // Base amplification steps (like real oscilloscope)
     const amplSteps = [0.002, 0.005, 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10];
-    const amplLabels = ['2mV', '5mV', '10mV', '20mV', '50mV', '0.1V', '0.2V', '0.5V', '1V', '2V', '5V', '10V'];
 
     let amplBaseA = $state(8); // Index into amplSteps (default 1V)
     let amplFineA = $state(1.0); // Fine adjustment multiplier (0.5 to 2.5)
@@ -139,13 +137,11 @@
         bind:xPosition
         bind:timeDivBase
         bind:timeDivFine
-        {timeDivLabels}
         bind:triggerLevel
         bind:triggerChannel
         bind:positionA
         bind:amplBaseA
         bind:amplFineA
-        {amplLabels}
         bind:positionB
         bind:amplBaseB
         bind:amplFineB
