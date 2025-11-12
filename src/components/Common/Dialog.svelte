@@ -99,7 +99,7 @@
     }
 
     .dialog.anchored::backdrop {
-        background: rgba(0, 0, 0, 0.3);
+        background: transparent;
     }
 
     /* Arrow pointing up to anchor element */
