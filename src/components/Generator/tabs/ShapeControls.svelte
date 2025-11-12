@@ -106,27 +106,21 @@
             </div>
 
             <div class="controls-row">
-                <div class="control-item">
+                <div class="control-item slider-item">
                     <label>Frequency:</label>
-                    <div class="slider-control">
-                        <input type="range" bind:value={leftFrequency} min="20" max="2000" step="1">
-                        <span class="value-display">{leftFrequency} Hz</span>
-                    </div>
+                    <input type="range" bind:value={leftFrequency} min="20" max="2000" step="1">
+                    <span class="value-display">{leftFrequency} Hz</span>
                 </div>
 
-                <div class="control-item">
+                <div class="control-item slider-item">
                     <label>Phase Shift:</label>
-                    <div class="slider-control">
-                        <input type="range" bind:value={leftPhase} min="0" max="360" step="1">
-                        <span class="value-display">{leftPhase}°</span>
-                    </div>
+                    <input type="range" bind:value={leftPhase} min="0" max="360" step="1">
+                    <span class="value-display">{leftPhase}°</span>
                 </div>
 
-                <div class="control-item">
-                    <label>Invert:</label>
-                    <label class="checkbox-label">
-                        <input type="checkbox" bind:checked={leftInvert}>
-                    </label>
+                <div class="control-item checkbox-item">
+                    <input type="checkbox" bind:checked={leftInvert}>
+                    <label>Invert</label>
                 </div>
             </div>
         </div>
@@ -139,27 +133,21 @@
             </div>
 
             <div class="controls-row">
-                <div class="control-item">
+                <div class="control-item slider-item">
                     <label>Frequency:</label>
-                    <div class="slider-control">
-                        <input type="range" bind:value={rightFrequency} min="20" max="2000" step="1">
-                        <span class="value-display">{rightFrequency} Hz</span>
-                    </div>
+                    <input type="range" bind:value={rightFrequency} min="20" max="2000" step="1">
+                    <span class="value-display">{rightFrequency} Hz</span>
                 </div>
 
-                <div class="control-item">
+                <div class="control-item slider-item">
                     <label>Phase Shift:</label>
-                    <div class="slider-control">
-                        <input type="range" bind:value={rightPhase} min="0" max="360" step="1">
-                        <span class="value-display">{rightPhase}°</span>
-                    </div>
+                    <input type="range" bind:value={rightPhase} min="0" max="360" step="1">
+                    <span class="value-display">{rightPhase}°</span>
                 </div>
 
-                <div class="control-item">
-                    <label>Invert:</label>
-                    <label class="checkbox-label">
-                        <input type="checkbox" bind:checked={rightInvert}>
-                    </label>
+                <div class="control-item checkbox-item">
+                    <input type="checkbox" bind:checked={rightInvert}>
+                    <label>Invert</label>
                 </div>
             </div>
         </div>
@@ -192,9 +180,18 @@
     }
 
     .control-item {
-        display: flex;
-        flex-direction: column;
+        display: grid;
+        align-items: center;
         gap: 8px;
+    }
+
+    .slider-item {
+        grid-template-columns: auto 1fr auto;
+    }
+
+    .checkbox-item {
+        grid-template-columns: auto 1fr;
+        justify-items: start;
     }
 
     .control-item label {
@@ -203,35 +200,27 @@
         color: #666;
         text-transform: uppercase;
         letter-spacing: 0.5px;
+        white-space: nowrap;
     }
 
-    .slider-control {
-        display: flex;
-        flex-direction: column;
-        gap: 8px;
-    }
-
-    .slider-control input[type="range"] {
+    .control-item input[type="range"] {
         width: 100%;
     }
 
     .value-display {
         font-size: 11pt;
         color: #666;
-        text-align: center;
+        white-space: nowrap;
     }
 
-    .checkbox-label {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        cursor: pointer;
-        margin-top: 8px;
-    }
-
-    .checkbox-label input[type="checkbox"] {
+    .checkbox-item input[type="checkbox"] {
         width: 18px;
         height: 18px;
         cursor: pointer;
+    }
+
+    .checkbox-item label {
+        cursor: pointer;
+        user-select: none;
     }
 </style>
