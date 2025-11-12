@@ -1,9 +1,7 @@
 <script>
     import { onMount, onDestroy } from 'svelte';
-    import { Icon } from 'svelte-icon';
-    import sineIcon from '../../assets/icons/glyph/sine.svg?raw';
     import Controls from './Controls.svelte';
-    import PhysicsDialog from './PhysicsDialog.svelte';
+    import Physics from './Physics.svelte';
     import Grid from './Grid.svelte';
     import Visualiser from './Visualiser.svelte';
     import { MicrophoneInput } from '../../utils/microphoneInput.js';
@@ -11,7 +9,6 @@
     let { audioEngine, isPlaying, inputSource, isPowered, mode = $bindable() } = $props();
 
     let visualiser;
-    let physicsDialog;
     let micInput = new MicrophoneInput();
 
     // Physics parameters (adjustable)
@@ -64,12 +61,6 @@
         stopMicrophoneInput();
     });
 
-    function openPhysicsDialog() {
-        if (physicsDialog) {
-            physicsDialog.open();
-        }
-    }
-
     // React to input source changes
     $effect(() => {
         if (inputSource === 'microphone') {
@@ -81,9 +72,15 @@
 </script>
 
 <div class="preview-panel">
-    <button class="physics-button" onclick={openPhysicsDialog}>
-        <Icon data={sineIcon} />
-    </button>
+    <Physics
+        bind:forceMultiplier
+        bind:damping
+        bind:mass
+        bind:persistence
+        bind:signalNoise
+        bind:velocityDimming
+        bind:decay
+    />
     <div class="canvas-area">
         <div class="canvas-container">
             <Visualiser
@@ -129,17 +126,6 @@
     />
 </div>
 
-<PhysicsDialog
-    bind:this={physicsDialog}
-    bind:forceMultiplier
-    bind:damping
-    bind:mass
-    bind:persistence
-    bind:signalNoise
-    bind:velocityDimming
-    bind:decay
-/>
-
 <style>
     .preview-panel {
         background: transparent;
@@ -156,28 +142,6 @@
         align-items: center;
         justify-content: center;
         min-height: 0;
-    }
-
-    .physics-button {
-        position: absolute;
-        top: 20px;
-        right: 20px;
-        width: 24px;
-        height: 24px;
-        background: none;
-        border: none;
-        color: #4CAF50;
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        z-index: 10;
-        padding: 0;
-    }
-
-    .physics-button :global(svg) {
-        width: 24px;
-        height: 24px;
     }
 
     .canvas-container {
