@@ -104,7 +104,6 @@
             tabs={xyShapeTabs}
             bind:activeTab={selectedShape}
             onTabChange={handleShapeChange}
-            wrap={true}
         />
     </Card>
 
@@ -113,7 +112,6 @@
             tabs={lissajousTabs}
             bind:activeTab={selectedShape}
             onTabChange={handleShapeChange}
-            wrap={true}
         />
     </Card>
 </div>
