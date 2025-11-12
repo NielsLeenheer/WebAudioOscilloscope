@@ -2,6 +2,7 @@
     import { onMount } from 'svelte';
     import Card from '../../Common/Card.svelte';
     import TabBar from '../../Common/TabBar.svelte';
+    import { generateStereoWaveform } from '../../../utils/waveGenerator.js';
     import SineIcon from '../../../assets/icons/wave-sine.svg?raw';
     import SquareIcon from '../../../assets/icons/wave-square.svg?raw';
     import SawtoothIcon from '../../../assets/icons/wave-sawtooth.svg?raw';
@@ -25,82 +26,24 @@
     let leftInvert = $state(false);
     let rightInvert = $state(false);
 
-    function gcd(a, b) {
-        a = Math.abs(Math.round(a));
-        b = Math.abs(Math.round(b));
-        while (b !== 0) {
-            const temp = b;
-            b = a % b;
-            a = temp;
-        }
-        return a;
-    }
-
     function updateWaves() {
         if (!isPlaying) return;
 
-        // Find GCD of both frequencies to use as base frequency
-        // This makes both channels independent - they're both relative to the same base
-        const baseFreq = gcd(leftFrequency, rightFrequency);
-        audioEngine.setFrequency(baseFreq);
+        // Generate stereo waveform using helper library
+        const { stereoPoints, baseFrequency } = generateStereoWaveform({
+            leftFrequency,
+            rightFrequency,
+            leftWave,
+            rightWave,
+            leftPhase,
+            rightPhase,
+            leftInvert,
+            rightInvert
+        });
 
-        const samples = 1000;
-
-        // Calculate cycles for each channel independently
-        let leftCycles = Math.round(leftFrequency / baseFreq);
-        let rightCycles = Math.round(rightFrequency / baseFreq);
-
-        // Limit maximum cycles to keep pattern reasonable
-        const maxCycles = 20;
-        if (leftCycles > maxCycles || rightCycles > maxCycles) {
-            const scale = maxCycles / Math.max(leftCycles, rightCycles);
-            leftCycles = Math.max(1, Math.round(leftCycles * scale));
-            rightCycles = Math.max(1, Math.round(rightCycles * scale));
-        }
-
-        // Generate waveforms
-        const leftPoints = [];
-        const rightPoints = [];
-
-        for (let i = 0; i < samples; i++) {
-            const t = i / samples;
-            leftPoints.push(generateWaveValue(leftWave, t * leftCycles, leftPhase, leftInvert));
-            rightPoints.push(generateWaveValue(rightWave, t * rightCycles, rightPhase, rightInvert));
-        }
-
-        // Combine left and right into stereo points as [x, y] arrays
-        const stereoPoints = leftPoints.map((leftVal, i) => [leftVal, rightPoints[i]]);
-
+        // Set base frequency and create waveform
+        audioEngine.setFrequency(baseFrequency);
         audioEngine.createWaveform(stereoPoints);
-    }
-
-    function generateWaveValue(type, cycles, phaseShift = 0, invert = false) {
-        // Apply phase shift (convert degrees to cycles)
-        const shiftedCycles = cycles + (phaseShift / 360);
-        const phase = shiftedCycles * 2 * Math.PI;
-
-        let value;
-        switch(type) {
-            case 'sine':
-                value = Math.sin(phase);
-                break;
-            case 'square':
-                value = Math.sin(phase) >= 0 ? 1 : -1;
-                break;
-            case 'sawtooth':
-                const t = shiftedCycles - Math.floor(shiftedCycles);
-                value = 2 * (t - 0.5);
-                break;
-            case 'triangle':
-                const t2 = shiftedCycles - Math.floor(shiftedCycles);
-                value = 4 * Math.abs(t2 - 0.5) - 1;
-                break;
-            default:
-                value = 0;
-        }
-
-        // Apply inversion
-        return invert ? -value : value;
     }
 
     // Generate default sine wave when component mounts and audio starts playing
