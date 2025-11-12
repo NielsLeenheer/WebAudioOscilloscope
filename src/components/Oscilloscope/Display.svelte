@@ -1,15 +1,12 @@
 <script>
-    import { onMount, onDestroy } from 'svelte';
     import Controls from './Controls.svelte';
     import Physics from './Physics.svelte';
     import Grid from './Grid.svelte';
     import Visualiser from './Visualiser.svelte';
-    import { MicrophoneInput } from '../../utils/microphoneInput.js';
 
-    let { audioEngine, isPlaying, inputSource, isPowered, mode = $bindable() } = $props();
+    let { audioEngine, isPlaying, inputSource, isPowered, micInput, mode = $bindable() } = $props();
 
     let visualiser;
-    let micInput = new MicrophoneInput();
 
     // Physics parameters (adjustable)
     let forceMultiplier = $state(0.3);
@@ -33,42 +30,6 @@
     let amplDivB = $state(0); // Channel B amplification (calculated by Controls)
     let positionA = $state(0); // Channel A position (managed by Controls)
     let positionB = $state(0); // Channel B position (managed by Controls)
-
-    async function startMicrophoneInput() {
-        try {
-            await micInput.start({
-                fftSize: 16384,
-                echoCancellation: false,
-                noiseSuppression: false,
-                autoGainControl: false
-            });
-        } catch (error) {
-            console.error('Error accessing microphone:', error);
-            alert('Could not access microphone. Please check permissions.');
-            inputSource = 'generated';
-        }
-    }
-
-    function stopMicrophoneInput() {
-        micInput.stop();
-    }
-
-    onMount(() => {
-        // Microphone setup handled by effects
-    });
-
-    onDestroy(() => {
-        stopMicrophoneInput();
-    });
-
-    // React to input source changes
-    $effect(() => {
-        if (inputSource === 'microphone') {
-            startMicrophoneInput();
-        } else {
-            stopMicrophoneInput();
-        }
-    });
 </script>
 
 <div class="display-panel">
