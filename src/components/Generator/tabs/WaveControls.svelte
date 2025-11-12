@@ -99,13 +99,13 @@
 
             <div class="controls-row">
                 <div class="control-item slider-item">
-                    <label>Frequency:</label>
+                    <label>Frequency</label>
                     <input type="range" bind:value={rightFrequency} min="20" max="2000" step="1">
                     <span class="value-display">{rightFrequency} Hz</span>
                 </div>
 
                 <div class="control-item slider-item">
-                    <label>Phase Shift:</label>
+                    <label>Phase Shift</label>
                     <input type="range" bind:value={rightPhase} min="0" max="360" step="1">
                     <span class="value-display">{rightPhase}°</span>
                 </div>
