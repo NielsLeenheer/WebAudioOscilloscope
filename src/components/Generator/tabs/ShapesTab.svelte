@@ -11,6 +11,15 @@
         generateSpiral,
         generateLissajous
     } from '../../../utils/shapes.js';
+    import CircleIcon from '../../../assets/icons/shape-circle.svg?raw';
+    import SquareIcon from '../../../assets/icons/shape-square.svg?raw';
+    import TriangleIcon from '../../../assets/icons/shape-triangle.svg?raw';
+    import StarIcon from '../../../assets/icons/shape-star.svg?raw';
+    import HeartIcon from '../../../assets/icons/shape-heart.svg?raw';
+    import SpiralIcon from '../../../assets/icons/shape-spiral.svg?raw';
+    import Lissajous32Icon from '../../../assets/icons/shape-lissajous-3-2.svg?raw';
+    import Lissajous54Icon from '../../../assets/icons/shape-lissajous-5-4.svg?raw';
+    import LissajousCustomIcon from '../../../assets/icons/shape-lissajous-custom.svg?raw';
 
     let { audioEngine, isPlaying, isActive = false } = $props();
 
@@ -21,15 +30,15 @@
     let hasAutoDrawn = $state(false);
 
     const shapeTabs = [
-        { id: 'circle', label: 'Circle' },
-        { id: 'square', label: 'Square' },
-        { id: 'triangle', label: 'Triangle' },
-        { id: 'star', label: 'Star' },
-        { id: 'heart', label: 'Heart' },
-        { id: 'spiral', label: 'Spiral' },
-        { id: 'liss32', label: 'Lissajous 3:2' },
-        { id: 'liss54', label: 'Lissajous 5:4' },
-        { id: 'custom', label: 'Custom Lissajous', anchorName: 'custom-liss-anchor' }
+        { id: 'circle', label: 'Circle', icon: CircleIcon },
+        { id: 'square', label: 'Square', icon: SquareIcon },
+        { id: 'triangle', label: 'Triangle', icon: TriangleIcon },
+        { id: 'star', label: 'Star', icon: StarIcon },
+        { id: 'heart', label: 'Heart', icon: HeartIcon },
+        { id: 'spiral', label: 'Spiral', icon: SpiralIcon },
+        { id: 'liss32', label: 'Lissajous 3:2', icon: Lissajous32Icon },
+        { id: 'liss54', label: 'Lissajous 5:4', icon: Lissajous54Icon },
+        { id: 'custom', label: 'Custom Lissajous', icon: LissajousCustomIcon, anchorName: 'custom-liss-anchor' }
     ];
 
     const shapeGenerators = {
@@ -65,14 +74,6 @@
         }
     }
 
-    function applyCustomLissajous() {
-        customDialog?.close();
-        const generator = shapeGenerators.custom;
-        if (generator) {
-            drawShape(generator);
-        }
-    }
-
     // Auto-draw circle when tab becomes active
     $effect(() => {
         if (isActive && !hasAutoDrawn && isPlaying) {
@@ -80,6 +81,16 @@
             handleShapeChange('circle');
         } else if (!isActive) {
             hasAutoDrawn = false;
+        }
+    });
+
+    // Auto-apply custom lissajous when sliders change
+    $effect(() => {
+        if (selectedShape === 'custom' && isPlaying) {
+            const generator = shapeGenerators.custom;
+            if (generator) {
+                drawShape(generator);
+            }
         }
     });
 </script>
@@ -121,10 +132,6 @@
                     step="1"
                 >
             </div>
-
-            <button class="apply-button" onclick={applyCustomLissajous}>
-                Apply
-            </button>
         </div>
     {/snippet}
 </Dialog>
@@ -156,22 +163,5 @@
 
     .slider-group input[type="range"] {
         width: 100%;
-    }
-
-    .apply-button {
-        width: 100%;
-        padding: 10px;
-        background: #1976d2;
-        color: white;
-        border: none;
-        border-radius: 4px;
-        cursor: pointer;
-        font-family: system-ui;
-        font-size: 11pt;
-        transition: all 0.2s;
-    }
-
-    .apply-button:hover {
-        background: #1565c0;
     }
 </style>
