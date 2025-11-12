@@ -25,9 +25,26 @@
     let leftInvert = $state(false);
     let rightInvert = $state(false);
 
-    // Calculate greatest common divisor
-    function gcd(a, b) {
-        return b === 0 ? a : gcd(b, a % b);
+    // Approximate a decimal as a fraction with limited denominator
+    function approximateFraction(decimal, maxDenominator = 20) {
+        let bestNumerator = 1;
+        let bestDenominator = 1;
+        let bestError = Math.abs(decimal - 1);
+
+        for (let denominator = 1; denominator <= maxDenominator; denominator++) {
+            const numerator = Math.round(decimal * denominator);
+            const error = Math.abs(decimal - numerator / denominator);
+
+            if (error < bestError) {
+                bestError = error;
+                bestNumerator = numerator;
+                bestDenominator = denominator;
+            }
+
+            if (error < 0.001) break; // Close enough
+        }
+
+        return { numerator: bestNumerator, denominator: bestDenominator };
     }
 
     function updateWaves() {
@@ -39,22 +56,13 @@
         const samples = 1000;
 
         // Calculate cycle counts to ensure complete patterns
-        // For clean Lissajous figures, we need integer cycle ratios
-        const leftFreqInt = Math.round(leftFrequency);
-        const rightFreqInt = Math.round(rightFrequency);
-        const divisor = gcd(leftFreqInt, rightFreqInt);
+        // Use ratio approximation to avoid huge cycle counts for similar frequencies
+        const ratio = rightFrequency / leftFrequency;
+        const fraction = approximateFraction(ratio, 20);
 
-        // Simplify the ratio to smallest integers
-        let leftCycles = leftFreqInt / divisor;
-        let rightCycles = rightFreqInt / divisor;
-
-        // Limit maximum cycles to keep pattern reasonable
-        const maxCycles = 20;
-        if (leftCycles > maxCycles || rightCycles > maxCycles) {
-            const scale = maxCycles / Math.max(leftCycles, rightCycles);
-            leftCycles = Math.max(1, Math.round(leftCycles * scale));
-            rightCycles = Math.max(1, Math.round(rightCycles * scale));
-        }
+        // Use the fraction to determine cycle counts
+        let leftCycles = fraction.denominator;
+        let rightCycles = fraction.numerator;
 
         // Generate waveforms
         const leftPoints = [];
