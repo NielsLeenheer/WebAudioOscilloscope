@@ -551,7 +551,8 @@ Full SVG example:
 
         font-family: monospace;
         font-size: 13px;
-        color: #333;
+        color: #666;
+        line-height: 1.6;
 
         overflow-x: auto;
         overflow-y: auto;
