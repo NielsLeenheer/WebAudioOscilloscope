@@ -1,5 +1,6 @@
 <script>
     import { onMount } from 'svelte';
+    import { get } from 'svelte/store';
     import Card from '../../Common/Card.svelte';
     import TabBar from '../../Common/TabBar.svelte';
     import { generateStereoWaveform } from '../../../utils/waveGenerator.js';
@@ -27,7 +28,7 @@
     let rightInvert = $state(false);
 
     function updateWaves() {
-        if (!audioEngine.isPlaying) return;
+        if (!get(audioEngine.isPlaying)) return;
 
         // Generate stereo waveform using helper library
         const { stereoPoints, baseFrequency } = generateStereoWaveform({
@@ -48,14 +49,14 @@
 
     // Generate default sine wave when component mounts and audio starts playing
     onMount(() => {
-        if (audioEngine.isPlaying) {
+        if (get(audioEngine.isPlaying)) {
             updateWaves();
         }
     });
 
     // Update waves when parameters change and audio is playing
     $effect(() => {
-        if (audioEngine.isPlaying) {
+        if ($audioEngine.isPlaying) {
             updateWaves();
         }
     });

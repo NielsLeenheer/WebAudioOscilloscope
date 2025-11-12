@@ -1,4 +1,5 @@
 <script>
+    import { get } from 'svelte/store';
     import Button from '../../Common/Button.svelte';
     import PathEditor from '../../Common/PathEditor.svelte';
     import ImageUpload from '../../Common/ImageUpload.svelte';
@@ -13,14 +14,14 @@
 
     // Auto-update scope whenever path changes and playing
     $effect(() => {
-        if (audioEngine.isPlaying && currentNormalizedPoints) {
+        if ($audioEngine.isPlaying && currentNormalizedPoints) {
             updateScope();
         }
     });
 
     function handlePathChange(normalizedPoints) {
         currentNormalizedPoints = normalizedPoints;
-        if (audioEngine.isPlaying && normalizedPoints) {
+        if (get(audioEngine.isPlaying) && normalizedPoints) {
             updateScope();
         }
     }

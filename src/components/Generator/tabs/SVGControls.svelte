@@ -1,4 +1,5 @@
 <script>
+    import { get } from 'svelte/store';
     import { parseSVGPath } from '../../../utils/shapes.js';
     import { svgExamples } from '../../../utils/svgExamples/index.js';
     import { onMount } from 'svelte';
@@ -44,7 +45,7 @@
                     audioEngine.restoreDefaultFrequency();
                     audioEngine.createWaveform(normalized);
                 },
-                () => audioEngine.isPlaying
+                () => get(audioEngine.isPlaying)
             );
         } catch (error) {
             console.error('Error starting continuous sampling:', error);
@@ -88,7 +89,7 @@
     }
 
     function applyInput(value) {
-        if (!audioEngine.isPlaying || !isValid) return;
+        if (!get(audioEngine.isPlaying) || !isValid) return;
 
         const data = value.trim();
         if (!data) return;
@@ -141,7 +142,7 @@
 
             validateInput(svgInput);
 
-            if (audioEngine.isPlaying && isValid) {
+            if (get(audioEngine.isPlaying) && isValid) {
                 applyInput(svgInput);
             }
         }
@@ -159,7 +160,7 @@
 
     // Stop continuous sampling when playback stops
     $effect(() => {
-        if (!audioEngine.isPlaying) {
+        if (!$audioEngine.isPlaying) {
             stopContinuousSampling();
         }
     });

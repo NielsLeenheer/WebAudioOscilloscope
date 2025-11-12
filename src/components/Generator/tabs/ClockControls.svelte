@@ -4,7 +4,7 @@
     let { audioEngine, isActive } = $props();
 
     $effect(() => {
-        if (isActive && audioEngine.isPlaying) {
+        if (isActive && $audioEngine.isPlaying) {
             audioEngine.startClock(generateClockPoints);
         }
     });

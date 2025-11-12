@@ -1,4 +1,5 @@
 <script>
+    import { get } from 'svelte/store';
     import Card from '../../Common/Card.svelte';
     import TabBar from '../../Common/TabBar.svelte';
     import Dialog from '../../Common/Dialog.svelte';
@@ -54,7 +55,7 @@
     };
 
     function drawShape(shapeGenerator) {
-        if (!audioEngine.isPlaying) return;
+        if (!get(audioEngine.isPlaying)) return;
         // Restore Settings tab default frequency before generating
         audioEngine.restoreDefaultFrequency();
         const points = shapeGenerator();
@@ -76,7 +77,7 @@
 
     // Auto-draw circle when tab becomes active
     $effect(() => {
-        if (isActive && !hasAutoDrawn && audioEngine.isPlaying) {
+        if (isActive && !hasAutoDrawn && $audioEngine.isPlaying) {
             hasAutoDrawn = true;
             handleShapeChange('circle');
         } else if (!isActive) {
@@ -86,7 +87,7 @@
 
     // Auto-apply custom lissajous when sliders change
     $effect(() => {
-        if (selectedShape === 'custom' && audioEngine.isPlaying) {
+        if (selectedShape === 'custom' && $audioEngine.isPlaying) {
             const generator = shapeGenerators.custom;
             if (generator) {
                 drawShape(generator);

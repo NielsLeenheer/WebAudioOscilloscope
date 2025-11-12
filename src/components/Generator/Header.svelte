@@ -7,7 +7,7 @@
 </script>
 
 <header>
-    {#if !audioEngine.isPlaying}
+    {#if !$audioEngine.isPlaying}
     <button id="start" onclick={() => start()}>
         <Icon data={powerIcon} />
         POWER ON
@@ -21,7 +21,7 @@
 
     <h1>Generator</h1>
 
-    {#if audioEngine.isPlaying}
+    {#if $audioEngine.isPlaying}
     <img src={audioPlayingGif} alt="Audio playing" class="audio-playing" />
     {/if}
 </header>
