@@ -44,8 +44,8 @@
     .tab-bar {
         display: flex;
         gap: 4px;
-        background: #f5f5f5;
-        padding: 4px;
+        background: #eee;
+        /* padding: 4px; */
         border-radius: 6px;
     }
 
@@ -54,7 +54,7 @@
         padding: 8px 12px;
         background: transparent;
         border: none;
-        border-radius: 4px;
+        border-radius: 6px;
         cursor: pointer;
         transition: all 0.2s;
         font-family: system-ui;
@@ -71,17 +71,15 @@
     }
 
     .tab.active {
-        background: white;
-        color: #1976d2;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        background: #1976d2;
+        color: #bbdefb;
     }
 
     .tab-icon {
         display: flex;
         align-items: center;
         justify-content: center;
-        width: 48px;
-        height: 24px;
+        height: 20px;
     }
 
     .tab-icon :global(svg) {

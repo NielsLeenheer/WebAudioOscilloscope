@@ -99,7 +99,7 @@
 </script>
 
 <div class="channels-container">
-    <Card title="Left Channel">
+    <Card>
         <div class="card-grid">
             <div class="wave-selector">
                 <TabBar tabs={waveTabs} bind:activeTab={leftWave} />
@@ -126,7 +126,7 @@
         </div>
     </Card>
 
-    <Card title="Right Channel">
+    <Card>
         <div class="card-grid">
             <div class="wave-selector">
                 <TabBar tabs={waveTabs} bind:activeTab={rightWave} />
@@ -175,8 +175,9 @@
 
     .controls-row {
         display: grid;
-        grid-template-columns: repeat(3, 1fr);
-        gap: 16px;
+        grid-template-columns: 1fr 1fr auto;
+        gap: 8px 36px;
+        width: 100%;
     }
 
     .control-item {
@@ -195,7 +196,7 @@
     }
 
     .control-item label {
-        font-size: 12px;
+        font-size: 11px;
         font-weight: 600;
         color: #666;
         text-transform: uppercase;
@@ -208,9 +209,10 @@
     }
 
     .value-display {
-        font-size: 11pt;
+        font-size: 9pt;
         color: #666;
         white-space: nowrap;
+        margin: 0;
     }
 
     .checkbox-item input[type="checkbox"] {
