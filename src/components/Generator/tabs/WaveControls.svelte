@@ -10,6 +10,7 @@
     import TriangleIcon from '../../../assets/icons/wave-triangle.svg?raw';
 
     let { audioEngine } = $props();
+    let isPlaying = audioEngine.isPlaying;
 
     const waveTabs = [
         { id: 'sine', label: 'Sine', icon: SineIcon },
@@ -56,7 +57,7 @@
 
     // Update waves when parameters change and audio is playing
     $effect(() => {
-        if ($audioEngine.isPlaying) {
+        if ($isPlaying) {
             updateWaves();
         }
     });

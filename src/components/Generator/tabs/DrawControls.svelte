@@ -6,6 +6,7 @@
     import EraseIcon from '../../../assets/icons/erase.svg?raw';
 
     let { audioEngine } = $props();
+    let isPlaying = audioEngine.isPlaying;
 
     let pathEditor;
     let backgroundImage = $state(null);
@@ -14,7 +15,7 @@
 
     // Auto-update scope whenever path changes and playing
     $effect(() => {
-        if ($audioEngine.isPlaying && currentNormalizedPoints) {
+        if ($isPlaying && currentNormalizedPoints) {
             updateScope();
         }
     });

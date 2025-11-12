@@ -4,10 +4,11 @@
     import audioPlayingGif from '../../assets/audio-playing.gif';
 
     let { audioEngine, start, stop } = $props();
+    let isPlaying = audioEngine.isPlaying;
 </script>
 
 <header>
-    {#if !$audioEngine.isPlaying}
+    {#if !$isPlaying}
     <button id="start" onclick={() => start()}>
         <Icon data={powerIcon} />
         POWER ON
@@ -21,7 +22,7 @@
 
     <h1>Generator</h1>
 
-    {#if $audioEngine.isPlaying}
+    {#if $isPlaying}
     <img src={audioPlayingGif} alt="Audio playing" class="audio-playing" />
     {/if}
 </header>

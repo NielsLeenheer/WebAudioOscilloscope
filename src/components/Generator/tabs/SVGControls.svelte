@@ -13,6 +13,7 @@
     } from '../../../utils/svgSampler.js';
 
     let { audioEngine, animationFPS = $bindable(30), numSamples = $bindable(200) } = $props();
+    let isPlaying = audioEngine.isPlaying;
 
     let svgInput = $state('');
     let selectedExample = $state('star');
@@ -160,7 +161,7 @@
 
     // Stop continuous sampling when playback stops
     $effect(() => {
-        if (!$audioEngine.isPlaying) {
+        if (!$isPlaying) {
             stopContinuousSampling();
         }
     });
