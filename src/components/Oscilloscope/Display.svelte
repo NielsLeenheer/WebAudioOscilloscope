@@ -4,11 +4,11 @@
     import sineIcon from '../../assets/icons/glyph/sine.svg?raw';
     import Controls from './Controls.svelte';
     import PhysicsDialog from './PhysicsDialog.svelte';
+    import Grid from './Grid.svelte';
 
     let { audioEngine, isPlaying, inputSource, isPowered, mode = $bindable() } = $props();
 
     let canvas;
-    let gridCanvas;
     let physicsDialog;
     let animationId = null;
     let leftData = null;
@@ -109,83 +109,7 @@
         console.log('Microphone input stopped');
     }
 
-    function drawGrid() {
-        if (!gridCanvas) return;
-
-        const ctx = gridCanvas.getContext('2d');
-        const canvasWidth = 600; // Full canvas with overscan
-        const canvasHeight = 600;
-        const visibleWidth = 400; // Visible screen area
-        const visibleHeight = 400;
-        const overscan = (canvasWidth - visibleWidth) / 2; // 100px on each side
-
-        // Clear canvas
-        ctx.clearRect(0, 0, canvasWidth, canvasHeight);
-
-        // Grid style - black lines
-        ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
-        ctx.lineWidth = 1;
-
-        // Draw 10x10 grid within the visible area (offset by overscan)
-        const divisions = 10;
-        const divSize = visibleWidth / divisions;
-
-        // Vertical lines
-        for (let i = 0; i <= divisions; i++) {
-            const x = overscan + i * divSize;
-            ctx.beginPath();
-            ctx.moveTo(x, overscan);
-            ctx.lineTo(x, overscan + visibleHeight);
-            ctx.stroke();
-        }
-
-        // Horizontal lines
-        for (let i = 0; i <= divisions; i++) {
-            const y = overscan + i * divSize;
-            ctx.beginPath();
-            ctx.moveTo(overscan, y);
-            ctx.lineTo(overscan + visibleWidth, y);
-            ctx.stroke();
-        }
-
-        // Draw tick marks on center lines
-        // 5 ticks per division = 0.2 step each
-        const ticksPerDiv = 5;
-        const tickLength = 4;
-        const centerX = overscan + visibleWidth / 2;
-        const centerY = overscan + visibleHeight / 2;
-
-        ctx.strokeStyle = 'rgba(0, 0, 0, 0.7)';
-        ctx.lineWidth = 1;
-
-        // Horizontal center line ticks (Y = center)
-        for (let i = 0; i <= divisions * ticksPerDiv; i++) {
-            const x = overscan + (i / ticksPerDiv) * divSize;
-            // Skip if this is a major grid line
-            if (i % ticksPerDiv !== 0) {
-                ctx.beginPath();
-                ctx.moveTo(x, centerY - tickLength);
-                ctx.lineTo(x, centerY + tickLength);
-                ctx.stroke();
-            }
-        }
-
-        // Vertical center line ticks (X = center)
-        for (let i = 0; i <= divisions * ticksPerDiv; i++) {
-            const y = overscan + (i / ticksPerDiv) * divSize;
-            // Skip if this is a major grid line
-            if (i % ticksPerDiv !== 0) {
-                ctx.beginPath();
-                ctx.moveTo(centerX - tickLength, y);
-                ctx.lineTo(centerX + tickLength, y);
-                ctx.stroke();
-            }
-        }
-    }
-
     onMount(() => {
-        // Draw grid
-        drawGrid();
 
         // Initialize Web Worker with OffscreenCanvas
         worker = new Worker(new URL('../../workers/physics-worker.js', import.meta.url), { type: 'module' });
@@ -414,12 +338,7 @@
                 class="scope-canvas"
                 style="filter: blur({Math.abs(focus) * 3}px);"
             ></canvas>
-            <canvas
-                bind:this={gridCanvas}
-                width="600"
-                height="600"
-                class="grid-canvas"
-            ></canvas>
+            <Grid />
         </div>
     </div>
     <Controls
@@ -512,17 +431,6 @@
         left: -100px;
         display: block;
         background: #1a1f1a;
-        border-radius: 8px;
-    }
-
-    .grid-canvas {
-        position: absolute;
-        /* Offset by -100px to align with scope canvas */
-        top: -100px;
-        left: -100px;
-        display: block;
-        background: transparent;
-        pointer-events: none;
         border-radius: 8px;
     }
 </style>
