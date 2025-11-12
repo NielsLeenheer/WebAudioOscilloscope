@@ -2,6 +2,7 @@
     import { parseSVGPath } from '../../../utils/shapes.js';
     import { svgExamples } from '../../../utils/svgExamples/index.js';
     import { onMount } from 'svelte';
+    import Preview from '../../Common/Preview.svelte';
 
     let { audioEngine, isPlaying, animationFPS = $bindable(30), numSamples = $bindable(200) } = $props();
 
@@ -12,8 +13,7 @@
     let validationTimeout = null;
     let applyTimeout = null;
     let svgContainer;
-    let previewCanvas;
-    let previewCtx;
+    let normalizedPoints = $state([]);
 
     // Animation interval
     let samplingInterval = null;
@@ -113,81 +113,17 @@
         return points;
     }
 
-    // Draw extracted points on preview canvas
-    function drawPreview(points, bbox) {
-        if (!previewCanvas) return;
+    // Convert raw points to normalized points for preview and audio engine
+    function normalizePoints(points, bbox) {
+        const centerX = bbox.x + bbox.width / 2;
+        const centerY = bbox.y + bbox.height / 2;
+        const scale = Math.max(bbox.width, bbox.height);
 
-        // Initialize context if needed
-        if (!previewCtx) {
-            previewCtx = previewCanvas.getContext('2d');
-        }
-
-        const canvas = previewCanvas;
-        const ctx = previewCtx;
-
-        // Clear canvas (transparent)
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-        if (points.length === 0) return;
-
-        // Calculate scaling to fit canvas while maintaining aspect ratio
-        const padding = 10;
-        const availableWidth = canvas.width - padding * 2;
-        const availableHeight = canvas.height - padding * 2;
-
-        const bboxWidth = bbox.width || 1;
-        const bboxHeight = bbox.height || 1;
-        const scale = Math.min(availableWidth / bboxWidth, availableHeight / bboxHeight);
-
-        const centerX = bbox.x + bboxWidth / 2;
-        const centerY = bbox.y + bboxHeight / 2;
-        const canvasCenterX = canvas.width / 2;
-        const canvasCenterY = canvas.height / 2;
-
-        // Draw points as a path with 70% opacity
-        ctx.strokeStyle = 'rgba(60, 60, 60, 0.7)';
-        ctx.lineWidth = 1.5;
-
-        ctx.beginPath();
-        let firstPoint = true;
-        let prevCanvasX = 0;
-        let prevCanvasY = 0;
-
-        for (let i = 0; i < points.length; i++) {
-            const [x, y] = points[i];
-            const canvasX = canvasCenterX + (x - centerX) * scale;
-            const canvasY = canvasCenterY + (y - centerY) * scale;
-
-            if (firstPoint) {
-                ctx.moveTo(canvasX, canvasY);
-                firstPoint = false;
-            } else {
-                // Calculate distance from previous point
-                const dx = canvasX - prevCanvasX;
-                const dy = canvasY - prevCanvasY;
-                const distance = Math.sqrt(dx * dx + dy * dy);
-
-                // If it's a huge leap (more than 50 pixels), draw with 10% opacity
-                if (distance > 50) {
-                    ctx.stroke(); // Finish current path
-                    ctx.strokeStyle = 'rgba(60, 60, 60, 0.1)';
-                    ctx.beginPath();
-                    ctx.moveTo(prevCanvasX, prevCanvasY);
-                    ctx.lineTo(canvasX, canvasY);
-                    ctx.stroke();
-                    ctx.strokeStyle = 'rgba(60, 60, 60, 0.7)';
-                    ctx.beginPath();
-                    ctx.moveTo(canvasX, canvasY);
-                } else {
-                    ctx.lineTo(canvasX, canvasY);
-                }
-            }
-
-            prevCanvasX = canvasX;
-            prevCanvasY = canvasY;
-        }
-
-        ctx.stroke();
+        // Normalize to -1 to 1 range
+        return points.map(([x, y]) => [
+            ((x - centerX) / scale) * 2,
+            -((y - centerY) / scale) * 2  // Flip Y for oscilloscope coordinates
+        ]);
     }
 
     // Parse full SVG markup and extract all paths (static, no animation)
@@ -235,20 +171,8 @@
         // Get bounding box to normalize coordinates
         const bbox = svgElement.getBBox();
 
-        // Draw preview with raw points
-        drawPreview(allPoints, bbox);
-
-        const centerX = bbox.x + bbox.width / 2;
-        const centerY = bbox.y + bbox.height / 2;
-        const scale = Math.max(bbox.width, bbox.height);
-
-        // Normalize to -1 to 1 range
-        const normalizedPoints = allPoints.map(([x, y]) => [
-            ((x - centerX) / scale) * 2,
-            -((y - centerY) / scale) * 2  // Flip Y for oscilloscope coordinates
-        ]);
-
-        return normalizedPoints;
+        // Normalize points for preview and audio engine
+        return normalizePoints(allPoints, bbox);
     }
 
     // Sample current frame from live animations
@@ -313,18 +237,13 @@
 
                 if (framePoints.length === 0) return;
 
-                // Draw preview with raw points
-                drawPreview(framePoints, bbox);
-
-                // Normalize points
-                const normalizedPoints = framePoints.map(([x, y]) => [
-                    ((x - centerX) / scale) * 2,
-                    -((y - centerY) / scale) * 2
-                ]);
+                // Normalize points for preview and audio engine
+                const normalized = normalizePoints(framePoints, bbox);
+                normalizedPoints = normalized;
 
                 // Update waveform with current frame
                 audioEngine.restoreDefaultFrequency();
-                audioEngine.createWaveform(normalizedPoints);
+                audioEngine.createWaveform(normalized);
             } catch (error) {
                 console.error('Error sampling animation frame:', error);
             }
@@ -355,9 +274,9 @@
                 parseSVGPath(data, numSamples, true);
                 // Update preview for path data
                 const { points, bbox } = extractPathPoints(data, numSamples);
-                drawPreview(points, bbox);
+                normalizedPoints = normalizePoints(points, bbox);
             } else {
-                parseSVGMarkupStatic(data, numSamples);
+                normalizedPoints = parseSVGMarkupStatic(data, numSamples);
             }
             validationError = '';
             isValid = true;
@@ -394,9 +313,8 @@
 
         try {
             const valid = await validateInput();
-            if (valid) {
-                const points = parseSVGPath(data, numSamples, true);
-                audioEngine.createWaveform(points);
+            if (valid && normalizedPoints.length > 0) {
+                audioEngine.createWaveform(normalizedPoints);
             }
         } catch (error) {
             console.error('Error drawing SVG:', error);
@@ -455,11 +373,6 @@
     }
 
     onMount(() => {
-        // Initialize canvas context
-        if (previewCanvas) {
-            previewCtx = previewCanvas.getContext('2d');
-        }
-
         // Load initial example
         handleSelectChange();
 
@@ -479,12 +392,7 @@
 
 <div class="svg-controls">
     <div class="header">
-        <canvas
-            bind:this={previewCanvas}
-            width="150"
-            height="150"
-            class="preview-canvas"
-        ></canvas>
+        <Preview points={normalizedPoints} width={150} height={150} />
 
         <select bind:value={selectedExample} onchange={handleSelectChange}>
             <option value="custom">Custom...</option>
@@ -530,11 +438,6 @@ Full SVG example:
 
     select {
         border: 2px solid #ccc;
-    }
-
-    .preview-canvas {
-        width: 150px;
-        height: 150px;
     }
 
     pre[contenteditable] {
