@@ -477,34 +477,37 @@
     });
 </script>
 
-<div class="control-group">
-    <!-- Preview canvas - absolutely positioned top right -->
-    <canvas
-        bind:this={previewCanvas}
-        width="150"
-        height="150"
-        style="position: absolute; top: 0; right: 0; width: 150px; height: 150px; pointer-events: none; right: 10px;"
-    ></canvas>
+<div class="svg-controls">
+    <div class="header">
+        <select bind:value={selectedExample} onchange={handleSelectChange}>
+            <option value="custom">Custom...</option>
+            <option value="star">Star</option>
+            <option value="html5">HTML5 Logo</option>
+            <option value="heart_svg">Heart (SVG)</option>
+            <option value="lightning">Lightning Bolt</option>
+            <option value="music">Music Note</option>
+            <option value="rocket">Rocket</option>
+            <option value="house">House</option>
+            <option value="smiley">Smiley Face</option>
+            <option value="infinity">Infinity Symbol</option>
+            <option value="peace">Peace Sign</option>
+            <option value="beyondtellerrand">Beyond Tellerrand</option>
+        </select>
 
-    <select bind:value={selectedExample} onchange={handleSelectChange}>
-        <option value="custom">Custom...</option>
-        <option value="star">Star</option>
-        <option value="html5">HTML5 Logo</option>
-        <option value="heart_svg">Heart (SVG)</option>
-        <option value="lightning">Lightning Bolt</option>
-        <option value="music">Music Note</option>
-        <option value="rocket">Rocket</option>
-        <option value="house">House</option>
-        <option value="smiley">Smiley Face</option>
-        <option value="infinity">Infinity Symbol</option>
-        <option value="peace">Peace Sign</option>
-        <option value="beyondtellerrand">Beyond Tellerrand</option>
-    </select>
+        <!-- Preview canvas - absolutely positioned top right -->
+        <canvas
+            bind:this={previewCanvas}
+            width="150"
+            height="150"
+            style="position: absolute; top: 0; right: 0; width: 150px; height: 150px; pointer-events: none; right: 10px;"
+        ></canvas>
+    </div>
 
-    <textarea
-        bind:value={svgInput}
+    <pre
+        contenteditable="plaintext-only"
+        bind:textContent={svgInput}
         oninput={handleTextareaInput}
-        placeholder="Paste SVG path data or full SVG markup here.
+        data-placeholder="Paste SVG path data or full SVG markup here.
 
 Path data example:
 M 10,10 L 90,90 L 10,90 Z
@@ -513,30 +516,31 @@ Full SVG example:
 <svg viewBox='0 0 100 100'>
   <circle cx='50' cy='50' r='40'/>
 </svg>"
-    ></textarea>
+    ></pre>
 </div>
 
 <!-- Hidden container for rendering and extracting SVG -->
 <div bind:this={svgContainer} style="position: fixed; left: 0; top: 0; width: 500px; height: 500px; opacity: 0; pointer-events: none; z-index: -9999;"></div>
 
 <style>
-    .control-group {
-        background: none;
-        padding: 20px;
+    .svg-controls {
+        display: grid;
+        grid-template-rows: auto 1fr;
         height: 100%;
-        display: flex;
-        flex-direction: column;
-        gap: 20px;
+    }
+
+    .header {
+        position: relative;
+        padding: 20px;
     }
 
     select {
         border: 2px solid #ccc;
-        flex-shrink: 0;
     }
 
-    textarea {
-        flex: 1;
-        margin-right: 160px;
+    pre[contenteditable] {
+        padding: 20px;
+        margin: 0;
 
         font-family: monospace;
         font-size: 13px;
@@ -546,15 +550,12 @@ Full SVG example:
         overflow-y: auto;
         white-space: pre;
 
-        padding: 10px;
-        border: 1px solid #ccc;
-        border-radius: 4px;
-        resize: none;
         outline: none;
     }
 
-    textarea::placeholder {
+    pre[contenteditable]:empty:before {
+        content: attr(data-placeholder);
         color: #999;
-        white-space: pre;
+        pointer-events: none;
     }
 </style>
