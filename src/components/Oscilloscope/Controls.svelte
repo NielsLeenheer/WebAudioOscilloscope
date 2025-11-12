@@ -318,17 +318,13 @@
         transition: all 0.2s;
         line-height: 1;
         height: 100%;
+        padding: 0;
+        justify-content: center;
     }
     .channel-btn:hover:not(:disabled) {
         background: transparent;
         color: #4CAF50;
     }
-
-    /* .channel-btn:hover:not(:disabled) {
-        background: #333;
-        color: #4CAF50;
-    } */
-
     .channel-btn.active, 
     .channel-btn.active:hover:not(:disabled) {
         background: #4CAF50;
