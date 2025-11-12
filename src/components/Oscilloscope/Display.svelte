@@ -71,7 +71,7 @@
     });
 </script>
 
-<div class="preview-panel">
+<div class="display-panel">
     <Physics
         bind:forceMultiplier
         bind:damping
@@ -127,7 +127,7 @@
 </div>
 
 <style>
-    .preview-panel {
+    .display-panel {
         background: transparent;
         display: flex;
         flex-direction: column;
