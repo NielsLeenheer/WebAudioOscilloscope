@@ -494,12 +494,11 @@
             <option value="beyondtellerrand">Beyond Tellerrand</option>
         </select>
 
-        <!-- Preview canvas - absolutely positioned top right -->
         <canvas
             bind:this={previewCanvas}
             width="150"
             height="150"
-            style="position: absolute; top: 0; right: 0; width: 150px; height: 150px; pointer-events: none; right: 10px;"
+            class="preview-canvas"
         ></canvas>
     </div>
 
@@ -536,6 +535,20 @@ Full SVG example:
 
     select {
         border: 2px solid #ccc;
+    }
+
+    .preview-canvas {
+        position: absolute;
+        top: 20px;
+        right: 20px;
+        width: 150px;
+        height: 150px;
+        pointer-events: none;
+
+        background: rgba(255, 255, 255, 0.7);
+        backdrop-filter: blur(10px);
+        border-radius: 8px;
+        border: 1px solid rgba(0, 0, 0, 0.1);
     }
 
     pre[contenteditable] {
