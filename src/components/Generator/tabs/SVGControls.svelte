@@ -17,7 +17,6 @@
     let selectedExample = $state('star');
     let validationError = $state('');
     let isValid = $state(true);
-    let svgContainer;
     let normalizedPoints = $state([]);
 
     // Animation sampler
@@ -34,13 +33,10 @@
         // Stop any existing sampling
         stopContinuousSampling();
 
-        if (!svgContainer) return;
-
         try {
             sampler = createContinuousSampler(
                 markup,
                 samples,
-                svgContainer,
                 animationFPS,
                 (normalized) => {
                     normalizedPoints = normalized;
@@ -81,7 +77,7 @@
                 const { points, bbox } = extractPathPoints(data, numSamples);
                 normalizedPoints = normalizePoints(points, bbox);
             } else {
-                normalizedPoints = parseSVGMarkupStatic(data, numSamples, svgContainer);
+                normalizedPoints = parseSVGMarkupStatic(data, numSamples);
             }
             validationError = '';
             isValid = true;
@@ -200,9 +196,6 @@ Full SVG example:
 </svg>"
     />
 </div>
-
-<!-- Hidden container for rendering and extracting SVG -->
-<div bind:this={svgContainer} style="position: fixed; left: 0; top: 0; width: 500px; height: 500px; opacity: 0; pointer-events: none; z-index: -9999;"></div>
 
 <style>
     .svg-controls {

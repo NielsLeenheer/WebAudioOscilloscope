@@ -3,6 +3,29 @@
  * Handles SVG DOM creation and continuous path sampling for oscilloscope visualization
  */
 
+// Singleton container for SVG rendering
+let svgContainer = null;
+
+/**
+ * Get or create the hidden SVG container element
+ * @returns {HTMLElement} Container element
+ */
+function getContainer() {
+    if (!svgContainer) {
+        svgContainer = document.createElement('div');
+        svgContainer.style.position = 'fixed';
+        svgContainer.style.left = '0';
+        svgContainer.style.top = '0';
+        svgContainer.style.width = '500px';
+        svgContainer.style.height = '500px';
+        svgContainer.style.opacity = '0';
+        svgContainer.style.pointerEvents = 'none';
+        svgContainer.style.zIndex = '-9999';
+        document.body.appendChild(svgContainer);
+    }
+    return svgContainer;
+}
+
 /**
  * Normalize points to -1 to 1 range for oscilloscope coordinates
  * @param {Array<[number, number]>} points - Raw points as [x, y] pairs
@@ -124,13 +147,11 @@ export function extractPointsFromElement(element, samples) {
  * Parse full SVG markup and extract all paths (static, no animation)
  * @param {string} markup - Full SVG markup string
  * @param {number} samples - Number of samples per element
- * @param {HTMLElement} container - Container element for rendering SVG
  * @returns {Array<[number, number]>} Normalized points
  */
-export function parseSVGMarkupStatic(markup, samples, container) {
-    if (!container) {
-        throw new Error('Container element is required');
-    }
+export function parseSVGMarkupStatic(markup, samples) {
+    // Get or create the container
+    const container = getContainer();
 
     // Clear container and inject SVG
     container.innerHTML = markup;
@@ -204,16 +225,14 @@ export function sampleCurrentFrame(svgElement, elements, samples) {
  * Create a continuous sampler for animated SVGs
  * @param {string} markup - Full SVG markup string
  * @param {number} samples - Number of samples per frame
- * @param {HTMLElement} container - Container element for rendering SVG
  * @param {number} fps - Frames per second for sampling
  * @param {Function} onFrame - Callback function called with normalized points each frame
  * @param {Function} isPlayingGetter - Function that returns whether playback is active
  * @returns {Object} Sampler object with stop() method
  */
-export function createContinuousSampler(markup, samples, container, fps, onFrame, isPlayingGetter) {
-    if (!container) {
-        throw new Error('Container element is required');
-    }
+export function createContinuousSampler(markup, samples, fps, onFrame, isPlayingGetter) {
+    // Get or create the container
+    const container = getContainer();
 
     // Setup SVG
     container.innerHTML = markup;
