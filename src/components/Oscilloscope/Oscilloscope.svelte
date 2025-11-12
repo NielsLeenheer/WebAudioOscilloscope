@@ -48,7 +48,7 @@
 <div class="oscilloscope">
     <Header bind:isPowered />
     <InputSelector bind:inputSource bind:mode />
-    <Display {generatorInput} {inputSource} {isPowered} {micInput} bind:mode />
+    <Display {isPowered} bind:mode {inputSource} {generatorInput} {micInput} />
 </div>
 
 <style>
