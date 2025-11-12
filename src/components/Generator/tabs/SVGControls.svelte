@@ -1,6 +1,6 @@
 <script>
     import { parseSVGPath } from '../../../utils/shapes.js';
-    import { svgExamples, complexShapes } from '../../../utils/svgExamples.js';
+    import { svgExamples } from '../../../utils/svgExamples/index.js';
     import { onMount } from 'svelte';
 
     let { audioEngine, isPlaying, animationFPS = $bindable(30), numSamples = $bindable(200) } = $props();
@@ -434,13 +434,13 @@
             return;
         }
 
-        const pathData = svgExamples[selectedExample];
+        const example = svgExamples.find(ex => ex.id === selectedExample);
 
-        if (pathData) {
-            svgInput = pathData;
+        if (example) {
+            svgInput = example.path;
 
             // Adjust sample points based on complexity
-            if (complexShapes.includes(selectedExample)) {
+            if (example.complex) {
                 numSamples = 400;
             } else {
                 numSamples = 200;
@@ -488,17 +488,9 @@
 
         <select bind:value={selectedExample} onchange={handleSelectChange}>
             <option value="custom">Custom...</option>
-            <option value="star">Star</option>
-            <option value="html5">HTML5 Logo</option>
-            <option value="heart_svg">Heart (SVG)</option>
-            <option value="lightning">Lightning Bolt</option>
-            <option value="music">Music Note</option>
-            <option value="rocket">Rocket</option>
-            <option value="house">House</option>
-            <option value="smiley">Smiley Face</option>
-            <option value="infinity">Infinity Symbol</option>
-            <option value="peace">Peace Sign</option>
-            <option value="beyondtellerrand">Beyond Tellerrand</option>
+            {#each svgExamples as example}
+                <option value={example.id}>{example.label}</option>
+            {/each}
         </select>
     </div>
 
