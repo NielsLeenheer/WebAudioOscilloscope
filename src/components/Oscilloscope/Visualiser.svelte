@@ -2,7 +2,7 @@
     import { onMount, onDestroy } from 'svelte';
 
     let {
-        audioEngine,
+        generatorInput,
         inputSource,
         isPowered,
         mode,
@@ -71,7 +71,7 @@
         // Initialize data buffers
         const bufferLength = 16384; // Default FFT size
 
-        const analysers = audioEngine.getAnalysers();
+        const analysers = generatorInput.getAnalysers();
         if (analysers.left && analysers.right) {
             // Use actual FFT size if analysers exist
             const actualBufferLength = analysers.left.fftSize;
@@ -118,7 +118,7 @@
             }
         } else {
             // For generated input, always continue even if not playing
-            const analysers = audioEngine.getAnalysers();
+            const analysers = generatorInput.getAnalysers();
             if (analysers.left && analysers.right) {
                 analyserLeft = analysers.left;
                 analyserRight = analysers.right;
@@ -145,8 +145,8 @@
             if (context) {
                 sampleRate = context.sampleRate;
             }
-        } else if (audioEngine?.audioContext) {
-            sampleRate = audioEngine.audioContext.sampleRate;
+        } else if (generatorInput?.audioContext) {
+            sampleRate = generatorInput.audioContext.sampleRate;
         }
 
         // Send data to worker for physics calculation AND rendering

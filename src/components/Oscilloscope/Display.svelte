@@ -4,7 +4,7 @@
     import Grid from './Grid.svelte';
     import Visualiser from './Visualiser.svelte';
 
-    let { audioEngine, inputSource, isPowered, micInput, mode = $bindable() } = $props();
+    let { generatorInput, inputSource, isPowered, micInput, mode = $bindable() } = $props();
 
     let visualiser;
 
@@ -46,7 +46,7 @@
         <div class="visualiser-container">
             <Visualiser
                 bind:this={visualiser}
-                {audioEngine}
+                {generatorInput}
                 {inputSource}
                 {isPowered}
                 {mode}

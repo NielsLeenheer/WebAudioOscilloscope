@@ -22,7 +22,7 @@
 
     <!-- Right Side: Oscilloscope -->
     <div class="right-side">
-        <Oscilloscope {audioEngine} />
+        <Oscilloscope generatorInput={audioEngine} />
     </div>
 </div>
 
