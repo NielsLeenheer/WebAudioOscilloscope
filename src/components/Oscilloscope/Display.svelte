@@ -353,6 +353,7 @@
                     mode,
                     timeDiv,
                     triggerLevel,
+                    triggerChannel,
                     amplDivA,
                     positionA,
                     amplDivB,

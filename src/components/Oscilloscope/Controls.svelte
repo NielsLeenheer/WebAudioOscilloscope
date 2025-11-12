@@ -274,12 +274,13 @@
         color: #666;
         border: none;
         border-radius: 2px;
-        padding: 4px 8px;
+        padding: 2px 8px;
         font-family: system-ui;
-        font-size: 11px;
+        font-size: 10px;
         font-weight: 600;
         cursor: pointer;
         transition: all 0.2s;
+        line-height: 1;
     }
 
     .channel-btn:hover:not(:disabled) {
