@@ -24,16 +24,13 @@
 
 <style>
     .card {
-        background: white;
-        border: 1px solid #e0e0e0;
+        background: #f9f9f9;
         border-radius: 8px;
         overflow: hidden;
     }
 
     .card-header {
-        padding: 12px 16px;
-        background: #f8f9fa;
-        border-bottom: 1px solid #e0e0e0;
+        padding: 16px 16px 0;
     }
 
     .card-title {

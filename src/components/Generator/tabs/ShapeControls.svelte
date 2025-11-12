@@ -167,22 +167,17 @@
 <style>
     .channels-container {
         display: grid;
-        grid-template-columns: repeat(2, 1fr);
+        grid-template-rows: repeat(2, 1fr);
         gap: 16px;
-        padding: 16px;
+        padding: 20px;
     }
 
     .control-group {
-        margin-bottom: 16px;
-    }
-
-    .control-group:last-child {
-        margin-bottom: 0;
+        margin: 0;
     }
 
     .control-group label {
         display: block;
-        margin-bottom: 8px;
         font-size: 12px;
         font-weight: 600;
         color: #666;

@@ -262,33 +262,39 @@
 
     .trigger-channel-selector {
         display: flex;
-        gap: 2px;
+        /* gap: 2px; */
         background: #2d2d2d;
-        border-radius: 4px;
-        padding: 2px;
+        border-radius: 5px;
+        height: 24px;
+        align-items: center;
     }
 
     .channel-btn {
-        flex: 1;
+        width: 50%;
         background: transparent;
         color: #666;
         border: none;
-        border-radius: 2px;
-        padding: 2px 8px;
+        border-radius: 5px;
         font-family: system-ui;
-        font-size: 10px;
+        font-size: 12px;
         font-weight: 600;
         cursor: pointer;
         transition: all 0.2s;
         line-height: 1;
+        height: 100%;
     }
-
     .channel-btn:hover:not(:disabled) {
-        background: #333;
+        background: transparent;
         color: #4CAF50;
     }
 
-    .channel-btn.active {
+    /* .channel-btn:hover:not(:disabled) {
+        background: #333;
+        color: #4CAF50;
+    } */
+
+    .channel-btn.active, 
+    .channel-btn.active:hover:not(:disabled) {
         background: #4CAF50;
         color: #1a1a1a;
     }

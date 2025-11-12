@@ -325,11 +325,6 @@
 </script>
 
 <div class="control-group">
-    <label>Draw Your Own Path:</label>
-    <p style="color: #666; font-size: 14px; margin: 10px 0;">
-        Click to add points, drag while adding to create curves. The path automatically updates on the oscilloscope as you draw.
-    </p>
-
     <div style="display: flex; justify-content: center; margin: 15px 0;">
         <Button variant="secondary" onclick={clearCanvas}>
             {@html EraseIcon}
@@ -348,18 +343,6 @@
         ></canvas>
     </div>
 
-    <div class="value-display" style="margin-top: 15px;">
-        <strong>Instructions:</strong><br>
-        • Click empty space to add points (straight segments)<br>
-        • Click and drag while adding to create curved segments<br>
-        • Click the first point to close the path (no more points can be added)<br>
-        • Click any point to make it active (only active point shows handles)<br>
-        • Click and drag the active point to reposition it<br>
-        • Click and drag bezier handles (circles) to adjust curves<br>
-        • Drag and drop an image to trace over it<br>
-        • Path automatically updates on the oscilloscope as you draw
-    </div>
-
     {#if backgroundImage}
         <div style="margin-top: 15px;">
             <label for="backgroundOpacity">Background Image Opacity: <span>{backgroundOpacity}</span>%</label>
@@ -375,3 +358,13 @@
         </div>
     {/if}
 </div>
+
+<style>
+
+    .control-group {
+        background: none;
+        margin-top: 0px;
+        padding: 10px;
+    }
+
+</style>
