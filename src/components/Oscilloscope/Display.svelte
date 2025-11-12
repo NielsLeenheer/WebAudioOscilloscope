@@ -25,33 +25,17 @@
     let focus = $state(0.2); // Focus control (-1.0 to 1.0, 0.0 = perfect focus, abs value = blur amount)
     let decay = $state(512); // Maximum points to render (controls phosphor decay/overdraw)
 
-    // Time division steps (like real oscilloscope) - stored in microseconds for easy calculation
-    const timeDivSteps = [0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000, 50000, 100000, 200000, 500000];
-
-    let timeDivBase = $state(13); // Index into timeDivSteps (default 1ms)
-    let timeDivFine = $state(1.0); // Fine adjustment multiplier (0.5 to 2.5)
+    // Oscilloscope controls (exposed from Controls component)
     let triggerLevel = $state(0.0); // Trigger level: voltage threshold for triggering (-1.0 to 1.0)
     let triggerChannel = $state('a'); // Trigger channel: 'a' or 'b'
-
-    // Calculate combined time division (in microseconds)
-    // This value represents microseconds per division on the oscilloscope screen
-    let timeDiv = $derived(timeDivSteps[timeDivBase] * timeDivFine);
-
-    // Base amplification steps (like real oscilloscope)
-    const amplSteps = [0.002, 0.005, 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10];
-
-    let amplBaseA = $state(8); // Index into amplSteps (default 1V)
-    let amplFineA = $state(1.0); // Fine adjustment multiplier (0.5 to 2.5)
-    let positionA = $state(0.0); // Position A: vertical offset for channel A (-1.0 to 1.0)
-
-    let amplBaseB = $state(8); // Index into amplSteps (default 1V)
-    let amplFineB = $state(1.0); // Fine adjustment multiplier (0.5 to 2.5)
-    let positionB = $state(0.0); // Position B: vertical offset for channel B (-1.0 to 1.0)
     let xPosition = $state(0.0); // X Position: horizontal offset (-1.0 to 1.0)
 
-    // Calculate combined amplification
-    let amplDivA = $derived(amplSteps[amplBaseA] * amplFineA);
-    let amplDivB = $derived(amplSteps[amplBaseB] * amplFineB);
+    // Calculated values from Controls component
+    let timeDiv = $state(0); // Time division in microseconds (calculated by Controls)
+    let amplDivA = $state(0); // Channel A amplification (calculated by Controls)
+    let amplDivB = $state(0); // Channel B amplification (calculated by Controls)
+    let positionA = $state(0); // Channel A position (managed by Controls)
+    let positionB = $state(0); // Channel B position (managed by Controls)
 
     async function startMicrophoneInput() {
         try {
@@ -135,16 +119,13 @@
         bind:beamPower
         bind:focus
         bind:xPosition
-        bind:timeDivBase
-        bind:timeDivFine
         bind:triggerLevel
         bind:triggerChannel
+        bind:timeDiv
+        bind:amplDivA
+        bind:amplDivB
         bind:positionA
-        bind:amplBaseA
-        bind:amplFineA
         bind:positionB
-        bind:amplBaseB
-        bind:amplFineB
     />
 </div>
 
