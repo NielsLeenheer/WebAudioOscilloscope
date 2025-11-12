@@ -56,7 +56,7 @@
         display: flex;
         align-items: center;
         padding: 0 20px;
-        background: #fafafa;
+        background: #f5f5f5;
         border-bottom: 1px solid #ddd;
         padding-top: 15px;
         padding-bottom: 15px;
@@ -64,20 +64,20 @@
 
     nav {
         border: none;
-        border-radius: 6px;
-        background: #eaeaea;
         font-family: system-ui;
         font-size: 10pt;
         display: flex;
         height: 32px;
         align-items: stretch;
         user-select: none;
+        gap: 6px;
     }
 
     label {
         display: flex;
         align-items: center;
-        padding: 0px 9px;
+        padding: 0px 12px;
+        border-radius: 6px;
         cursor: pointer;
     }
     label:first-child {
@@ -90,12 +90,12 @@
         outline: -webkit-focus-ring-color auto 1px;
     }
     label:has(input:checked) {
-        background: #d5d5d5;
+        background: #fff;
     }
 
     label :global(svg) {
-        width: 1.5em;
-        height: 1.5em;
+        width: 1.8em;
+        height: 1.8em;
         margin-right: 4px;
     }
 
