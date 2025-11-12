@@ -23,7 +23,7 @@
         {#if activeTab === 'waves'}
             <ShapeControls {audioEngine} {isPlaying} />
         {:else if activeTab === 'shapes'}
-            <ShapesTab {audioEngine} {isPlaying} />
+            <ShapesTab {audioEngine} {isPlaying} isActive={activeTab === 'shapes'} />
         {:else if activeTab === 'clock'}
             <ClockControls {audioEngine} {isPlaying} isActive={activeTab === 'clock'} />
         {:else if activeTab === 'draw'}

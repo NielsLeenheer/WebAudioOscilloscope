@@ -5,11 +5,13 @@
      * @prop {Array} tabs - Array of tab objects with structure: { id: string, label: string, icon?: string }
      * @prop {string} activeTab - Currently active tab ID
      * @prop {Function} onTabChange - Callback when tab changes, receives tab ID
+     * @prop {boolean} wrap - Whether to wrap tabs when they overflow
      */
     let {
         tabs = [],
         activeTab = $bindable(''),
-        onTabChange = null
+        onTabChange = null,
+        wrap = false
     } = $props();
 
     function handleTabClick(tabId) {
@@ -20,7 +22,7 @@
     }
 </script>
 
-<div class="tab-bar">
+<div class="tab-bar" class:wrap={wrap}>
     {#each tabs as tab}
         <button
             class="tab"
@@ -49,6 +51,10 @@
         border-radius: 6px;
     }
 
+    .tab-bar.wrap {
+        flex-wrap: wrap;
+    }
+
     .tab {
         flex: 1;
         padding: 8px 12px;
@@ -64,6 +70,11 @@
         align-items: center;
         justify-content: center;
         min-height: 40px;
+    }
+
+    .tab-bar.wrap .tab {
+        flex: 0 1 auto;
+        min-width: fit-content;
     }
 
     .tab:hover {
