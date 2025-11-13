@@ -72,13 +72,13 @@
 
             <div class="controls-row">
                 <div class="control-item slider-item">
-                    <label>Frequency:</label>
+                    <label class="clickable" onclick={() => leftFrequency = 440}>Frequency:</label>
                     <input type="range" bind:value={leftFrequency} min="20" max="2000" step="1">
                     <span class="value-display">{leftFrequency} Hz</span>
                 </div>
 
                 <div class="control-item slider-item">
-                    <label>Phase Shift:</label>
+                    <label class="clickable" onclick={() => leftPhase = 0}>Phase Shift:</label>
                     <input type="range" bind:value={leftPhase} min="0" max="360" step="1">
                     <span class="value-display">{leftPhase}°</span>
                 </div>
@@ -99,13 +99,13 @@
 
             <div class="controls-row">
                 <div class="control-item slider-item">
-                    <label>Frequency</label>
+                    <label class="clickable" onclick={() => rightFrequency = 440}>Frequency</label>
                     <input type="range" bind:value={rightFrequency} min="20" max="2000" step="1">
                     <span class="value-display">{rightFrequency} Hz</span>
                 </div>
 
                 <div class="control-item slider-item">
-                    <label>Phase Shift</label>
+                    <label class="clickable" onclick={() => rightPhase = 0}>Phase Shift</label>
                     <input type="range" bind:value={rightPhase} min="0" max="360" step="1">
                     <span class="value-display">{rightPhase}°</span>
                 </div>
@@ -167,6 +167,15 @@
         text-transform: uppercase;
         letter-spacing: 0.5px;
         white-space: nowrap;
+    }
+
+    .control-item label.clickable {
+        cursor: pointer;
+        user-select: none;
+    }
+
+    .control-item label.clickable:hover {
+        color: #333;
     }
 
     .control-item input[type="range"] {
