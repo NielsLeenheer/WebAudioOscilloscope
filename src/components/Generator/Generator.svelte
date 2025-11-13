@@ -33,19 +33,19 @@
     <Navigation bind:activeTab onSettingsClick={handleSettingsClick} />
     <div class="content-area">
         <div class="tab-panel" class:active={activeTab === 'waves'}>
-            <WaveControls {audioEngine} />
+            <WaveControls {audioEngine} isActive={activeTab === 'waves'} />
         </div>
         <div class="tab-panel" class:active={activeTab === 'shapes'}>
-            <ShapeControls {audioEngine} />
+            <ShapeControls {audioEngine} isActive={activeTab === 'shapes'} />
         </div>
         <div class="tab-panel" class:active={activeTab === 'clock'}>
-            <ClockControls {audioEngine} />
+            <ClockControls {audioEngine} isActive={activeTab === 'clock'} />
         </div>
         <div class="tab-panel" class:active={activeTab === 'draw'}>
-            <DrawControls {audioEngine} bind:activeTab bind:svgInput bind:svgSelectedExample />
+            <DrawControls {audioEngine} isActive={activeTab === 'draw'} bind:activeTab bind:svgInput bind:svgSelectedExample />
         </div>
         <div class="tab-panel" class:active={activeTab === 'svg'}>
-            <SVGControls {audioEngine} bind:animationFPS={svgAnimationFPS} bind:numSamples={svgSamplePoints} bind:svgInput bind:selectedExample={svgSelectedExample} />
+            <SVGControls {audioEngine} isActive={activeTab === 'svg'} bind:animationFPS={svgAnimationFPS} bind:numSamples={svgSamplePoints} bind:svgInput bind:selectedExample={svgSelectedExample} />
         </div>
     </div>
 

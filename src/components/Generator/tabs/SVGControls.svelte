@@ -12,7 +12,7 @@
         createContinuousSampler
     } from '../../../utils/svgSampler.js';
 
-    let { audioEngine, animationFPS = $bindable(30), numSamples = $bindable(200), svgInput = $bindable(''), selectedExample = $bindable('star') } = $props();
+    let { audioEngine, isActive = false, animationFPS = $bindable(30), numSamples = $bindable(200), svgInput = $bindable(''), selectedExample = $bindable('star') } = $props();
     let isPlaying = audioEngine.isPlaying;
     let validationError = $state('');
     let isValid = $state(true);
@@ -88,7 +88,7 @@
     }
 
     function applyInput(value) {
-        if (!get(audioEngine.isPlaying) || !isValid) return;
+        if (!get(audioEngine.isPlaying) || !isValid || !isActive) return;
 
         const data = value.trim();
         if (!data) return;
@@ -157,9 +157,16 @@
         };
     });
 
-    // Stop continuous sampling when playback stops
+    // Apply SVG when tab becomes active
     $effect(() => {
-        if (!$isPlaying) {
+        if (isActive && $isPlaying && svgInput && isValid) {
+            applyInput(svgInput);
+        }
+    });
+
+    // Stop continuous sampling when playback stops or tab becomes inactive
+    $effect(() => {
+        if (!$isPlaying || !isActive) {
             stopContinuousSampling();
         }
     });

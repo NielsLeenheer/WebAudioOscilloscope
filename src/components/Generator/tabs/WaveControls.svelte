@@ -9,7 +9,7 @@
     import SawtoothIcon from '../../../assets/icons/wave-sawtooth.svg?raw';
     import TriangleIcon from '../../../assets/icons/wave-triangle.svg?raw';
 
-    let { audioEngine } = $props();
+    let { audioEngine, isActive = false } = $props();
     let isPlaying = audioEngine.isPlaying;
 
     const waveTabs = [
@@ -48,16 +48,9 @@
         audioEngine.createWaveform(stereoPoints);
     }
 
-    // Generate default sine wave when component mounts and audio starts playing
-    onMount(() => {
-        if (get(audioEngine.isPlaying)) {
-            updateWaves();
-        }
-    });
-
-    // Update waves when parameters change and audio is playing
+    // Generate default sine wave when tab becomes active
     $effect(() => {
-        if ($isPlaying) {
+        if ($isPlaying && isActive) {
             updateWaves();
         }
     });

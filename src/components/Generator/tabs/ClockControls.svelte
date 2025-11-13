@@ -3,7 +3,7 @@
     import Preview from '../../Common/Preview.svelte';
     import { generateClockPoints } from '../../../utils/shapes.js';
 
-    let { audioEngine } = $props();
+    let { audioEngine, isActive = false } = $props();
     let isPlaying = audioEngine.isPlaying;
 
     let clockPoints = $state(generateClockPoints());
@@ -23,7 +23,7 @@
     });
 
     $effect(() => {
-        if ($isPlaying) {
+        if ($isPlaying && isActive) {
             audioEngine.startClock(generateClockPoints);
         }
     });

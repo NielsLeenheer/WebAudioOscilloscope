@@ -6,7 +6,7 @@
     import EraseIcon from '../../../assets/icons/erase.svg?raw';
     import MoveIcon from '../../../assets/icons/move.svg?raw';
 
-    let { audioEngine, activeTab = $bindable('draw'), svgInput = $bindable(''), svgSelectedExample = $bindable('star') } = $props();
+    let { audioEngine, isActive = false, activeTab = $bindable('draw'), svgInput = $bindable(''), svgSelectedExample = $bindable('star') } = $props();
     let isPlaying = audioEngine.isPlaying;
 
     let pathEditor;
@@ -16,7 +16,7 @@
 
     // Auto-update scope whenever path changes and playing
     $effect(() => {
-        if ($isPlaying && currentNormalizedPoints) {
+        if ($isPlaying && isActive && currentNormalizedPoints) {
             updateScope();
         }
     });
