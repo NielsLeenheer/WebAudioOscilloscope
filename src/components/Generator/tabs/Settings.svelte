@@ -104,7 +104,7 @@
             </div>
 
             <div class="control-group checkbox-group">
-                <label for="svgOptimizeSegments">Optimize segments</label>
+                <label for="svgOptimizeSegments">Optimize</label>
                 <input
                     type="checkbox"
                     id="svgOptimizeSegments"
@@ -199,7 +199,7 @@
         width: 18px;
         height: 18px;
         cursor: pointer;
-        margin: 0;
+        margin: 6px 0;
     }
 
     .checkbox-group label {
