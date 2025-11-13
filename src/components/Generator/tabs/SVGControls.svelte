@@ -12,10 +12,8 @@
         createContinuousSampler
     } from '../../../utils/svgSampler.js';
 
-    let { audioEngine, animationFPS = $bindable(30), numSamples = $bindable(200) } = $props();
+    let { audioEngine, animationFPS = $bindable(30), numSamples = $bindable(200), svgInput = $bindable('') } = $props();
     let isPlaying = audioEngine.isPlaying;
-
-    let svgInput = $state('');
     let selectedExample = $state('star');
     let validationError = $state('');
     let isValid = $state(true);

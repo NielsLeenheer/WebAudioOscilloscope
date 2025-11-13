@@ -5,7 +5,7 @@
     import ImageUpload from '../../Common/ImageUpload.svelte';
     import EraseIcon from '../../../assets/icons/erase.svg?raw';
 
-    let { audioEngine } = $props();
+    let { audioEngine, activeTab = $bindable('draw'), svgInput = $bindable('') } = $props();
     let isPlaying = audioEngine.isPlaying;
 
     let pathEditor;
@@ -64,13 +64,29 @@
             URL.revokeObjectURL(url);
         }
     }
+
+    function copyToSVG() {
+        if (!pathEditor || !pathEditor.hasPath()) {
+            alert('No path to copy');
+            return;
+        }
+
+        const svg = pathEditor.exportSVG();
+        if (svg) {
+            svgInput = svg;
+            activeTab = 'svg';
+        }
+    }
 </script>
 
 <div class="control-group">
-    <div style="display: flex; justify-content: center; margin: 15px 0;">
+    <div style="display: flex; justify-content: center; gap: 10px; margin: 15px 0;">
         <Button variant="secondary" onclick={clearCanvas}>
             {@html EraseIcon}
             Clear
+        </Button>
+        <Button variant="primary" onclick={copyToSVG}>
+            Copy to SVG
         </Button>
     </div>
 
