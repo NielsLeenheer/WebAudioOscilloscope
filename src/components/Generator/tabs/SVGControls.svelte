@@ -11,7 +11,7 @@
         createContinuousSampler
     } from '../../../utils/svgSampler.js';
 
-    let { audioEngine, isActive = false, animationFPS = $bindable(30), numSamples = $bindable(200), svgInput = $bindable(''), selectedExample = $bindable('star') } = $props();
+    let { audioEngine, isActive = false, animationFPS = $bindable(30), numSamples = $bindable(200), optimizeSegments = $bindable(true), doubleDraw = $bindable(true), svgInput = $bindable(''), selectedExample = $bindable('star') } = $props();
     let isPlaying = audioEngine.isPlaying;
     let validationError = $state('');
     let isValid = $state(true);
@@ -42,7 +42,9 @@
                     audioEngine.restoreDefaultFrequency();
                     audioEngine.createWaveform(normalized);
                 },
-                () => get(audioEngine.isPlaying)
+                () => get(audioEngine.isPlaying),
+                optimizeSegments,
+                doubleDraw
             );
         } catch (error) {
             console.error('Error starting continuous sampling:', error);
@@ -71,11 +73,11 @@
             const inputType = detectInputType(data);
             if (inputType === 'path') {
                 // Update preview for path data
-                const { segments, bbox } = extractPathPoints(data, numSamples);
+                const { segments, bbox } = extractPathPoints(data, numSamples, optimizeSegments, doubleDraw);
                 // Normalize all segments together
                 normalizedPoints = segments.map(segment => normalizePoints(segment, bbox));
             } else {
-                normalizedPoints = parseSVGMarkupStatic(data, numSamples);
+                normalizedPoints = parseSVGMarkupStatic(data, numSamples, optimizeSegments, doubleDraw);
             }
             validationError = '';
             isValid = true;

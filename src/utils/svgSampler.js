@@ -104,18 +104,39 @@ function distance(p1, p2) {
 
 /**
  * Optimize segment order to minimize jump distances
- * Uses greedy nearest-neighbor algorithm
+ * Uses greedy nearest-neighbor algorithm starting from center
  * @param {Array<Array<[number, number]>>} segments - Array of segments
+ * @param {boolean} startFromCenter - If true, start with segment closest to (0,0)
  * @returns {Array<Array<[number, number]>>} Reordered segments
  */
-function optimizeSegmentOrder(segments) {
+function optimizeSegmentOrder(segments, startFromCenter = true) {
     if (segments.length <= 1) return segments;
 
     const ordered = [];
     const remaining = [...segments];
 
-    // Start with the first segment
-    let current = remaining.shift();
+    // Find the segment closest to center (0, 0) if requested
+    let startIndex = 0;
+    if (startFromCenter) {
+        let minDistToCenter = Infinity;
+        remaining.forEach((segment, index) => {
+            const segStart = segment[0];
+            const segEnd = segment[segment.length - 1];
+
+            // Check both start and end of segment
+            const distStartToCenter = distance(segStart, [0, 0]);
+            const distEndToCenter = distance(segEnd, [0, 0]);
+
+            const minDist = Math.min(distStartToCenter, distEndToCenter);
+            if (minDist < minDistToCenter) {
+                minDistToCenter = minDist;
+                startIndex = index;
+            }
+        });
+    }
+
+    // Start with the chosen segment
+    let current = remaining.splice(startIndex, 1)[0];
     ordered.push(current);
 
     // Greedily add the closest segment
@@ -165,12 +186,32 @@ function optimizeSegmentOrder(segments) {
 }
 
 /**
+ * Double draw segments - draw forward then backward
+ * This makes the beam return to the starting point of each segment
+ * @param {Array<Array<[number, number]>>} segments - Array of segments
+ * @returns {Array<Array<[number, number]>>} Segments with doubled paths
+ */
+function doubleDrawSegments(segments) {
+    return segments.map(segment => {
+        if (segment.length === 0) return segment;
+
+        // Create reversed copy (excluding the last point to avoid duplication)
+        const reversed = [...segment].reverse().slice(1);
+
+        // Concatenate forward + backward
+        return [...segment, ...reversed];
+    });
+}
+
+/**
  * Extract raw segments and bbox from SVG path data
  * @param {string} pathData - SVG path data string
  * @param {number} numSamples - Number of points to sample
+ * @param {boolean} optimize - If true, optimize segment order
+ * @param {boolean} doubleDraw - If true, draw each segment forward and back
  * @returns {Object} Object with segments and bbox
  */
-export function extractPathPoints(pathData, numSamples = 200) {
+export function extractPathPoints(pathData, numSamples = 200, optimize = true, doubleDraw = true) {
     // Split path into segments
     const pathSegments = splitPathIntoSegments(pathData);
     const segments = [];
@@ -187,14 +228,22 @@ export function extractPathPoints(pathData, numSamples = 200) {
         throw new Error('No valid segments could be extracted from path');
     }
 
-    // Optimize segment order to minimize jump distances
-    const optimizedSegments = optimizeSegmentOrder(segments);
+    // Apply optimizations
+    let processedSegments = segments;
+
+    if (optimize) {
+        processedSegments = optimizeSegmentOrder(processedSegments, true);
+    }
+
+    if (doubleDraw) {
+        processedSegments = doubleDrawSegments(processedSegments);
+    }
 
     // Calculate bbox across all segments
     let minX = Infinity, maxX = -Infinity;
     let minY = Infinity, maxY = -Infinity;
 
-    optimizedSegments.forEach(segment => {
+    processedSegments.forEach(segment => {
         segment.forEach(([x, y]) => {
             minX = Math.min(minX, x);
             maxX = Math.max(maxX, x);
@@ -215,7 +264,7 @@ export function extractPathPoints(pathData, numSamples = 200) {
         height: maxY - minY
     };
 
-    return { segments: optimizedSegments, bbox };
+    return { segments: processedSegments, bbox };
 }
 
 /**
@@ -316,9 +365,11 @@ export function extractPointsFromElement(element, samples) {
  * Parse full SVG markup and extract all paths (static, no animation)
  * @param {string} markup - Full SVG markup string
  * @param {number} samples - Number of samples per element
+ * @param {boolean} optimize - If true, optimize segment order
+ * @param {boolean} doubleDraw - If true, draw each segment forward and back
  * @returns {Array<Array<[number, number]>>} Array of normalized segments
  */
-export function parseSVGMarkupStatic(markup, samples) {
+export function parseSVGMarkupStatic(markup, samples, optimize = true, doubleDraw = true) {
     // Get or create the container
     const container = getContainer();
 
@@ -366,8 +417,16 @@ export function parseSVGMarkupStatic(markup, samples) {
         throw new Error('Could not extract points from SVG');
     }
 
-    // Optimize segment order to minimize jump distances
-    const optimizedSegments = optimizeSegmentOrder(allSegments);
+    // Apply optimizations
+    let processedSegments = allSegments;
+
+    if (optimize) {
+        processedSegments = optimizeSegmentOrder(processedSegments, true);
+    }
+
+    if (doubleDraw) {
+        processedSegments = doubleDrawSegments(processedSegments);
+    }
 
     // Get bounding box to normalize coordinates
     let bbox;
@@ -383,7 +442,7 @@ export function parseSVGMarkupStatic(markup, samples) {
     }
 
     // Normalize all segments together using the same bounding box
-    const normalizedSegments = optimizedSegments.map(segment =>
+    const normalizedSegments = processedSegments.map(segment =>
         normalizePoints(segment, bbox)
     );
 
@@ -395,9 +454,11 @@ export function parseSVGMarkupStatic(markup, samples) {
  * @param {SVGSVGElement} svgElement - SVG root element
  * @param {NodeList} elements - List of drawable elements
  * @param {number} samples - Number of samples per element
+ * @param {boolean} optimize - If true, optimize segment order
+ * @param {boolean} doubleDraw - If true, draw each segment forward and back
  * @returns {Array<Array<[number, number]>>} Array of segments from current frame
  */
-export function sampleCurrentFrame(svgElement, elements, samples) {
+export function sampleCurrentFrame(svgElement, elements, samples, optimize = true, doubleDraw = true) {
     // Force style recalculation to get current animated state
     svgElement.getBoundingClientRect();
 
@@ -410,10 +471,18 @@ export function sampleCurrentFrame(svgElement, elements, samples) {
         }
     });
 
-    // Optimize segment order to minimize jump distances
-    const optimizedSegments = optimizeSegmentOrder(frameSegments);
+    // Apply optimizations
+    let processedSegments = frameSegments;
 
-    return optimizedSegments;
+    if (optimize) {
+        processedSegments = optimizeSegmentOrder(processedSegments, true);
+    }
+
+    if (doubleDraw) {
+        processedSegments = doubleDrawSegments(processedSegments);
+    }
+
+    return processedSegments;
 }
 
 /**
@@ -423,9 +492,11 @@ export function sampleCurrentFrame(svgElement, elements, samples) {
  * @param {number} fps - Frames per second for sampling
  * @param {Function} onFrame - Callback function called with normalized points each frame
  * @param {Function} isPlayingGetter - Function that returns whether playback is active
+ * @param {boolean} optimize - If true, optimize segment order
+ * @param {boolean} doubleDraw - If true, draw each segment forward and back
  * @returns {Object} Sampler object with stop() method
  */
-export function createContinuousSampler(markup, samples, fps, onFrame, isPlayingGetter) {
+export function createContinuousSampler(markup, samples, fps, onFrame, isPlayingGetter, optimize = true, doubleDraw = true) {
     // Get or create the container
     const container = getContainer();
 
@@ -474,7 +545,7 @@ export function createContinuousSampler(markup, samples, fps, onFrame, isPlaying
         }
 
         try {
-            const frameSegments = sampleCurrentFrame(svgElement, elements, samples);
+            const frameSegments = sampleCurrentFrame(svgElement, elements, samples, optimize, doubleDraw);
 
             if (frameSegments.length === 0) return;
 
