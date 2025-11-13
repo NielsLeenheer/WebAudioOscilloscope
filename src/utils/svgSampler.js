@@ -50,7 +50,7 @@ function splitPathIntoSegments(pathData) {
  */
 function samplePathSegment(pathData, numSamples) {
     try {
-        const properties = svgPathProperties(pathData);
+        const properties = new svgPathProperties(pathData);
         const length = properties.getTotalLength();
 
         if (!isFinite(length) || length === 0) {
