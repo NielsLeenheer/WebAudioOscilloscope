@@ -131,7 +131,7 @@ export function generateLissajous(a, b, delta = Math.PI / 2) {
 }
 
 export function generateClockPoints(showFace = true, showTicks = false) {
-    const points = [];
+    const segments = [];
     const now = new Date();
     const hours = now.getHours() % 12;
     const minutes = now.getMinutes();
@@ -144,79 +144,91 @@ export function generateClockPoints(showFace = true, showTicks = false) {
 
     // Draw outer circle (clock face) if enabled
     if (showFace) {
+        const facePoints = [];
         const circlePoints = 100;
         for (let i = 0; i < circlePoints; i++) {
             const angle = (i / circlePoints) * 2 * Math.PI;
-            points.push([0.9 * Math.cos(angle), -0.9 * Math.sin(angle)]);
+            facePoints.push([0.9 * Math.cos(angle), -0.9 * Math.sin(angle)]);
         }
+        segments.push(facePoints);
     }
 
     // Draw hour ticks if enabled
     if (showTicks) {
         for (let hour = 0; hour < 12; hour++) {
+            const tickPoints = [];
             const angle = (hour * 30 - 90) * Math.PI / 180;
             // Draw tick from 0.75 to 0.9 radius
             for (let i = 0; i <= 5; i++) {
                 const t = i / 5;
                 const r = 0.75 + t * 0.15;
-                points.push([r * Math.cos(angle), -r * Math.sin(angle)]);
+                tickPoints.push([r * Math.cos(angle), -r * Math.sin(angle)]);
             }
             // Return back to start
             for (let i = 5; i >= 0; i--) {
                 const t = i / 5;
                 const r = 0.75 + t * 0.15;
-                points.push([r * Math.cos(angle), -r * Math.sin(angle)]);
+                tickPoints.push([r * Math.cos(angle), -r * Math.sin(angle)]);
             }
+            segments.push(tickPoints);
         }
     }
 
     // Draw hour hand (from center to 0.5 radius)
+    const hourHandPoints = [];
     for (let i = 0; i <= 20; i++) {
         const t = i / 20;
         const r = t * 0.5;
-        points.push([r * Math.cos(hourAngle), -r * Math.sin(hourAngle)]);
+        hourHandPoints.push([r * Math.cos(hourAngle), -r * Math.sin(hourAngle)]);
     }
     // Return to center
     for (let i = 20; i >= 0; i--) {
         const t = i / 20;
         const r = t * 0.5;
-        points.push([r * Math.cos(hourAngle), -r * Math.sin(hourAngle)]);
+        hourHandPoints.push([r * Math.cos(hourAngle), -r * Math.sin(hourAngle)]);
     }
+    segments.push(hourHandPoints);
 
     // Draw minute hand (from center to 0.7 radius)
+    const minuteHandPoints = [];
     for (let i = 0; i <= 25; i++) {
         const t = i / 25;
         const r = t * 0.7;
-        points.push([r * Math.cos(minuteAngle), -r * Math.sin(minuteAngle)]);
+        minuteHandPoints.push([r * Math.cos(minuteAngle), -r * Math.sin(minuteAngle)]);
     }
     // Return to center
     for (let i = 25; i >= 0; i--) {
         const t = i / 25;
         const r = t * 0.7;
-        points.push([r * Math.cos(minuteAngle), -r * Math.sin(minuteAngle)]);
+        minuteHandPoints.push([r * Math.cos(minuteAngle), -r * Math.sin(minuteAngle)]);
     }
+    segments.push(minuteHandPoints);
 
     // Draw second hand (from center to 0.65 radius, thinner)
+    const secondHandPoints = [];
     for (let i = 0; i <= 20; i++) {
         const t = i / 20;
         const r = t * 0.65;
-        points.push([r * Math.cos(secondAngle), -r * Math.sin(secondAngle)]);
+        secondHandPoints.push([r * Math.cos(secondAngle), -r * Math.sin(secondAngle)]);
     }
     // Return to center
     for (let i = 20; i >= 0; i--) {
         const t = i / 20;
         const r = t * 0.65;
-        points.push([r * Math.cos(secondAngle), -r * Math.sin(secondAngle)]);
+        secondHandPoints.push([r * Math.cos(secondAngle), -r * Math.sin(secondAngle)]);
     }
+    segments.push(secondHandPoints);
 
     // Draw center dot
+    const centerDotPoints = [];
     const dotPoints = 15;
     for (let i = 0; i < dotPoints; i++) {
         const angle = (i / dotPoints) * 2 * Math.PI;
-        points.push([0.05 * Math.cos(angle), -0.05 * Math.sin(angle)]);
+        centerDotPoints.push([0.05 * Math.cos(angle), -0.05 * Math.sin(angle)]);
     }
+    segments.push(centerDotPoints);
 
-    return points;
+    return segments;
 }
 
 export function parseSVGPath(pathData, numSamples = 200, autoCenter = true) {
