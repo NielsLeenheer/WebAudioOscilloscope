@@ -130,7 +130,7 @@ export function generateLissajous(a, b, delta = Math.PI / 2) {
     return points;
 }
 
-export function generateClockPoints() {
+export function generateClockPoints(showFace = true, showTicks = false) {
     const points = [];
     const now = new Date();
     const hours = now.getHours() % 12;
@@ -142,11 +142,32 @@ export function generateClockPoints() {
     const minuteAngle = ((minutes + seconds / 60) * 6 - 90) * Math.PI / 180;
     const secondAngle = (seconds * 6 - 90) * Math.PI / 180;
 
-    // Draw outer circle (100 points)
-    const circlePoints = 100;
-    for (let i = 0; i < circlePoints; i++) {
-        const angle = (i / circlePoints) * 2 * Math.PI;
-        points.push([0.9 * Math.cos(angle), -0.9 * Math.sin(angle)]);
+    // Draw outer circle (clock face) if enabled
+    if (showFace) {
+        const circlePoints = 100;
+        for (let i = 0; i < circlePoints; i++) {
+            const angle = (i / circlePoints) * 2 * Math.PI;
+            points.push([0.9 * Math.cos(angle), -0.9 * Math.sin(angle)]);
+        }
+    }
+
+    // Draw hour ticks if enabled
+    if (showTicks) {
+        for (let hour = 0; hour < 12; hour++) {
+            const angle = (hour * 30 - 90) * Math.PI / 180;
+            // Draw tick from 0.75 to 0.9 radius
+            for (let i = 0; i <= 5; i++) {
+                const t = i / 5;
+                const r = 0.75 + t * 0.15;
+                points.push([r * Math.cos(angle), -r * Math.sin(angle)]);
+            }
+            // Return back to start
+            for (let i = 5; i >= 0; i--) {
+                const t = i / 5;
+                const r = 0.75 + t * 0.15;
+                points.push([r * Math.cos(angle), -r * Math.sin(angle)]);
+            }
+        }
     }
 
     // Draw hour hand (from center to 0.5 radius)
