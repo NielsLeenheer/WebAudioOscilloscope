@@ -27,7 +27,7 @@
     <Card title="Output">
         <div class="card-controls">
             <div class="control-group">
-                <label for="frequency">Frequency</label>
+                <label for="frequency" class="clickable" onclick={() => updateFrequency(100)}>Frequency</label>
                 <input
                     type="range"
                     id="frequency"
@@ -42,7 +42,7 @@
             </div>
 
             <div class="control-group">
-                <label for="rotation">Rotation</label>
+                <label for="rotation" class="clickable" onclick={() => updateRotation(0)}>Rotation</label>
                 <input
                     type="range"
                     id="rotation"
@@ -57,7 +57,7 @@
             </div>
 
             <div class="control-group">
-                <label for="volume">Volume</label>
+                <label for="volume" class="clickable" onclick={() => updateVolume(30)}>Volume</label>
                 <input
                     type="range"
                     id="volume"
@@ -76,7 +76,7 @@
     <Card title="SVG">
         <div class="card-controls">
             <div class="control-group">
-                <label for="svgSamplePoints">Sample Points</label>
+                <label for="svgSamplePoints" class="clickable" onclick={() => svgSamplePoints = 200}>Sample Points</label>
                 <input
                     type="range"
                     id="svgSamplePoints"
@@ -90,7 +90,7 @@
             </div>
 
             <div class="control-group">
-                <label for="svgAnimationFPS">Sampling rate</label>
+                <label for="svgAnimationFPS" class="clickable" onclick={() => svgAnimationFPS = 30}>Sampling rate</label>
                 <input
                     type="range"
                     id="svgAnimationFPS"
@@ -137,6 +137,15 @@
         text-align: right;
         margin: 0;
         padding: 8px 16px;
+    }
+
+    .control-group label.clickable {
+        cursor: pointer;
+        user-select: none;
+    }
+
+    .control-group label.clickable:hover {
+        color: #333;
     }
 
     .control-group .value {
