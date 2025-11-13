@@ -49,7 +49,7 @@
         </div>
     </div>
 
-    <Dialog bind:dialogRef={settingsDialog} anchored={true} anchorId="settings-button" title="Settings">
+    <Dialog bind:dialogRef={settingsDialog} anchored={true} anchorId="settings-button">
         <Settings {audioEngine} bind:svgAnimationFPS bind:svgSamplePoints />
     </Dialog>
 </div>
@@ -75,5 +75,11 @@
 
     .tab-panel.active {
         display: block;
+    }
+
+    /* Make settings dialog wider */
+    .generator :global(.dialog.anchored) {
+        min-width: 500px;
+        max-width: 700px;
     }
 </style>
