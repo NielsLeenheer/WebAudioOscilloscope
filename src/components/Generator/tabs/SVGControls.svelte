@@ -177,6 +177,23 @@
             validateInput(svgInput);
         }
     });
+
+    // Re-validate and re-apply when optimization settings change
+    $effect(() => {
+        // Track dependencies
+        optimizeSegments;
+        doubleDraw;
+
+        // Re-validate current input to apply new optimization settings
+        if (svgInput && isValid) {
+            validateInput(svgInput);
+
+            // Re-apply if tab is active and playing
+            if (isActive && $isPlaying) {
+                applyInput(svgInput);
+            }
+        }
+    });
 </script>
 
 <div class="svg-controls">
