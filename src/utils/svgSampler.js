@@ -54,6 +54,7 @@ function samplePathSegment(pathData, numSamples) {
         const length = properties.getTotalLength();
 
         if (!isFinite(length) || length === 0) {
+            console.warn('Path segment has zero or invalid length:', pathData.substring(0, 50) + '...');
             return [];
         }
 
@@ -66,7 +67,7 @@ function samplePathSegment(pathData, numSamples) {
 
         return points;
     } catch (error) {
-        console.warn('Error sampling path segment:', error.message);
+        console.error('Error sampling path segment:', error.message, '\nPath:', pathData.substring(0, 100) + '...');
         return [];
     }
 }
@@ -108,6 +109,10 @@ export function extractPathPoints(pathData, numSamples = 200) {
         }
     });
 
+    if (segments.length === 0) {
+        throw new Error('No valid segments could be extracted from path');
+    }
+
     // Calculate bbox across all segments
     let minX = Infinity, maxX = -Infinity;
     let minY = Infinity, maxY = -Infinity;
@@ -120,6 +125,11 @@ export function extractPathPoints(pathData, numSamples = 200) {
             maxY = Math.max(maxY, y);
         });
     });
+
+    // Validate bbox
+    if (!isFinite(minX) || !isFinite(maxX) || !isFinite(minY) || !isFinite(maxY)) {
+        throw new Error('Invalid bounding box calculated from path');
+    }
 
     const bbox = {
         x: minX,
@@ -235,8 +245,14 @@ export function parseSVGMarkupStatic(markup, samples) {
     // Get or create the container
     const container = getContainer();
 
+    // Clean up markup - remove XML declarations which can cause issues
+    let cleanedMarkup = markup.trim();
+    if (cleanedMarkup.startsWith('<?xml')) {
+        cleanedMarkup = cleanedMarkup.replace(/<\?xml[^?]*\?>\s*/i, '');
+    }
+
     // Clear container and inject SVG
-    container.innerHTML = markup;
+    container.innerHTML = cleanedMarkup;
 
     const svgElement = container.querySelector('svg');
     if (!svgElement) {
@@ -274,7 +290,17 @@ export function parseSVGMarkupStatic(markup, samples) {
     }
 
     // Get bounding box to normalize coordinates
-    const bbox = svgElement.getBBox();
+    let bbox;
+    try {
+        bbox = svgElement.getBBox();
+    } catch (error) {
+        throw new Error(`Could not get bounding box from SVG: ${error.message}`);
+    }
+
+    // Validate bbox
+    if (!bbox || !isFinite(bbox.width) || !isFinite(bbox.height) || bbox.width === 0 || bbox.height === 0) {
+        throw new Error('Invalid bounding box from SVG');
+    }
 
     // Normalize all segments together using the same bounding box
     const normalizedSegments = allSegments.map(segment =>
@@ -320,8 +346,14 @@ export function createContinuousSampler(markup, samples, fps, onFrame, isPlaying
     // Get or create the container
     const container = getContainer();
 
+    // Clean up markup - remove XML declarations which can cause issues
+    let cleanedMarkup = markup.trim();
+    if (cleanedMarkup.startsWith('<?xml')) {
+        cleanedMarkup = cleanedMarkup.replace(/<\?xml[^?]*\?>\s*/i, '');
+    }
+
     // Setup SVG
-    container.innerHTML = markup;
+    container.innerHTML = cleanedMarkup;
     const svgElement = container.querySelector('svg');
     if (!svgElement) {
         throw new Error('No <svg> element found in markup');
