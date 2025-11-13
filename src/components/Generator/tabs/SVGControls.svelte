@@ -162,6 +162,13 @@
             stopContinuousSampling();
         }
     });
+
+    // Validate input when it changes externally (e.g., from Draw tab copy)
+    $effect(() => {
+        if (selectedExample === 'custom' && svgInput) {
+            validateInput(svgInput);
+        }
+    });
 </script>
 
 <div class="svg-controls">

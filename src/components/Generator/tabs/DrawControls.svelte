@@ -73,9 +73,13 @@
 
         const svg = pathEditor.exportSVG();
         if (svg) {
-            svgSelectedExample = 'custom';
-            svgInput = svg;
-            activeTab = 'svg';
+            // Extract the d attribute from the path element
+            const pathMatch = svg.match(/<path[^>]+d="([^"]+)"/);
+            if (pathMatch && pathMatch[1]) {
+                svgSelectedExample = 'custom';
+                svgInput = pathMatch[1];
+                activeTab = 'svg';
+            }
         }
     }
 </script>
