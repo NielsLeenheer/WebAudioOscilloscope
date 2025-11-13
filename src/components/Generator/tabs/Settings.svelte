@@ -26,7 +26,7 @@
 <div class="settings-container">
     <Card title="Output">
         <div class="control-group">
-            <label for="frequency">Frequency (Hz): <span>{frequency}</span></label>
+            <label for="frequency">Frequency (Hz)</label>
             <input
                 type="range"
                 id="frequency"
@@ -36,11 +36,12 @@
                 step="1"
                 oninput={(e) => updateFrequency(e.target.value)}
             >
+            <span class="value">{frequency} Hz</span>
             <div class="value-display">Lower = slower drawing, Higher = brighter but more flickery</div>
         </div>
 
         <div class="control-group">
-            <label for="rotation">Rotation: <span>{rotation}</span>°</label>
+            <label for="rotation">Rotation</label>
             <input
                 type="range"
                 id="rotation"
@@ -50,10 +51,11 @@
                 step="1"
                 oninput={(e) => updateRotation(e.target.value)}
             >
+            <span class="value">{rotation}°</span>
         </div>
 
         <div class="control-group">
-            <label for="volume">Volume: <span>{volume}</span>%</label>
+            <label for="volume">Volume</label>
             <input
                 type="range"
                 id="volume"
@@ -63,13 +65,14 @@
                 step="1"
                 oninput={(e) => updateVolume(e.target.value)}
             >
+            <span class="value">{volume}%</span>
             <div class="value-display">Adjust based on your oscilloscope's sensitivity</div>
         </div>
     </Card>
 
     <Card title="SVG">
         <div class="control-group">
-            <label for="svgSamplePoints">Sample Points: <span>{svgSamplePoints}</span></label>
+            <label for="svgSamplePoints">Sample Points</label>
             <input
                 type="range"
                 id="svgSamplePoints"
@@ -78,11 +81,12 @@
                 bind:value={svgSamplePoints}
                 step="50"
             >
+            <span class="value">{svgSamplePoints}</span>
             <div class="value-display">Number of points sampled from SVG paths</div>
         </div>
 
         <div class="control-group">
-            <label for="svgAnimationFPS">Animation FPS: <span>{svgAnimationFPS}</span></label>
+            <label for="svgAnimationFPS">Animation FPS</label>
             <input
                 type="range"
                 id="svgAnimationFPS"
@@ -91,6 +95,7 @@
                 bind:value={svgAnimationFPS}
                 step="5"
             >
+            <span class="value">{svgAnimationFPS}</span>
             <div class="value-display">Frame rate for sampling CSS animations in SVG tab</div>
         </div>
     </Card>
@@ -105,22 +110,27 @@
     }
 
     .control-group {
-        display: flex;
-        flex-direction: column;
-        gap: 8px;
+        display: grid;
+        grid-template-columns: auto 1fr auto;
+        gap: 8px 12px;
+        align-items: center;
     }
 
     .control-group label {
-        font-size: 12px;
+        font-size: 11px;
         font-weight: 600;
         color: #666;
         text-transform: uppercase;
         letter-spacing: 0.5px;
+        white-space: nowrap;
     }
 
-    .control-group label span {
+    .control-group .value {
+        font-size: 9pt;
         color: #1976d2;
         font-weight: 700;
+        white-space: nowrap;
+        text-align: right;
     }
 
     .control-group input[type="range"] {
@@ -128,6 +138,7 @@
     }
 
     .value-display {
+        grid-column: 2 / 4;
         font-size: 11px;
         color: #999;
         font-style: italic;
