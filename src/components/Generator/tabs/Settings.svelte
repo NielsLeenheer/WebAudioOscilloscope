@@ -114,16 +114,18 @@
     }
 
     .card-controls {
-        padding: 10px;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
     }
 
     .control-group {
         display: grid;
-        grid-template-columns: 130px 1fr 70px;
-        gap: 0 12px;
+        grid-template-columns: 104px 1fr 50px;
         align-items: center;
+        gap: 0 12px;
         margin: 0;
-        padding: 4px 12px;
+        padding: 0;
     }
 
     .control-group label {
@@ -135,7 +137,7 @@
         white-space: nowrap;
         text-align: right;
         margin: 0;
-        padding: 8px 16px;
+        padding: 0;
     }
 
     .control-group label.clickable {

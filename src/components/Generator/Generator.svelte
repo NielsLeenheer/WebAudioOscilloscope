@@ -79,7 +79,7 @@
 
     /* Make settings dialog wider */
     .generator :global(.dialog.anchored) {
-        min-width: 500px;
-        max-width: 700px;
+        min-width: 400px;
+        max-width: 500px;
     }
 </style>
