@@ -124,7 +124,7 @@
         display: grid;
         grid-template-rows: repeat(2, 1fr);
         gap: 16px;
-        padding: 20px;
+        padding: 40px;
     }
 
     .card-grid {

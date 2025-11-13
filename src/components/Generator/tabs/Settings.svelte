@@ -108,7 +108,7 @@
 
 <style>
     .settings-container {
-        padding: 20px;
+        padding: 40px;
         display: flex;
         flex-direction: column;
         gap: 15px;
@@ -120,10 +120,11 @@
 
     .control-group {
         display: grid;
-        grid-template-columns: 110px 1fr 70px;
+        grid-template-columns: 130px 1fr 70px;
         gap: 0 12px;
         align-items: center;
         margin: 0;
+        padding: 4px 12px;
     }
 
     .control-group label {

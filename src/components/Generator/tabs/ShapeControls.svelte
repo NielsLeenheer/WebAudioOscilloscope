@@ -154,7 +154,7 @@
 
 <style>
     .shapes-container {
-        padding: 20px;
+        padding: 40px;
         display: flex;
         flex-direction: column;
         gap: 15px;

@@ -102,14 +102,6 @@
         transition: border-color 0.2s;
     }
 
-    .code-editor:focus {
-        border-color: #1976d2;
-    }
-
-    .code-editor.invalid {
-        border-color: #f44336;
-    }
-
     .code-editor:empty:before {
         content: attr(data-placeholder);
         color: #999;
