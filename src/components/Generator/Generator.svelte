@@ -7,6 +7,7 @@
     import DrawControls from './tabs/DrawControls.svelte';
     import SVGControls from './tabs/SVGControls.svelte';
     import Settings from './tabs/Settings.svelte';
+    import Dialog from '../Common/Dialog.svelte';
 
     let { audioEngine, start, stop } = $props();
     let activeTab = $state('waves');
@@ -18,11 +19,18 @@
     // SVG input shared between Draw tab and SVG tab
     let svgInput = $state('');
     let svgSelectedExample = $state('star');
+
+    // Settings dialog
+    let settingsDialog = $state(null);
+
+    function handleSettingsClick() {
+        settingsDialog?.showModal();
+    }
 </script>
 
 <div class="generator">
     <Header {audioEngine} {start} {stop} />
-    <Navigation bind:activeTab />
+    <Navigation bind:activeTab onSettingsClick={handleSettingsClick} />
     <div class="content-area">
         <div class="tab-panel" class:active={activeTab === 'waves'}>
             <WaveControls {audioEngine} />
@@ -39,10 +47,11 @@
         <div class="tab-panel" class:active={activeTab === 'svg'}>
             <SVGControls {audioEngine} bind:animationFPS={svgAnimationFPS} bind:numSamples={svgSamplePoints} bind:svgInput bind:selectedExample={svgSelectedExample} />
         </div>
-        <div class="tab-panel" class:active={activeTab === 'settings'}>
-            <Settings {audioEngine} bind:svgAnimationFPS bind:svgSamplePoints />
-        </div>
     </div>
+
+    <Dialog bind:dialogRef={settingsDialog} anchored={true} anchorId="settings-button" title="Settings">
+        <Settings {audioEngine} bind:svgAnimationFPS bind:svgSamplePoints />
+    </Dialog>
 </div>
 
 <style>

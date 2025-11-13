@@ -8,7 +8,7 @@
     import pathsIcon from '../../assets/icons/paths.svg?raw';
     import settingsIcon from '../../assets/icons/settings.svg?raw';
 
-    let { activeTab = $bindable() } = $props();
+    let { activeTab = $bindable(), onSettingsClick } = $props();
 </script>
 
 <div class="navigation">
@@ -43,10 +43,9 @@
             SVG
         </label>
 
-        <label>
-            <input type="radio" name="tab" value="settings" bind:group={activeTab}>
+        <button class="settings-button" onclick={onSettingsClick} style="anchor-name: --settings-button">
             <Icon data={settingsIcon} />
-        </label>
+        </button>
     </nav>
 </div>
 
@@ -80,9 +79,6 @@
         border-radius: 6px;
         cursor: pointer;
     }
-    label:last-child {
-        margin-left: auto;
-    }
     label:has(:focus-visible) {
         outline: -webkit-focus-ring-color auto 1px;
     }
@@ -99,5 +95,26 @@
     input {
         position: absolute;
         opacity: 0;
+    }
+
+    .settings-button {
+        display: flex;
+        align-items: center;
+        padding: 0px 12px;
+        border-radius: 6px;
+        cursor: pointer;
+        background: none;
+        border: none;
+        margin-left: auto;
+        height: 100%;
+    }
+
+    .settings-button:hover {
+        background: rgba(0, 0, 0, 0.05);
+    }
+
+    .settings-button :global(svg) {
+        width: 1.8em;
+        height: 1.8em;
     }
 </style>

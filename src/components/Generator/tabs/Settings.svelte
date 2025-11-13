@@ -108,7 +108,6 @@
 
 <style>
     .settings-container {
-        padding: 40px;
         display: flex;
         flex-direction: column;
         gap: 15px;
