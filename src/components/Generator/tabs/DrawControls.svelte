@@ -16,8 +16,14 @@
 
     // Auto-update scope whenever path changes and playing
     $effect(() => {
-        if ($isPlaying && isActive && currentNormalizedPoints) {
-            updateScope();
+        if ($isPlaying && isActive) {
+            if (currentNormalizedPoints) {
+                updateScope();
+            } else {
+                // Clear output when tab becomes active with no points
+                audioEngine.restoreDefaultFrequency();
+                audioEngine.createWaveform([]);
+            }
         }
     });
 

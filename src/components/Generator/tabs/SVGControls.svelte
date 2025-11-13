@@ -1,6 +1,5 @@
 <script>
     import { get } from 'svelte/store';
-    import { parseSVGPath } from '../../../utils/shapes.js';
     import { svgExamples } from '../../../utils/svgExamples/index.js';
     import { onMount } from 'svelte';
     import Preview from '../../Common/Preview.svelte';
@@ -71,7 +70,6 @@
         try {
             const inputType = detectInputType(data);
             if (inputType === 'path') {
-                parseSVGPath(data, numSamples, true);
                 // Update preview for path data
                 const { segments, bbox } = extractPathPoints(data, numSamples);
                 // Normalize all segments together
