@@ -76,7 +76,6 @@
         padding: 40px;
         display: flex;
         flex-direction: column;
-        align-items: center;
         gap: 20px;
     }
 
@@ -87,13 +86,16 @@
 
     .options-grid {
         display: grid;
+        width: fit-content;
         grid-template-columns: 1fr 1fr;
-        gap: 12px;
+        gap: 24px;
+        justify-self: center;
     }
 
     .option-item {
         display: flex;
         align-items: center;
+        justify-self: center;
         gap: 8px;
     }
 
