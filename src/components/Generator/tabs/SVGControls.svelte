@@ -1,5 +1,6 @@
 <script>
     import { get } from 'svelte/store';
+    import { untrack } from 'svelte';
     import { svgExamples } from '../../../utils/svgExamples/index.js';
     import { onMount } from 'svelte';
     import Preview from '../../Common/Preview.svelte';
@@ -181,7 +182,7 @@
 
     // Re-validate and re-apply when optimization settings change
     $effect(() => {
-        // Track dependencies
+        // Track ONLY these dependencies
         optimizeSegments;
         doubleDraw;
 
@@ -191,15 +192,18 @@
             return;
         }
 
-        // Re-validate current input to apply new optimization settings
-        if (svgInput && isValid) {
-            validateInput(svgInput);
+        // Use untrack to access other reactive values without subscribing to them
+        untrack(() => {
+            // Re-validate current input to apply new optimization settings
+            if (svgInput && isValid) {
+                validateInput(svgInput);
 
-            // Re-apply if tab is active and playing
-            if (isActive && $isPlaying) {
-                applyInput(svgInput);
+                // Re-apply if tab is active and playing
+                if (isActive && $isPlaying) {
+                    applyInput(svgInput);
+                }
             }
-        }
+        });
     });
 </script>
 
