@@ -8,7 +8,7 @@
     import pathsIcon from '../../assets/icons/paths.svg?raw';
     import settingsIcon from '../../assets/icons/settings.svg?raw';
 
-    let { activeTab = $bindable() } = $props();
+    let { activeTab = $bindable(), onSettingsClick } = $props();
 </script>
 
 <div class="navigation">
@@ -40,14 +40,12 @@
         <label>
             <input type="radio" name="tab" value="svg" bind:group={activeTab}>
             <Icon data={pathsIcon} />
-            SVG Paths
+            SVG
         </label>
 
-        <label>
-            <input type="radio" name="tab" value="settings" bind:group={activeTab}>
+        <button class="settings-button" onclick={onSettingsClick} style="anchor-name: --settings-button">
             <Icon data={settingsIcon} />
-            Settings
-        </label>
+        </button>
     </nav>
 </div>
 
@@ -56,51 +54,67 @@
         display: flex;
         align-items: center;
         padding: 0 20px;
-        background: #fafafa;
+        background: #f5f5f5;
         border-bottom: 1px solid #ddd;
         padding-top: 15px;
         padding-bottom: 15px;
     }
 
     nav {
+        width: 100%;
         border: none;
-        border-radius: 6px;
-        background: #eaeaea;
         font-family: system-ui;
         font-size: 10pt;
         display: flex;
         height: 32px;
         align-items: stretch;
         user-select: none;
+        gap: 6px;
     }
 
     label {
         display: flex;
         align-items: center;
-        padding: 0px 9px;
+        padding: 0px 12px;
+        border-radius: 6px;
         cursor: pointer;
-    }
-    label:first-child {
-        border-radius: 6px 0 0 6px;
-    }
-    label:last-child {
-        border-radius: 0 6px 6px 0;
     }
     label:has(:focus-visible) {
         outline: -webkit-focus-ring-color auto 1px;
     }
     label:has(input:checked) {
-        background: #d5d5d5;
+        background: #fff;
     }
 
     label :global(svg) {
-        width: 1.5em;
-        height: 1.5em;
+        width: 1.8em;
+        height: 1.8em;
         margin-right: 4px;
     }
 
     input {
         position: absolute;
         opacity: 0;
+    }
+
+    .settings-button {
+        display: flex;
+        align-items: center;
+        padding: 0px 12px;
+        border-radius: 6px;
+        cursor: pointer;
+        background: none;
+        border: none;
+        margin-left: auto;
+        height: 100%;
+    }
+
+    .settings-button:hover {
+        background: rgba(0, 0, 0, 0.05);
+    }
+
+    .settings-button :global(svg) {
+        width: 1.8em;
+        height: 1.8em;
     }
 </style>

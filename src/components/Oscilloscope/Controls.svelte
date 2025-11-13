@@ -4,19 +4,51 @@
         beamPower = $bindable(),
         focus = $bindable(),
         xPosition = $bindable(),
-        timeDivBase = $bindable(),
-        timeDivFine = $bindable(),
-        timeDivLabels,
         triggerLevel = $bindable(),
         triggerChannel = $bindable(),
+        // Expose calculated values
+        timeDiv = $bindable(),
+        amplDivA = $bindable(),
+        amplDivB = $bindable(),
         positionA = $bindable(),
-        amplBaseA = $bindable(),
-        amplFineA = $bindable(),
-        amplLabels,
-        positionB = $bindable(),
-        amplBaseB = $bindable(),
-        amplFineB = $bindable()
+        positionB = $bindable()
     } = $props();
+
+    // Time division steps (like real oscilloscope) - stored in microseconds for easy calculation
+    const timeDivSteps = [0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000, 50000, 100000, 200000, 500000];
+    const timeDivLabels = ['0.05µs', '0.1µs', '0.2µs', '0.5µs', '1µs', '2µs', '5µs', '10µs', '20µs', '50µs', '0.1ms', '0.2ms', '0.5ms', '1ms', '2ms', '5ms', '10ms', '20ms', '50ms', '0.1s', '0.2s', '0.5s'];
+
+    // Base amplification steps (like real oscilloscope)
+    const amplSteps = [0.002, 0.005, 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10];
+    const amplLabels = ['2mV', '5mV', '10mV', '20mV', '50mV', '0.1V', '0.2V', '0.5V', '1V', '2V', '5V', '10V'];
+
+    // Internal state for time division
+    let timeDivBase = $state(13); // Index into timeDivSteps (default 1ms)
+    let timeDivFine = $state(1.0); // Fine adjustment multiplier (0.5 to 2.5)
+
+    // Internal state for channel A
+    let amplBaseA = $state(8); // Index into amplSteps (default 1V)
+    let amplFineA = $state(1.0); // Fine adjustment multiplier (0.5 to 2.5)
+    let internalPositionA = $state(0.0); // Position A: vertical offset for channel A (-1.0 to 1.0)
+
+    // Internal state for channel B
+    let amplBaseB = $state(8); // Index into amplSteps (default 1V)
+    let amplFineB = $state(1.0); // Fine adjustment multiplier (0.5 to 2.5)
+    let internalPositionB = $state(0.0); // Position B: vertical offset for channel B (-1.0 to 1.0)
+
+    // Calculate combined values
+    let calculatedTimeDiv = $derived(timeDivSteps[timeDivBase] * timeDivFine);
+    let calculatedAmplDivA = $derived(amplSteps[amplBaseA] * amplFineA);
+    let calculatedAmplDivB = $derived(amplSteps[amplBaseB] * amplFineB);
+
+    // Sync calculated values and positions to bindable props
+    $effect(() => {
+        timeDiv = calculatedTimeDiv;
+        amplDivA = calculatedAmplDivA;
+        amplDivB = calculatedAmplDivB;
+        positionA = internalPositionA;
+        positionB = internalPositionB;
+    });
 </script>
 
 <div class="controls-grid">
@@ -49,7 +81,6 @@
         </div>
         <div class="slider-control trigger-control" class:disabled={mode === 'xy'}>
             <label>TRIGGER</label>
-            <input type="range" min="-1" max="1" step="0.01" bind:value={triggerLevel} disabled={mode === 'xy'} class="trigger-slider" />
             <div class="trigger-channel-selector">
                 <button
                     class="channel-btn"
@@ -64,6 +95,7 @@
                     disabled={mode === 'xy'}
                 >B</button>
             </div>
+            <input type="range" min="-1" max="1" step="0.01" bind:value={triggerLevel} disabled={mode === 'xy'} class="trigger-slider" />
             <span class="value">{triggerLevel.toFixed(2)}</span>
         </div>
     </div>
@@ -73,8 +105,8 @@
         <div class="panel-label">CHANNEL A</div>
         <div class="slider-control" class:disabled={mode === 'b'}>
             <label>POSITION</label>
-            <input type="range" min="-1" max="1" step="0.01" bind:value={positionA} disabled={mode === 'b'} />
-            <span class="value">{positionA.toFixed(2)}</span>
+            <input type="range" min="-1" max="1" step="0.01" bind:value={internalPositionA} disabled={mode === 'b'} />
+            <span class="value">{internalPositionA.toFixed(2)}</span>
         </div>
         <div class="slider-control dual-slider" class:disabled={mode === 'b'}>
             <label>AMPL/DIV</label>
@@ -89,8 +121,8 @@
         <div class="panel-label">CHANNEL B</div>
         <div class="slider-control" class:disabled={mode === 'a'}>
             <label>POSITION</label>
-            <input type="range" min="-1" max="1" step="0.01" bind:value={positionB} disabled={mode === 'a'} />
-            <span class="value">{positionB.toFixed(2)}</span>
+            <input type="range" min="-1" max="1" step="0.01" bind:value={internalPositionB} disabled={mode === 'a'} />
+            <span class="value">{internalPositionB.toFixed(2)}</span>
         </div>
         <div class="slider-control dual-slider" class:disabled={mode === 'a'}>
             <label>AMPL/DIV</label>
@@ -253,10 +285,14 @@
     }
 
     .slider-control.trigger-control {
-        grid-template-columns: 80px 1fr 60px 50px;
+        grid-template-columns: 80px 1fr 1fr 50px;
     }
 
     .slider-control.trigger-control .trigger-slider {
+        width: 100%;
+    }
+
+    .slider-control.trigger-control .trigger-channel-selector {
         width: 100%;
     }
 
@@ -282,17 +318,13 @@
         transition: all 0.2s;
         line-height: 1;
         height: 100%;
+        padding: 0;
+        justify-content: center;
     }
     .channel-btn:hover:not(:disabled) {
         background: transparent;
         color: #4CAF50;
     }
-
-    /* .channel-btn:hover:not(:disabled) {
-        background: #333;
-        color: #4CAF50;
-    } */
-
     .channel-btn.active, 
     .channel-btn.active:hover:not(:disabled) {
         background: #4CAF50;

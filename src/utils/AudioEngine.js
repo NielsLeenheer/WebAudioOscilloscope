@@ -1,3 +1,5 @@
+import { writable, get } from 'svelte/store';
+
 export class AudioEngine {
     constructor() {
         this.audioContext = null;
@@ -12,7 +14,7 @@ export class AudioEngine {
         this.defaultFrequency = 100; // Settings tab default frequency
         this.baseFrequency = 100; // Current playback frequency
         this.currentRotation = 0;
-        this.isPlaying = false;
+        this.isPlaying = writable(false);
         this.clockInterval = null;
     }
 
@@ -58,7 +60,7 @@ export class AudioEngine {
 
     start() {
         this.initialize();
-        this.isPlaying = true;
+        this.isPlaying.set(true);
     }
 
     stop() {
@@ -77,7 +79,7 @@ export class AudioEngine {
             this.clockInterval = null;
         }
 
-        this.isPlaying = false;
+        this.isPlaying.set(false);
     }
 
     setVolume(value) {
@@ -113,7 +115,7 @@ export class AudioEngine {
     }
 
     createWaveform(points, isClockUpdate = false) {
-        if (!this.audioContext || !this.isPlaying) return;
+        if (!this.audioContext || !get(this.isPlaying)) return;
 
         // Clear clock interval if switching to a different shape (but not if this is a clock update)
         if (this.clockInterval && !isClockUpdate) {
@@ -194,7 +196,7 @@ export class AudioEngine {
 
         // Set up interval to redraw every second
         this.clockInterval = setInterval(() => {
-            if (this.isPlaying) {
+            if (get(this.isPlaying)) {
                 this.createWaveform(generateClockPoints(), true); // true = this is a clock update
             }
         }, 1000);

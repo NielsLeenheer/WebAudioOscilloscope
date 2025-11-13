@@ -2,14 +2,16 @@
     /**
      * Reusable TabBar component
      *
-     * @prop {Array} tabs - Array of tab objects with structure: { id: string, label: string, icon?: string }
+     * @prop {Array} tabs - Array of tab objects with structure: { id: string, label: string, icon?: string, anchorName?: string }
      * @prop {string} activeTab - Currently active tab ID
      * @prop {Function} onTabChange - Callback when tab changes, receives tab ID
+     * @prop {boolean} wrap - Whether to wrap tabs when they overflow
      */
     let {
         tabs = [],
         activeTab = $bindable(''),
-        onTabChange = null
+        onTabChange = null,
+        wrap = false
     } = $props();
 
     function handleTabClick(tabId) {
@@ -20,13 +22,14 @@
     }
 </script>
 
-<div class="tab-bar">
+<div class="tab-bar" class:wrap={wrap}>
     {#each tabs as tab}
         <button
             class="tab"
             class:active={activeTab === tab.id}
             onclick={() => handleTabClick(tab.id)}
             title={tab.label}
+            style={tab.anchorName ? `anchor-name: --${tab.anchorName}` : ''}
         >
             {#if tab.icon}
                 <div class="tab-icon">
@@ -42,11 +45,14 @@
 
 <style>
     .tab-bar {
-        display: flex;
+        display: inline-flex;
         gap: 4px;
-        background: #f5f5f5;
-        padding: 4px;
+        background: #eee;
         border-radius: 6px;
+    }
+
+    .tab-bar.wrap {
+        flex-wrap: wrap;
     }
 
     .tab {
@@ -54,7 +60,7 @@
         padding: 8px 12px;
         background: transparent;
         border: none;
-        border-radius: 4px;
+        border-radius: 6px;
         cursor: pointer;
         transition: all 0.2s;
         font-family: system-ui;
@@ -66,22 +72,25 @@
         min-height: 40px;
     }
 
+    .tab-bar.wrap .tab {
+        flex: 0 1 auto;
+        min-width: fit-content;
+    }
+
     .tab:hover {
         background: rgba(0, 0, 0, 0.05);
     }
 
     .tab.active {
-        background: white;
-        color: #1976d2;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        background: #1976d2;
+        color: #bbdefb;
     }
 
     .tab-icon {
         display: flex;
         align-items: center;
         justify-content: center;
-        width: 48px;
-        height: 24px;
+        height: 20px;
     }
 
     .tab-icon :global(svg) {
