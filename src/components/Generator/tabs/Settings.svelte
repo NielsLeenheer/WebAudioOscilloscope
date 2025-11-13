@@ -134,12 +134,13 @@
         letter-spacing: 0.5px;
         white-space: nowrap;
         text-align: right;
+        margin: 0;
+        padding: 8px 16px;
     }
 
     .control-group .value {
         font-size: 9pt;
-        color: #1976d2;
-        font-weight: 700;
+        color: #666;
         white-space: nowrap;
         text-align: left;
     }

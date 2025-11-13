@@ -72,13 +72,13 @@
 
             <div class="controls-row">
                 <div class="control-item slider-item">
-                    <label class="clickable" onclick={() => leftFrequency = 440}>Frequency:</label>
+                    <label class="clickable" onclick={() => leftFrequency = 440}>Frequency</label>
                     <input type="range" bind:value={leftFrequency} min="20" max="2000" step="1">
                     <span class="value-display">{leftFrequency} Hz</span>
                 </div>
 
                 <div class="control-item slider-item">
-                    <label class="clickable" onclick={() => leftPhase = 0}>Phase Shift:</label>
+                    <label class="clickable" onclick={() => leftPhase = 0}>Phase Shift</label>
                     <input type="range" bind:value={leftPhase} min="0" max="360" step="1">
                     <span class="value-display">{leftPhase}°</span>
                 </div>
