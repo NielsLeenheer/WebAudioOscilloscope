@@ -16,6 +16,7 @@
     let validationError = $state('');
     let isValid = $state(true);
     let normalizedPoints = $state([]);
+    let optimizationInitialized = $state(false);
 
     // Animation sampler
     let sampler = null;
@@ -183,6 +184,12 @@
         // Track dependencies
         optimizeSegments;
         doubleDraw;
+
+        // Skip initial effect run to avoid infinite loop
+        if (!optimizationInitialized) {
+            optimizationInitialized = true;
+            return;
+        }
 
         // Re-validate current input to apply new optimization settings
         if (svgInput && isValid) {
