@@ -53,6 +53,7 @@
                     oninput={(e) => updateRotation(e.target.value)}
                 >
                 <span class="value">{rotation}°</span>
+                <div class="value-display">Rotate the output signal clockwise</div>
             </div>
 
             <div class="control-group">
@@ -132,6 +133,7 @@
         text-transform: uppercase;
         letter-spacing: 0.5px;
         white-space: nowrap;
+        text-align: right;
     }
 
     .control-group .value {
@@ -139,7 +141,7 @@
         color: #1976d2;
         font-weight: 700;
         white-space: nowrap;
-        text-align: right;
+        text-align: left;
     }
 
     .control-group input[type="range"] {
