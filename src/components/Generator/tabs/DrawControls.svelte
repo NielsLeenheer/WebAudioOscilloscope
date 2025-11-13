@@ -4,6 +4,7 @@
     import PathEditor from '../../Common/PathEditor.svelte';
     import ImageUpload from '../../Common/ImageUpload.svelte';
     import EraseIcon from '../../../assets/icons/erase.svg?raw';
+    import MoveIcon from '../../../assets/icons/move.svg?raw';
 
     let { audioEngine, activeTab = $bindable('draw'), svgInput = $bindable(''), svgSelectedExample = $bindable('star') } = $props();
     let isPlaying = audioEngine.isPlaying;
@@ -90,7 +91,8 @@
             {@html EraseIcon}
             Clear
         </Button>
-        <Button variant="primary" onclick={copyToSVG}>
+        <Button variant="secondary" onclick={copyToSVG}>
+            {@html MoveIcon}
             Copy to SVG
         </Button>
     </div>
