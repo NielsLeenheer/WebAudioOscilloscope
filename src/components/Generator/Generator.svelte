@@ -17,6 +17,7 @@
 
     // SVG input shared between Draw tab and SVG tab
     let svgInput = $state('');
+    let svgSelectedExample = $state('star');
 </script>
 
 <div class="generator">
@@ -30,9 +31,9 @@
         {:else if activeTab === 'clock'}
             <ClockControls {audioEngine} />
         {:else if activeTab === 'draw'}
-            <DrawControls {audioEngine} bind:activeTab bind:svgInput />
+            <DrawControls {audioEngine} bind:activeTab bind:svgInput bind:svgSelectedExample />
         {:else if activeTab === 'svg'}
-            <SVGControls {audioEngine} bind:animationFPS={svgAnimationFPS} bind:numSamples={svgSamplePoints} bind:svgInput />
+            <SVGControls {audioEngine} bind:animationFPS={svgAnimationFPS} bind:numSamples={svgSamplePoints} bind:svgInput bind:selectedExample={svgSelectedExample} />
         {:else if activeTab === 'settings'}
             <Settings {audioEngine} bind:svgAnimationFPS bind:svgSamplePoints />
         {/if}

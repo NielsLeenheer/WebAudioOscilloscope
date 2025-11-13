@@ -5,7 +5,7 @@
     import ImageUpload from '../../Common/ImageUpload.svelte';
     import EraseIcon from '../../../assets/icons/erase.svg?raw';
 
-    let { audioEngine, activeTab = $bindable('draw'), svgInput = $bindable('') } = $props();
+    let { audioEngine, activeTab = $bindable('draw'), svgInput = $bindable(''), svgSelectedExample = $bindable('star') } = $props();
     let isPlaying = audioEngine.isPlaying;
 
     let pathEditor;
@@ -73,6 +73,7 @@
 
         const svg = pathEditor.exportSVG();
         if (svg) {
+            svgSelectedExample = 'custom';
             svgInput = svg;
             activeTab = 'svg';
         }
