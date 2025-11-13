@@ -73,8 +73,9 @@
             if (inputType === 'path') {
                 parseSVGPath(data, numSamples, true);
                 // Update preview for path data
-                const { points, bbox } = extractPathPoints(data, numSamples);
-                normalizedPoints = normalizePoints(points, bbox);
+                const { segments, bbox } = extractPathPoints(data, numSamples);
+                // Normalize all segments together
+                normalizedPoints = segments.map(segment => normalizePoints(segment, bbox));
             } else {
                 normalizedPoints = parseSVGMarkupStatic(data, numSamples);
             }

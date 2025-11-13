@@ -114,7 +114,7 @@ export class AudioEngine {
         this.currentRotation = parseFloat(value);
     }
 
-    createWaveform(points, isClockUpdate = false) {
+    createWaveform(pointsOrSegments, isClockUpdate = false) {
         if (!this.audioContext || !get(this.isPlaying)) return;
 
         // Clear clock interval if switching to a different shape (but not if this is a clock update)
@@ -127,17 +127,24 @@ export class AudioEngine {
         if (this.leftOscillator) this.leftOscillator.stop();
         if (this.rightOscillator) this.rightOscillator.stop();
 
-        // Apply rotation
+        // Detect if input is segments (array of arrays) or flat points (array of [x,y])
+        const isSegmented = pointsOrSegments.length > 0 &&
+                           Array.isArray(pointsOrSegments[0]) &&
+                           Array.isArray(pointsOrSegments[0][0]);
+
+        const segments = isSegmented ? pointsOrSegments : [pointsOrSegments];
+
+        // Apply rotation to all segments
         const rad = this.currentRotation * Math.PI / 180;
         const cos = Math.cos(rad);
         const sin = Math.sin(rad);
 
-        const rotatedPoints = points.map(([x, y]) => {
-            return [
+        const rotatedSegments = segments.map(segment =>
+            segment.map(([x, y]) => [
                 x * cos - y * sin,
                 x * sin + y * cos
-            ];
-        });
+            ])
+        );
 
         // Create buffer for custom waveform
         const sampleRate = this.audioContext.sampleRate;
@@ -150,17 +157,41 @@ export class AudioEngine {
         const leftData = leftBuffer.getChannelData(0);
         const rightData = rightBuffer.getChannelData(0);
 
-        // Fill buffers with interpolated points
-        for (let i = 0; i < bufferSize; i++) {
-            const t = i / bufferSize;
-            const pointIndex = t * rotatedPoints.length;
-            const index1 = Math.floor(pointIndex) % rotatedPoints.length;
-            const index2 = (index1 + 1) % rotatedPoints.length;
-            const frac = pointIndex - Math.floor(pointIndex);
+        // Calculate total points across all segments
+        const totalPoints = rotatedSegments.reduce((sum, seg) => sum + seg.length, 0);
 
-            // Linear interpolation
-            leftData[i] = rotatedPoints[index1][0] * (1 - frac) + rotatedPoints[index2][0] * frac;
-            rightData[i] = rotatedPoints[index1][1] * (1 - frac) + rotatedPoints[index2][1] * frac;
+        // Allocate buffer space proportionally to each segment
+        let bufferOffset = 0;
+        rotatedSegments.forEach((segment, segmentIndex) => {
+            const segmentBufferSize = Math.floor(bufferSize * segment.length / totalPoints);
+
+            // Fill this segment's portion of the buffer with interpolation
+            for (let i = 0; i < segmentBufferSize; i++) {
+                const t = i / segmentBufferSize;
+                const pointIndex = t * segment.length;
+                const index1 = Math.floor(pointIndex);
+                const index2 = Math.min(index1 + 1, segment.length - 1);
+                const frac = pointIndex - Math.floor(pointIndex);
+
+                // Linear interpolation within this segment
+                const bufferIndex = bufferOffset + i;
+                if (bufferIndex < bufferSize) {
+                    leftData[bufferIndex] = segment[index1][0] * (1 - frac) + segment[index2][0] * frac;
+                    rightData[bufferIndex] = segment[index1][1] * (1 - frac) + segment[index2][1] * frac;
+                }
+            }
+
+            bufferOffset += segmentBufferSize;
+        });
+
+        // Fill any remaining buffer space (due to rounding) by repeating the last segment
+        if (bufferOffset < bufferSize && rotatedSegments.length > 0) {
+            const lastSegment = rotatedSegments[rotatedSegments.length - 1];
+            const lastPoint = lastSegment[lastSegment.length - 1];
+            for (let i = bufferOffset; i < bufferSize; i++) {
+                leftData[i] = lastPoint[0];
+                rightData[i] = lastPoint[1];
+            }
         }
 
         // Create buffer sources

@@ -36,52 +36,51 @@
         const centerX = canvas.width / 2;
         const centerY = canvas.height / 2;
 
-        // Draw points as a path
+        // Detect if input is segments (array of arrays) or flat points
+        const isSegmented = points.length > 0 &&
+                           Array.isArray(points[0]) &&
+                           Array.isArray(points[0][0]);
+
+        const segments = isSegmented ? points : [points];
+
+        // Draw each segment
         ctx.strokeStyle = strokeColor;
         ctx.lineWidth = lineWidth;
 
-        ctx.beginPath();
-        let firstPoint = true;
-        let prevX = 0;
-        let prevY = 0;
+        segments.forEach((segment, segmentIndex) => {
+            if (segment.length === 0) return;
 
-        for (let i = 0; i < points.length; i++) {
-            const [normX, normY] = points[i];
+            ctx.beginPath();
 
-            // Convert normalized coordinates (-1 to 1) to canvas coordinates
-            const canvasX = centerX + normX * scale;
-            const canvasY = centerY - normY * scale;  // Flip Y for canvas
+            for (let i = 0; i < segment.length; i++) {
+                const [normX, normY] = segment[i];
 
-            if (firstPoint) {
-                ctx.moveTo(canvasX, canvasY);
-                firstPoint = false;
-            } else {
-                // Calculate distance in normalized space
-                const dx = normX - prevX;
-                const dy = normY - prevY;
-                const distance = Math.sqrt(dx * dx + dy * dy);
+                // Convert normalized coordinates (-1 to 1) to canvas coordinates
+                const canvasX = centerX + normX * scale;
+                const canvasY = centerY - normY * scale;  // Flip Y for canvas
 
-                // If it's a large jump, draw with lower opacity
-                if (distance > jumpThreshold) {
-                    ctx.stroke(); // Finish current path
-                    ctx.strokeStyle = jumpColor;
-                    ctx.beginPath();
-                    ctx.moveTo(centerX + prevX * scale, centerY - prevY * scale);
-                    ctx.lineTo(canvasX, canvasY);
-                    ctx.stroke();
-                    ctx.strokeStyle = strokeColor;
-                    ctx.beginPath();
+                if (i === 0) {
                     ctx.moveTo(canvasX, canvasY);
                 } else {
                     ctx.lineTo(canvasX, canvasY);
                 }
             }
 
-            prevX = normX;
-            prevY = normY;
-        }
+            ctx.stroke();
 
-        ctx.stroke();
+            // Draw a faint line to the next segment (if any) to show the jump
+            if (segmentIndex < segments.length - 1 && segments[segmentIndex + 1].length > 0) {
+                const lastPoint = segment[segment.length - 1];
+                const nextFirstPoint = segments[segmentIndex + 1][0];
+
+                ctx.strokeStyle = jumpColor;
+                ctx.beginPath();
+                ctx.moveTo(centerX + lastPoint[0] * scale, centerY - lastPoint[1] * scale);
+                ctx.lineTo(centerX + nextFirstPoint[0] * scale, centerY - nextFirstPoint[1] * scale);
+                ctx.stroke();
+                ctx.strokeStyle = strokeColor;
+            }
+        });
     });
 </script>
 

@@ -3,6 +3,8 @@
  * Handles SVG DOM creation and continuous path sampling for oscilloscope visualization
  */
 
+import { svgPathProperties } from 'svg-path-properties';
+
 // Singleton container for SVG rendering
 let svgContainer = null;
 
@@ -27,6 +29,49 @@ function getContainer() {
 }
 
 /**
+ * Split SVG path data into segments based on M/m (moveto) commands
+ * @param {string} pathData - SVG path data string
+ * @returns {Array<string>} Array of path segment strings
+ */
+function splitPathIntoSegments(pathData) {
+    // Split on M or m commands, keeping the command
+    const segments = pathData.split(/(?=[Mm])/).filter(s => s.trim());
+
+    if (segments.length === 0) return [pathData];
+
+    return segments;
+}
+
+/**
+ * Sample points from a path segment using svg-path-properties
+ * @param {string} pathData - SVG path segment data
+ * @param {number} numSamples - Number of points to sample
+ * @returns {Array<[number, number]>} Array of [x, y] points
+ */
+function samplePathSegment(pathData, numSamples) {
+    try {
+        const properties = svgPathProperties(pathData);
+        const length = properties.getTotalLength();
+
+        if (!isFinite(length) || length === 0) {
+            return [];
+        }
+
+        const points = [];
+        for (let i = 0; i < numSamples; i++) {
+            const distance = (i / numSamples) * length;
+            const point = properties.getPointAtLength(distance);
+            points.push([point.x, point.y]);
+        }
+
+        return points;
+    } catch (error) {
+        console.warn('Error sampling path segment:', error.message);
+        return [];
+    }
+}
+
+/**
  * Normalize points to -1 to 1 range for oscilloscope coordinates
  * @param {Array<[number, number]>} points - Raw points as [x, y] pairs
  * @param {Object} bbox - Bounding box with x, y, width, height
@@ -45,36 +90,35 @@ export function normalizePoints(points, bbox) {
 }
 
 /**
- * Extract raw points and bbox from SVG path data
+ * Extract raw segments and bbox from SVG path data
  * @param {string} pathData - SVG path data string
  * @param {number} numSamples - Number of points to sample
- * @returns {Object} Object with points and bbox
+ * @returns {Object} Object with segments and bbox
  */
 export function extractPathPoints(pathData, numSamples = 200) {
-    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    // Split path into segments
+    const pathSegments = splitPathIntoSegments(pathData);
+    const segments = [];
 
-    path.setAttribute('d', pathData);
-    svg.appendChild(path);
+    // Sample each segment
+    pathSegments.forEach(segmentData => {
+        const segmentPoints = samplePathSegment(segmentData, Math.floor(numSamples / pathSegments.length));
+        if (segmentPoints.length > 0) {
+            segments.push(segmentPoints);
+        }
+    });
 
-    const totalLength = path.getTotalLength();
-    const points = [];
-
-    for (let i = 0; i < numSamples; i++) {
-        const distance = (i / numSamples) * totalLength;
-        const point = path.getPointAtLength(distance);
-        points.push([point.x, point.y]);
-    }
-
-    // Calculate bbox
+    // Calculate bbox across all segments
     let minX = Infinity, maxX = -Infinity;
     let minY = Infinity, maxY = -Infinity;
 
-    points.forEach(([x, y]) => {
-        minX = Math.min(minX, x);
-        maxX = Math.max(maxX, x);
-        minY = Math.min(minY, y);
-        maxY = Math.max(maxY, y);
+    segments.forEach(segment => {
+        segment.forEach(([x, y]) => {
+            minX = Math.min(minX, x);
+            maxX = Math.max(maxX, x);
+            minY = Math.min(minY, y);
+            maxY = Math.max(maxY, y);
+        });
     });
 
     const bbox = {
@@ -84,23 +128,22 @@ export function extractPathPoints(pathData, numSamples = 200) {
         height: maxY - minY
     };
 
-    return { points, bbox };
+    return { segments, bbox };
 }
 
 /**
  * Extract points from an SVG element using browser APIs
+ * Detects segments within path elements based on M/m commands
  * @param {SVGGeometryElement} element - SVG element to extract points from
  * @param {number} samples - Number of samples to take
- * @returns {Array<[number, number]>} Array of points
+ * @returns {Array<Array<[number, number]>>} Array of segments, each containing points
  */
 export function extractPointsFromElement(element, samples) {
-    const points = [];
+    const segments = [];
 
     // Check if element is an SVGGeometryElement (has getTotalLength)
     if (typeof element.getTotalLength === 'function') {
         try {
-            const totalLength = element.getTotalLength();
-
             // Get the SVG root
             const svg = element.ownerSVGElement;
 
@@ -119,19 +162,58 @@ export function extractPointsFromElement(element, samples) {
                 }
             }
 
-            for (let i = 0; i <= samples; i++) {
-                const distance = (i / samples) * totalLength;
-                const point = element.getPointAtLength(distance);
+            // For path elements, try to detect segments
+            if (element.tagName.toLowerCase() === 'path') {
+                const pathData = element.getAttribute('d');
+                if (pathData) {
+                    const pathSegments = splitPathIntoSegments(pathData);
 
-                // Apply transformation matrix if available
-                if (matrix && svg) {
-                    const svgPoint = svg.createSVGPoint();
-                    svgPoint.x = point.x;
-                    svgPoint.y = point.y;
-                    const transformedPoint = svgPoint.matrixTransform(matrix);
-                    points.push([transformedPoint.x, transformedPoint.y]);
-                } else {
-                    points.push([point.x, point.y]);
+                    // Sample each segment separately
+                    pathSegments.forEach(segmentData => {
+                        const segmentPoints = samplePathSegment(segmentData, Math.floor(samples / pathSegments.length));
+
+                        // Apply transformation matrix to all points in this segment
+                        if (matrix && svg) {
+                            const transformedPoints = segmentPoints.map(([x, y]) => {
+                                const svgPoint = svg.createSVGPoint();
+                                svgPoint.x = x;
+                                svgPoint.y = y;
+                                const transformed = svgPoint.matrixTransform(matrix);
+                                return [transformed.x, transformed.y];
+                            });
+                            if (transformedPoints.length > 0) {
+                                segments.push(transformedPoints);
+                            }
+                        } else {
+                            if (segmentPoints.length > 0) {
+                                segments.push(segmentPoints);
+                            }
+                        }
+                    });
+                }
+            } else {
+                // For non-path elements (circle, rect, etc.), treat as single segment
+                const points = [];
+                const totalLength = element.getTotalLength();
+
+                for (let i = 0; i <= samples; i++) {
+                    const distance = (i / samples) * totalLength;
+                    const point = element.getPointAtLength(distance);
+
+                    // Apply transformation matrix if available
+                    if (matrix && svg) {
+                        const svgPoint = svg.createSVGPoint();
+                        svgPoint.x = point.x;
+                        svgPoint.y = point.y;
+                        const transformedPoint = svgPoint.matrixTransform(matrix);
+                        points.push([transformedPoint.x, transformedPoint.y]);
+                    } else {
+                        points.push([point.x, point.y]);
+                    }
+                }
+
+                if (points.length > 0) {
+                    segments.push(points);
                 }
             }
         } catch (error) {
@@ -140,14 +222,14 @@ export function extractPointsFromElement(element, samples) {
         }
     }
 
-    return points;
+    return segments;
 }
 
 /**
  * Parse full SVG markup and extract all paths (static, no animation)
  * @param {string} markup - Full SVG markup string
  * @param {number} samples - Number of samples per element
- * @returns {Array<[number, number]>} Normalized points
+ * @returns {Array<Array<[number, number]>>} Array of normalized segments
  */
 export function parseSVGMarkupStatic(markup, samples) {
     // Get or create the container
@@ -178,24 +260,28 @@ export function parseSVGMarkupStatic(markup, samples) {
         throw new Error('No drawable shapes found in SVG');
     }
 
-    // Extract points from all elements and combine
-    let allPoints = [];
+    // Extract segments from all elements
+    let allSegments = [];
     elements.forEach((element) => {
-        const elementPoints = extractPointsFromElement(element, Math.floor(samples / elements.length));
-        if (elementPoints.length > 0) {
-            allPoints = allPoints.concat(elementPoints);
+        const elementSegments = extractPointsFromElement(element, Math.floor(samples / elements.length));
+        if (elementSegments.length > 0) {
+            allSegments = allSegments.concat(elementSegments);
         }
     });
 
-    if (allPoints.length === 0) {
+    if (allSegments.length === 0) {
         throw new Error('Could not extract points from SVG');
     }
 
     // Get bounding box to normalize coordinates
     const bbox = svgElement.getBBox();
 
-    // Normalize points for preview and audio engine
-    return normalizePoints(allPoints, bbox);
+    // Normalize all segments together using the same bounding box
+    const normalizedSegments = allSegments.map(segment =>
+        normalizePoints(segment, bbox)
+    );
+
+    return normalizedSegments;
 }
 
 /**
@@ -203,22 +289,22 @@ export function parseSVGMarkupStatic(markup, samples) {
  * @param {SVGSVGElement} svgElement - SVG root element
  * @param {NodeList} elements - List of drawable elements
  * @param {number} samples - Number of samples per element
- * @returns {Array<[number, number]>} Raw points from current frame
+ * @returns {Array<Array<[number, number]>>} Array of segments from current frame
  */
 export function sampleCurrentFrame(svgElement, elements, samples) {
     // Force style recalculation to get current animated state
     svgElement.getBoundingClientRect();
 
-    // Extract points from all elements at current animation state
-    let framePoints = [];
+    // Extract segments from all elements at current animation state
+    let frameSegments = [];
     elements.forEach((element) => {
-        const elementPoints = extractPointsFromElement(element, Math.floor(samples / elements.length));
-        if (elementPoints.length > 0) {
-            framePoints = framePoints.concat(elementPoints);
+        const elementSegments = extractPointsFromElement(element, Math.floor(samples / elements.length));
+        if (elementSegments.length > 0) {
+            frameSegments = frameSegments.concat(elementSegments);
         }
     });
 
-    return framePoints;
+    return frameSegments;
 }
 
 /**
@@ -273,15 +359,17 @@ export function createContinuousSampler(markup, samples, fps, onFrame, isPlaying
         }
 
         try {
-            const framePoints = sampleCurrentFrame(svgElement, elements, samples);
+            const frameSegments = sampleCurrentFrame(svgElement, elements, samples);
 
-            if (framePoints.length === 0) return;
+            if (frameSegments.length === 0) return;
 
-            // Normalize points for preview and audio engine
-            const normalized = normalizePoints(framePoints, bbox);
+            // Normalize all segments together using the same bounding box
+            const normalizedSegments = frameSegments.map(segment =>
+                normalizePoints(segment, bbox)
+            );
 
-            // Call the callback with normalized points
-            onFrame(normalized);
+            // Call the callback with normalized segments
+            onFrame(normalizedSegments);
         } catch (error) {
             console.error('Error sampling animation frame:', error);
         }
