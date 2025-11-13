@@ -25,78 +25,82 @@
 
 <div class="settings-container">
     <Card title="Output">
-        <div class="control-group">
-            <label for="frequency">Frequency (Hz)</label>
-            <input
-                type="range"
-                id="frequency"
-                min="20"
-                max="500"
-                value={frequency}
-                step="1"
-                oninput={(e) => updateFrequency(e.target.value)}
-            >
-            <span class="value">{frequency} Hz</span>
-            <div class="value-display">Lower = slower drawing, Higher = brighter but more flickery</div>
-        </div>
+        <div class="card-controls">
+            <div class="control-group">
+                <label for="frequency">Frequency</label>
+                <input
+                    type="range"
+                    id="frequency"
+                    min="20"
+                    max="500"
+                    value={frequency}
+                    step="1"
+                    oninput={(e) => updateFrequency(e.target.value)}
+                >
+                <span class="value">{frequency} Hz</span>
+                <div class="value-display">Lower = slower drawing, Higher = brighter but more flickery</div>
+            </div>
 
-        <div class="control-group">
-            <label for="rotation">Rotation</label>
-            <input
-                type="range"
-                id="rotation"
-                min="0"
-                max="360"
-                value={rotation}
-                step="1"
-                oninput={(e) => updateRotation(e.target.value)}
-            >
-            <span class="value">{rotation}°</span>
-        </div>
+            <div class="control-group">
+                <label for="rotation">Rotation</label>
+                <input
+                    type="range"
+                    id="rotation"
+                    min="0"
+                    max="360"
+                    value={rotation}
+                    step="1"
+                    oninput={(e) => updateRotation(e.target.value)}
+                >
+                <span class="value">{rotation}°</span>
+            </div>
 
-        <div class="control-group">
-            <label for="volume">Volume</label>
-            <input
-                type="range"
-                id="volume"
-                min="0"
-                max="100"
-                value={volume}
-                step="1"
-                oninput={(e) => updateVolume(e.target.value)}
-            >
-            <span class="value">{volume}%</span>
-            <div class="value-display">Adjust based on your oscilloscope's sensitivity</div>
+            <div class="control-group">
+                <label for="volume">Volume</label>
+                <input
+                    type="range"
+                    id="volume"
+                    min="0"
+                    max="100"
+                    value={volume}
+                    step="1"
+                    oninput={(e) => updateVolume(e.target.value)}
+                >
+                <span class="value">{volume}%</span>
+                <div class="value-display">Adjust based on your oscilloscope's sensitivity</div>
+            </div>
         </div>
     </Card>
 
     <Card title="SVG">
-        <div class="control-group">
-            <label for="svgSamplePoints">Sample Points</label>
-            <input
-                type="range"
-                id="svgSamplePoints"
-                min="50"
-                max="1000"
-                bind:value={svgSamplePoints}
-                step="50"
-            >
-            <span class="value">{svgSamplePoints}</span>
-            <div class="value-display">Number of points sampled from SVG paths</div>
-        </div>
+        <div class="card-controls">
+            <div class="control-group">
+                <label for="svgSamplePoints">Sample Points</label>
+                <input
+                    type="range"
+                    id="svgSamplePoints"
+                    min="50"
+                    max="1000"
+                    bind:value={svgSamplePoints}
+                    step="50"
+                >
+                <span class="value">{svgSamplePoints}</span>
+                <div class="value-display">Number of points sampled from SVG paths</div>
+            </div>
 
-        <div class="control-group">
-            <label for="svgAnimationFPS">Animation FPS</label>
-            <input
-                type="range"
-                id="svgAnimationFPS"
-                min="10"
-                max="60"
-                bind:value={svgAnimationFPS}
-                step="5"
-            >
-            <span class="value">{svgAnimationFPS}</span>
-            <div class="value-display">Frame rate for sampling CSS animations in SVG tab</div>
+            <div class="control-group">
+                <label for="svgAnimationFPS">Sampling rate</label>
+                <input
+                    type="range"
+                    id="svgAnimationFPS"
+                    min="10"
+                    max="60"
+                    bind:value={svgAnimationFPS}
+                    step="5"
+                >
+                <span class="value">{svgAnimationFPS} FPS</span>
+                <div class="value-display">Frame rate for sampling CSS animations in SVG tab</div>
+            </div>
         </div>
     </Card>
 </div>
@@ -109,11 +113,16 @@
         gap: 15px;
     }
 
+    .card-controls {
+        padding: 10px;
+    }
+
     .control-group {
         display: grid;
-        grid-template-columns: auto 1fr auto;
-        gap: 8px 12px;
+        grid-template-columns: 110px 1fr 70px;
+        gap: 0 12px;
         align-items: center;
+        margin: 0;
     }
 
     .control-group label {
@@ -142,5 +151,6 @@
         font-size: 11px;
         color: #999;
         font-style: italic;
+        margin-top: 0;
     }
 </style>
