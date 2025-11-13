@@ -56,7 +56,7 @@
         <Preview points={clockPoints} width={200} height={200} />
     </div>
 
-    <Card title="Options">
+    <Card title="Clock">
         <div class="options-grid">
             <div class="option-item">
                 <input type="checkbox" id="showFace" bind:checked={showFace}>
@@ -73,7 +73,7 @@
 
 <style>
     .clock-container {
-        padding: 20px;
+        padding: 40px;
         display: flex;
         flex-direction: column;
         align-items: center;
@@ -86,8 +86,8 @@
     }
 
     .options-grid {
-        display: flex;
-        flex-direction: column;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
         gap: 12px;
     }
 
