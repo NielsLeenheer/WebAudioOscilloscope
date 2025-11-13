@@ -24,19 +24,24 @@
     <Header {audioEngine} {start} {stop} />
     <Navigation bind:activeTab />
     <div class="content-area">
-        {#if activeTab === 'waves'}
+        <div class="tab-panel" class:active={activeTab === 'waves'}>
             <WaveControls {audioEngine} />
-        {:else if activeTab === 'shapes'}
+        </div>
+        <div class="tab-panel" class:active={activeTab === 'shapes'}>
             <ShapeControls {audioEngine} />
-        {:else if activeTab === 'clock'}
+        </div>
+        <div class="tab-panel" class:active={activeTab === 'clock'}>
             <ClockControls {audioEngine} />
-        {:else if activeTab === 'draw'}
+        </div>
+        <div class="tab-panel" class:active={activeTab === 'draw'}>
             <DrawControls {audioEngine} bind:activeTab bind:svgInput bind:svgSelectedExample />
-        {:else if activeTab === 'svg'}
+        </div>
+        <div class="tab-panel" class:active={activeTab === 'svg'}>
             <SVGControls {audioEngine} bind:animationFPS={svgAnimationFPS} bind:numSamples={svgSamplePoints} bind:svgInput bind:selectedExample={svgSelectedExample} />
-        {:else if activeTab === 'settings'}
+        </div>
+        <div class="tab-panel" class:active={activeTab === 'settings'}>
             <Settings {audioEngine} bind:svgAnimationFPS bind:svgSamplePoints />
-        {/if}
+        </div>
     </div>
 </div>
 
@@ -51,5 +56,15 @@
     .content-area {
         flex: 1;
         overflow: auto;
+        position: relative;
+    }
+
+    .tab-panel {
+        display: none;
+        height: 100%;
+    }
+
+    .tab-panel.active {
+        display: block;
     }
 </style>
