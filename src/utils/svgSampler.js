@@ -91,6 +91,80 @@ export function normalizePoints(points, bbox) {
 }
 
 /**
+ * Calculate distance between two points
+ * @param {[number, number]} p1 - First point
+ * @param {[number, number]} p2 - Second point
+ * @returns {number} Euclidean distance
+ */
+function distance(p1, p2) {
+    const dx = p1[0] - p2[0];
+    const dy = p1[1] - p2[1];
+    return Math.sqrt(dx * dx + dy * dy);
+}
+
+/**
+ * Optimize segment order to minimize jump distances
+ * Uses greedy nearest-neighbor algorithm
+ * @param {Array<Array<[number, number]>>} segments - Array of segments
+ * @returns {Array<Array<[number, number]>>} Reordered segments
+ */
+function optimizeSegmentOrder(segments) {
+    if (segments.length <= 1) return segments;
+
+    const ordered = [];
+    const remaining = [...segments];
+
+    // Start with the first segment
+    let current = remaining.shift();
+    ordered.push(current);
+
+    // Greedily add the closest segment
+    while (remaining.length > 0) {
+        const currentEnd = current[current.length - 1];
+        let minDist = Infinity;
+        let minIndex = -1;
+        let shouldReverse = false;
+
+        // Find the closest segment (considering both orientations)
+        remaining.forEach((segment, index) => {
+            const segStart = segment[0];
+            const segEnd = segment[segment.length - 1];
+
+            // Distance to segment start
+            const distToStart = distance(currentEnd, segStart);
+            if (distToStart < minDist) {
+                minDist = distToStart;
+                minIndex = index;
+                shouldReverse = false;
+            }
+
+            // Distance to segment end (would need to reverse segment)
+            const distToEnd = distance(currentEnd, segEnd);
+            if (distToEnd < minDist) {
+                minDist = distToEnd;
+                minIndex = index;
+                shouldReverse = true;
+            }
+        });
+
+        // Add the closest segment
+        if (minIndex !== -1) {
+            let nextSegment = remaining.splice(minIndex, 1)[0];
+
+            // Reverse if needed
+            if (shouldReverse) {
+                nextSegment = [...nextSegment].reverse();
+            }
+
+            ordered.push(nextSegment);
+            current = nextSegment;
+        }
+    }
+
+    return ordered;
+}
+
+/**
  * Extract raw segments and bbox from SVG path data
  * @param {string} pathData - SVG path data string
  * @param {number} numSamples - Number of points to sample
@@ -113,11 +187,14 @@ export function extractPathPoints(pathData, numSamples = 200) {
         throw new Error('No valid segments could be extracted from path');
     }
 
+    // Optimize segment order to minimize jump distances
+    const optimizedSegments = optimizeSegmentOrder(segments);
+
     // Calculate bbox across all segments
     let minX = Infinity, maxX = -Infinity;
     let minY = Infinity, maxY = -Infinity;
 
-    segments.forEach(segment => {
+    optimizedSegments.forEach(segment => {
         segment.forEach(([x, y]) => {
             minX = Math.min(minX, x);
             maxX = Math.max(maxX, x);
@@ -138,7 +215,7 @@ export function extractPathPoints(pathData, numSamples = 200) {
         height: maxY - minY
     };
 
-    return { segments, bbox };
+    return { segments: optimizedSegments, bbox };
 }
 
 /**
@@ -289,6 +366,9 @@ export function parseSVGMarkupStatic(markup, samples) {
         throw new Error('Could not extract points from SVG');
     }
 
+    // Optimize segment order to minimize jump distances
+    const optimizedSegments = optimizeSegmentOrder(allSegments);
+
     // Get bounding box to normalize coordinates
     let bbox;
     try {
@@ -303,7 +383,7 @@ export function parseSVGMarkupStatic(markup, samples) {
     }
 
     // Normalize all segments together using the same bounding box
-    const normalizedSegments = allSegments.map(segment =>
+    const normalizedSegments = optimizedSegments.map(segment =>
         normalizePoints(segment, bbox)
     );
 
@@ -330,7 +410,10 @@ export function sampleCurrentFrame(svgElement, elements, samples) {
         }
     });
 
-    return frameSegments;
+    // Optimize segment order to minimize jump distances
+    const optimizedSegments = optimizeSegmentOrder(frameSegments);
+
+    return optimizedSegments;
 }
 
 /**
