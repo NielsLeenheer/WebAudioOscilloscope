@@ -45,7 +45,7 @@
 
 <style>
     .tab-bar {
-        display: flex;
+        display: inline-flex;
         gap: 4px;
         background: #eee;
         border-radius: 6px;

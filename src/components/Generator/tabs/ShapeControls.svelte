@@ -100,19 +100,25 @@
 
 <div class="shapes-container">
     <Card title="X/Y Shapes">
-        <TabBar
-            tabs={xyShapeTabs}
-            bind:activeTab={selectedShape}
-            onTabChange={handleShapeChange}
-        />
+        <div class="tabbar-wrapper">
+            <TabBar
+                tabs={xyShapeTabs}
+                bind:activeTab={selectedShape}
+                onTabChange={handleShapeChange}
+                wrap={true}
+            />
+        </div>
     </Card>
 
     <Card title="Lissajous">
-        <TabBar
-            tabs={lissajousTabs}
-            bind:activeTab={selectedShape}
-            onTabChange={handleShapeChange}
-        />
+        <div class="tabbar-wrapper">
+            <TabBar
+                tabs={lissajousTabs}
+                bind:activeTab={selectedShape}
+                onTabChange={handleShapeChange}
+                wrap={true}
+            />
+        </div>
     </Card>
 </div>
 
@@ -152,6 +158,11 @@
         display: flex;
         flex-direction: column;
         gap: 15px;
+    }
+
+    .tabbar-wrapper {
+        display: flex;
+        justify-content: center;
     }
 
     .dialog-controls {

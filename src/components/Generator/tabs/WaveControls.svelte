@@ -64,7 +64,7 @@
 </script>
 
 <div class="channels-container">
-    <Card>
+    <Card title="Left Channel">
         <div class="card-grid">
             <div class="wave-selector">
                 <TabBar tabs={waveTabs} bind:activeTab={leftWave} />
@@ -91,7 +91,7 @@
         </div>
     </Card>
 
-    <Card>
+    <Card title="Right Channel">
         <div class="card-grid">
             <div class="wave-selector">
                 <TabBar tabs={waveTabs} bind:activeTab={rightWave} />
