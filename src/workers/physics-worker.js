@@ -306,38 +306,28 @@ function simulatePhysicsElectromagnetic(targets, forceMultiplier, damping, mass,
         const target = targets[i];
 
         // In a real CRT:
-        // 1. Deflection coils create magnetic fields proportional to the signal
-        // 2. The beam is attracted/deflected by these fields
-        // 3. Without deflection, the beam naturally aims at center (0, 0)
-        // 4. The beam has inertia and will overshoot, then correct
+        // 1. Deflection coils create magnetic fields proportional to the signal (coil current)
+        // 2. The magnetic field deflects the electron beam
+        // 3. The beam has inertia and will overshoot the target position
+        // 4. The deflection force is proportional to the difference between target and current position
 
-        // Calculate the deflection field strength (proportional to target position)
-        // The magnetic field is proportional to the coil current, which is proportional to signal
-        const deflectionFieldX = target.x * forceMultiplier;
-        const deflectionFieldY = target.y * forceMultiplier;
+        // Calculate the deflection force (magnetic field pulling beam toward target)
+        // The force is proportional to (target - current), like the coil current driving the deflection
+        const forceX = (target.x - beamX) * forceMultiplier;
+        const forceY = (target.y - beamY) * forceMultiplier;
 
-        // Calculate restoring force - beam wants to return to center when no deflection
-        // This simulates the natural straight path of the electron beam
-        const restoringForceX = -beamX * forceMultiplier * 0.5;
-        const restoringForceY = -beamY * forceMultiplier * 0.5;
-
-        // Total force = deflection force + restoring force
-        const totalForceX = deflectionFieldX + restoringForceX;
-        const totalForceY = deflectionFieldY + restoringForceY;
-
-        // Calculate acceleration from total force (F = ma, so a = F/m)
-        const accelX = totalForceX / mass;
-        const accelY = totalForceY / mass;
+        // Calculate acceleration from force (F = ma, so a = F/m)
+        const accelX = forceX / mass;
+        const accelY = forceY / mass;
 
         // Update velocity with acceleration
         velocityX += accelX;
         velocityY += accelY;
 
         // Apply damping (represents beam interaction with residual gas in the CRT)
-        // Lower damping than spring model to allow more overshoot
-        const effectiveDamping = 0.5 + (damping * 0.5); // Range: 0.5 to 1.0
-        velocityX *= effectiveDamping;
-        velocityY *= effectiveDamping;
+        // Damping value is used directly - adjust via Field Damping parameter
+        velocityX *= damping;
+        velocityY *= damping;
 
         // Update beam position
         beamX += velocityX;
