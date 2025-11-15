@@ -1,7 +1,7 @@
 <script>
     import Card from '../../Common/Card.svelte';
 
-    let { audioEngine, svgAnimationFPS = $bindable(30), svgSamplePoints = $bindable(200) } = $props();
+    let { audioEngine, svgAnimationFPS = $bindable(30), svgSamplePoints = $bindable(200), svgOptimizeSegments = $bindable(true), svgDoubleDraw = $bindable(true) } = $props();
 
     let frequency = $state(100);
     let volume = $state(30);
@@ -102,6 +102,28 @@
                 <span class="value">{svgAnimationFPS} FPS</span>
                 <div class="value-display">Frame rate for sampling CSS animations in SVG tab</div>
             </div>
+
+            <div class="control-group checkbox-group">
+                <label for="svgOptimizeSegments">Optimize</label>
+                <input
+                    type="checkbox"
+                    id="svgOptimizeSegments"
+                    bind:checked={svgOptimizeSegments}
+                >
+                <span></span>
+                <div class="value-display">Reorder segments to minimize jump distances</div>
+            </div>
+
+            <div class="control-group checkbox-group">
+                <label for="svgDoubleDraw">Double draw</label>
+                <input
+                    type="checkbox"
+                    id="svgDoubleDraw"
+                    bind:checked={svgDoubleDraw}
+                >
+                <span></span>
+                <div class="value-display">Draw each segment forward and back to minimize beam travel</div>
+            </div>
         </div>
     </Card>
 </div>
@@ -166,5 +188,26 @@
         color: #999;
         font-style: italic;
         margin-top: 0;
+    }
+
+    .checkbox-group {
+        grid-template-columns: 104px auto 1fr;
+        margin-top: 8px;
+    }
+
+    .checkbox-group input[type="checkbox"] {
+        width: 18px;
+        height: 18px;
+        cursor: pointer;
+        margin: 6px 0;
+    }
+
+    .checkbox-group label {
+        cursor: pointer;
+        user-select: none;
+    }
+
+    .checkbox-group .value-display {
+        grid-column: 2 / 4;
     }
 </style>

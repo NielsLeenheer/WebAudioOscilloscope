@@ -15,6 +15,8 @@
     // SVG settings shared between Settings tab and SVG tab
     let svgAnimationFPS = $state(30);
     let svgSamplePoints = $state(200);
+    let svgOptimizeSegments = $state(true);
+    let svgDoubleDraw = $state(true);
 
     // SVG input shared between Draw tab and SVG tab
     let svgInput = $state('');
@@ -33,24 +35,24 @@
     <Navigation bind:activeTab onSettingsClick={handleSettingsClick} />
     <div class="content-area">
         <div class="tab-panel" class:active={activeTab === 'waves'}>
-            <WaveControls {audioEngine} />
+            <WaveControls {audioEngine} isActive={activeTab === 'waves'} />
         </div>
         <div class="tab-panel" class:active={activeTab === 'shapes'}>
-            <ShapeControls {audioEngine} />
+            <ShapeControls {audioEngine} isActive={activeTab === 'shapes'} />
         </div>
         <div class="tab-panel" class:active={activeTab === 'clock'}>
-            <ClockControls {audioEngine} />
+            <ClockControls {audioEngine} isActive={activeTab === 'clock'} />
         </div>
         <div class="tab-panel" class:active={activeTab === 'draw'}>
-            <DrawControls {audioEngine} bind:activeTab bind:svgInput bind:svgSelectedExample />
+            <DrawControls {audioEngine} isActive={activeTab === 'draw'} bind:activeTab bind:svgInput bind:svgSelectedExample />
         </div>
         <div class="tab-panel" class:active={activeTab === 'svg'}>
-            <SVGControls {audioEngine} bind:animationFPS={svgAnimationFPS} bind:numSamples={svgSamplePoints} bind:svgInput bind:selectedExample={svgSelectedExample} />
+            <SVGControls {audioEngine} isActive={activeTab === 'svg'} bind:animationFPS={svgAnimationFPS} bind:numSamples={svgSamplePoints} bind:optimizeSegments={svgOptimizeSegments} bind:doubleDraw={svgDoubleDraw} bind:svgInput bind:selectedExample={svgSelectedExample} />
         </div>
     </div>
 
     <Dialog bind:dialogRef={settingsDialog} anchored={true} anchorId="settings-button">
-        <Settings {audioEngine} bind:svgAnimationFPS bind:svgSamplePoints />
+        <Settings {audioEngine} bind:svgAnimationFPS bind:svgSamplePoints bind:svgOptimizeSegments bind:svgDoubleDraw />
     </Dialog>
 </div>
 

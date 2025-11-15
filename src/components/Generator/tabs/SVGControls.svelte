@@ -1,6 +1,6 @@
 <script>
     import { get } from 'svelte/store';
-    import { parseSVGPath } from '../../../utils/shapes.js';
+    import { untrack } from 'svelte';
     import { svgExamples } from '../../../utils/svgExamples/index.js';
     import { onMount } from 'svelte';
     import Preview from '../../Common/Preview.svelte';
@@ -12,11 +12,12 @@
         createContinuousSampler
     } from '../../../utils/svgSampler.js';
 
-    let { audioEngine, animationFPS = $bindable(30), numSamples = $bindable(200), svgInput = $bindable(''), selectedExample = $bindable('star') } = $props();
+    let { audioEngine, isActive = false, animationFPS = $bindable(30), numSamples = $bindable(200), optimizeSegments = $bindable(true), doubleDraw = $bindable(true), svgInput = $bindable(''), selectedExample = $bindable('star') } = $props();
     let isPlaying = audioEngine.isPlaying;
     let validationError = $state('');
     let isValid = $state(true);
     let normalizedPoints = $state([]);
+    let optimizationInitialized = $state(false);
 
     // Animation sampler
     let sampler = null;
@@ -43,7 +44,9 @@
                     audioEngine.restoreDefaultFrequency();
                     audioEngine.createWaveform(normalized);
                 },
-                () => get(audioEngine.isPlaying)
+                () => get(audioEngine.isPlaying),
+                optimizeSegments,
+                doubleDraw
             );
         } catch (error) {
             console.error('Error starting continuous sampling:', error);
@@ -71,12 +74,12 @@
         try {
             const inputType = detectInputType(data);
             if (inputType === 'path') {
-                parseSVGPath(data, numSamples, true);
                 // Update preview for path data
-                const { points, bbox } = extractPathPoints(data, numSamples);
-                normalizedPoints = normalizePoints(points, bbox);
+                const { segments, bbox } = extractPathPoints(data, numSamples, optimizeSegments, doubleDraw);
+                // Normalize all segments together
+                normalizedPoints = segments.map(segment => normalizePoints(segment, bbox));
             } else {
-                normalizedPoints = parseSVGMarkupStatic(data, numSamples);
+                normalizedPoints = parseSVGMarkupStatic(data, numSamples, optimizeSegments, doubleDraw);
             }
             validationError = '';
             isValid = true;
@@ -87,7 +90,7 @@
     }
 
     function applyInput(value) {
-        if (!get(audioEngine.isPlaying) || !isValid) return;
+        if (!get(audioEngine.isPlaying) || !isValid || !isActive) return;
 
         const data = value.trim();
         if (!data) return;
@@ -156,9 +159,16 @@
         };
     });
 
-    // Stop continuous sampling when playback stops
+    // Apply SVG when tab becomes active
     $effect(() => {
-        if (!$isPlaying) {
+        if (isActive && $isPlaying && svgInput && isValid) {
+            applyInput(svgInput);
+        }
+    });
+
+    // Stop continuous sampling when playback stops or tab becomes inactive
+    $effect(() => {
+        if (!$isPlaying || !isActive) {
             stopContinuousSampling();
         }
     });
@@ -168,6 +178,32 @@
         if (selectedExample === 'custom' && svgInput) {
             validateInput(svgInput);
         }
+    });
+
+    // Re-validate and re-apply when optimization settings change
+    $effect(() => {
+        // Track ONLY these dependencies
+        optimizeSegments;
+        doubleDraw;
+
+        // Skip initial effect run to avoid infinite loop
+        if (!optimizationInitialized) {
+            optimizationInitialized = true;
+            return;
+        }
+
+        // Use untrack to access other reactive values without subscribing to them
+        untrack(() => {
+            // Re-validate current input to apply new optimization settings
+            if (svgInput && isValid) {
+                validateInput(svgInput);
+
+                // Re-apply if tab is active and playing
+                if (isActive && $isPlaying) {
+                    applyInput(svgInput);
+                }
+            }
+        });
     });
 </script>
 

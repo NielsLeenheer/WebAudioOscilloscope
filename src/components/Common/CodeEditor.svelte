@@ -96,6 +96,7 @@
         color: #666;
         overflow-x: auto;
         overflow-y: auto;
+        max-width: 50vw;
         white-space: pre-wrap;
         outline: none;
         border: 2px solid transparent;
