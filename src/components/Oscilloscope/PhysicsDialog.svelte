@@ -1,9 +1,12 @@
 <script>
     let {
         simulationMode = $bindable(),
-        forceMultiplier = $bindable(),
-        damping = $bindable(),
-        mass = $bindable(),
+        springForce = $bindable(),
+        springDamping = $bindable(),
+        springMass = $bindable(),
+        coilStrength = $bindable(),
+        beamInertia = $bindable(),
+        fieldDamping = $bindable(),
         persistence = $bindable(),
         signalNoise = $bindable(),
         velocityDimming = $bindable(),
@@ -48,21 +51,39 @@
         </div>
     </div>
     <div class="sliders">
-        <div class="slider-control">
-            <label>Force</label>
-            <input type="range" min="0.01" max="5.0" step="0.01" bind:value={forceMultiplier} />
-            <span class="value">{forceMultiplier.toFixed(2)}</span>
-        </div>
-        <div class="slider-control">
-            <label>Damping</label>
-            <input type="range" min="0.1" max="0.99" step="0.01" bind:value={damping} />
-            <span class="value">{damping.toFixed(2)}</span>
-        </div>
-        <div class="slider-control">
-            <label>Mass</label>
-            <input type="range" min="0.01" max="5.0" step="0.01" bind:value={mass} />
-            <span class="value">{mass.toFixed(2)}</span>
-        </div>
+        {#if simulationMode === 'spring'}
+            <div class="slider-control">
+                <label>Force</label>
+                <input type="range" min="0.01" max="5.0" step="0.01" bind:value={springForce} />
+                <span class="value">{springForce.toFixed(2)}</span>
+            </div>
+            <div class="slider-control">
+                <label>Damping</label>
+                <input type="range" min="0.1" max="0.99" step="0.01" bind:value={springDamping} />
+                <span class="value">{springDamping.toFixed(2)}</span>
+            </div>
+            <div class="slider-control">
+                <label>Mass</label>
+                <input type="range" min="0.01" max="5.0" step="0.01" bind:value={springMass} />
+                <span class="value">{springMass.toFixed(2)}</span>
+            </div>
+        {:else}
+            <div class="slider-control">
+                <label>Coil Strength</label>
+                <input type="range" min="0.01" max="5.0" step="0.01" bind:value={coilStrength} />
+                <span class="value">{coilStrength.toFixed(2)}</span>
+            </div>
+            <div class="slider-control">
+                <label>Beam Inertia</label>
+                <input type="range" min="0.01" max="5.0" step="0.01" bind:value={beamInertia} />
+                <span class="value">{beamInertia.toFixed(2)}</span>
+            </div>
+            <div class="slider-control">
+                <label>Field Damping</label>
+                <input type="range" min="0.1" max="0.99" step="0.01" bind:value={fieldDamping} />
+                <span class="value">{fieldDamping.toFixed(2)}</span>
+            </div>
+        {/if}
         <div class="slider-control">
             <label>Persistence</label>
             <input type="range" min="0.0" max="0.95" step="0.005" bind:value={persistence} />

@@ -8,9 +8,12 @@
         mode,
         // Physics parameters
         simulationMode,
-        forceMultiplier,
-        damping,
-        mass,
+        springForce,
+        springDamping,
+        springMass,
+        coilStrength,
+        beamInertia,
+        fieldDamping,
         persistence,
         signalNoise,
         beamPower,
@@ -169,6 +172,11 @@
         const visibleScale = pixelsPerDivision * VOLTAGE_CALIBRATION; // 60
 
         const basePower = 0.2 + (beamPower * 1.4); // Allow up to 3.0 max brightness
+
+        // Select the appropriate physics parameters based on simulation mode
+        const forceMultiplier = simulationMode === 'spring' ? springForce : coilStrength;
+        const mass = simulationMode === 'spring' ? springMass : beamInertia;
+        const damping = simulationMode === 'spring' ? springDamping : fieldDamping;
 
         if (worker) {
             workerBusy = true;
