@@ -47,17 +47,42 @@ function estimateBezierLength(p0x, p0y, p1x, p1y, p2x, p2y) {
     return length;
 }
 
-// Calculate velocity-based opacity for a given speed
-function calculateVelocityOpacity(speed, velocityDimming, basePower) {
-    let velocityOpacity = 1.0;
+// Calculate phosphor excitation based on beam power and velocity (dwell time)
+// Models realistic CRT phosphor behavior:
+// - Higher beam power (current) = more phosphor excitation
+// - Lower velocity = longer dwell time = more energy deposited = brighter
+// - Phosphor saturation effects at very high energy
+function calculatePhosphorExcitation(speed, velocityDimming, basePower) {
+    // Beam power represents the electron beam current/intensity
+    // This is the base energy available for phosphor excitation
+    const beamEnergy = basePower;
+
+    // Dwell time is inversely proportional to velocity
+    // Slower beam = more time for electrons to excite phosphor atoms
+    let dwellFactor = 1.0;
     if (velocityDimming > 0 && speed > 0) {
+        // Exponential falloff: fast movement = short dwell = less excitation
         const falloffRate = 20;
-        const dimFactor = Math.exp(-speed / falloffRate);
-        velocityOpacity = 1.0 - velocityDimming * (1.0 - dimFactor);
-        const minOpacity = 0.02 * velocityDimming;
-        velocityOpacity = Math.max(velocityOpacity, minOpacity);
+        dwellFactor = Math.exp(-speed / falloffRate);
+
+        // Apply velocity dimming strength
+        dwellFactor = 1.0 - velocityDimming * (1.0 - dwellFactor);
+
+        // Minimum brightness even at very high speeds
+        const minDwell = 0.02 * velocityDimming;
+        dwellFactor = Math.max(dwellFactor, minDwell);
     }
-    return basePower * velocityOpacity;
+
+    // Energy deposited = beam energy × dwell time
+    let depositedEnergy = beamEnergy * dwellFactor;
+
+    // Phosphor saturation: at very high energy, phosphor response becomes sub-linear
+    // This prevents unrealistic brightness at slow speeds with high beam power
+    // Using a soft saturation curve: brightness = energy / (1 + energy/saturationPoint)
+    const saturationPoint = 1.5; // Energy level where saturation starts
+    const brightness = depositedEnergy / (1 + depositedEnergy / saturationPoint);
+
+    return brightness;
 }
 
 // Find trigger point: looks for rising edge where signal crosses trigger level
@@ -184,10 +209,10 @@ function interpretSignals(processedLeft, processedRight, mode, scale, visibleSca
 }
 
 // ============================================================================
-// STAGE C: PHYSICS SIMULATION
-// Apply electron beam physics uniformly to all target coordinates
+// STAGE C: PHYSICS SIMULATION - Spring-Damper Model (Original)
+// Apply spring-damper physics to beam
 // ============================================================================
-function simulatePhysics(targets, forceMultiplier, damping, mass, scale, centerX, centerY) {
+function simulatePhysicsSpring(targets, forceMultiplier, damping, mass, scale, centerX, centerY) {
     const points = [];
     const speeds = [];
 
@@ -270,6 +295,112 @@ function simulatePhysics(targets, forceMultiplier, damping, mass, scale, centerX
 }
 
 // ============================================================================
+// STAGE C: PHYSICS SIMULATION - Electromagnetic Deflection Model (New)
+// Simulates realistic CRT electron beam deflection by electromagnetic coils
+// ============================================================================
+function simulatePhysicsElectromagnetic(targets, forceMultiplier, damping, mass, scale, centerX, centerY) {
+    const points = [];
+    const speeds = [];
+
+    for (let i = 0; i < targets.length; i++) {
+        const target = targets[i];
+
+        // In a real CRT:
+        // 1. Deflection coils create magnetic fields proportional to the signal
+        // 2. The beam is attracted/deflected by these fields
+        // 3. Without deflection, the beam naturally aims at center (0, 0)
+        // 4. The beam has inertia and will overshoot, then correct
+
+        // Calculate the deflection field strength (proportional to target position)
+        // The magnetic field is proportional to the coil current, which is proportional to signal
+        const deflectionFieldX = target.x * forceMultiplier;
+        const deflectionFieldY = target.y * forceMultiplier;
+
+        // Calculate restoring force - beam wants to return to center when no deflection
+        // This simulates the natural straight path of the electron beam
+        const restoringForceX = -beamX * forceMultiplier * 0.5;
+        const restoringForceY = -beamY * forceMultiplier * 0.5;
+
+        // Total force = deflection force + restoring force
+        const totalForceX = deflectionFieldX + restoringForceX;
+        const totalForceY = deflectionFieldY + restoringForceY;
+
+        // Calculate acceleration from total force (F = ma, so a = F/m)
+        const accelX = totalForceX / mass;
+        const accelY = totalForceY / mass;
+
+        // Update velocity with acceleration
+        velocityX += accelX;
+        velocityY += accelY;
+
+        // Apply damping (represents beam interaction with residual gas in the CRT)
+        // Lower damping than spring model to allow more overshoot
+        const effectiveDamping = 0.5 + (damping * 0.5); // Range: 0.5 to 1.0
+        velocityX *= effectiveDamping;
+        velocityY *= effectiveDamping;
+
+        // Update beam position
+        beamX += velocityX;
+        beamY += velocityY;
+
+        // Safety checks: prevent NaN/Infinity and extreme values
+        if (!isFinite(beamX) || !isFinite(beamY) || !isFinite(velocityX) || !isFinite(velocityY)) {
+            beamX = 0;
+            beamY = 0;
+            velocityX = 0;
+            velocityY = 0;
+            smoothedBeamX = 0;
+            smoothedBeamY = 0;
+        } else {
+            // Clamp beam position to reasonable bounds
+            const maxPosition = scale * 10;
+            beamX = Math.max(-maxPosition, Math.min(maxPosition, beamX));
+            beamY = Math.max(-maxPosition, Math.min(maxPosition, beamY));
+
+            // Clamp velocities
+            const maxVelocity = scale * 3;
+            velocityX = Math.max(-maxVelocity, Math.min(maxVelocity, velocityX));
+            velocityY = Math.max(-maxVelocity, Math.min(maxVelocity, velocityY));
+        }
+
+        // Less smoothing for electromagnetic model to show more realistic overshoot
+        const EM_SMOOTHING = 0.6; // Higher = less smoothing, more responsive
+        smoothedBeamX = EM_SMOOTHING * beamX + (1 - EM_SMOOTHING) * smoothedBeamX;
+        smoothedBeamY = EM_SMOOTHING * beamY + (1 - EM_SMOOTHING) * smoothedBeamY;
+
+        // Convert to screen coordinates
+        const screenX = centerX + smoothedBeamX;
+        const screenY = centerY + smoothedBeamY;
+
+        points.push({ x: screenX, y: screenY });
+
+        // Calculate speed for this point
+        if (points.length > 1) {
+            const prev = points[points.length - 2];
+            const dx = screenX - prev.x;
+            const dy = screenY - prev.y;
+            const speed = Math.sqrt(dx * dx + dy * dy);
+            speeds.push(speed);
+        }
+    }
+
+    return { points, speeds };
+}
+
+// ============================================================================
+// PHYSICS SIMULATION DISPATCHER
+// Chooses the appropriate physics model based on simulationMode
+// ============================================================================
+function simulatePhysics(targets, simulationMode, forceMultiplier, damping, mass, scale, centerX, centerY) {
+    if (simulationMode === 'spring') {
+        return simulatePhysicsSpring(targets, forceMultiplier, damping, mass, scale, centerX, centerY);
+    } else {
+        // Default to electromagnetic model
+        return simulatePhysicsElectromagnetic(targets, forceMultiplier, damping, mass, scale, centerX, centerY);
+    }
+}
+
+// ============================================================================
 // RENDERING - Draw the simulated beam path
 // ============================================================================
 function renderTrace(ctx, points, speeds, velocityDimming, basePower) {
@@ -285,7 +416,7 @@ function renderTrace(ctx, points, speeds, velocityDimming, basePower) {
         const firstMidX = (points[0].x + points[1].x) / 2;
         const firstMidY = (points[0].y + points[1].y) / 2;
 
-        const firstOpacity = calculateVelocityOpacity(speeds[0] || 0, velocityDimming, basePower);
+        const firstOpacity = calculatePhosphorExcitation(speeds[0] || 0, velocityDimming, basePower);
         ctx.beginPath();
         ctx.moveTo(points[0].x, points[0].y);
         ctx.lineTo(firstMidX, firstMidY);
@@ -307,8 +438,8 @@ function renderTrace(ctx, points, speeds, velocityDimming, basePower) {
             // Get opacities for current and next point
             const currentSpeed = speeds[i] || 0;
             const nextSpeed = speeds[i + 1] || 0;
-            const currentOpacity = calculateVelocityOpacity(currentSpeed, velocityDimming, basePower);
-            const nextOpacity = calculateVelocityOpacity(nextSpeed, velocityDimming, basePower);
+            const currentOpacity = calculatePhosphorExcitation(currentSpeed, velocityDimming, basePower);
+            const nextOpacity = calculatePhosphorExcitation(nextSpeed, velocityDimming, basePower);
 
             // Draw curve as multiple sub-segments with interpolated opacity
             for (let s = 0; s < numSubSegments; s++) {
@@ -339,7 +470,7 @@ function renderTrace(ctx, points, speeds, velocityDimming, basePower) {
         const lastMidX = (points[lastIdx - 1].x + points[lastIdx].x) / 2;
         const lastMidY = (points[lastIdx - 1].y + points[lastIdx].y) / 2;
 
-        const lastOpacity = calculateVelocityOpacity(speeds[lastIdx - 1] || 0, velocityDimming, basePower);
+        const lastOpacity = calculatePhosphorExcitation(speeds[lastIdx - 1] || 0, velocityDimming, basePower);
         ctx.beginPath();
         ctx.moveTo(lastMidX, lastMidY);
         ctx.lineTo(points[lastIdx].x, points[lastIdx].y);
@@ -392,6 +523,7 @@ self.onmessage = function(e) {
             centerY,
             scale,
             visibleScale,
+            simulationMode,
             forceMultiplier,
             damping,
             mass,
@@ -449,7 +581,7 @@ self.onmessage = function(e) {
             }
 
             // STAGE C: Physics Simulation - Apply electron beam physics uniformly
-            const { points, speeds } = simulatePhysics(targets, forceMultiplier, damping, mass, scale, centerX, centerY);
+            const { points, speeds } = simulatePhysics(targets, simulationMode, forceMultiplier, damping, mass, scale, centerX, centerY);
 
             // ========================================================================
             // RENDERING - Draw the simulated beam path

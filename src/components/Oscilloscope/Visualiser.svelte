@@ -7,6 +7,7 @@
         isPowered,
         mode,
         // Physics parameters
+        simulationMode,
         forceMultiplier,
         damping,
         mass,
@@ -180,6 +181,7 @@
                     centerY,
                     scale,
                     visibleScale,
+                    simulationMode,
                     forceMultiplier,
                     damping,
                     mass,

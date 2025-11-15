@@ -1,5 +1,6 @@
 <script>
     let {
+        simulationMode = $bindable(),
         forceMultiplier = $bindable(),
         damping = $bindable(),
         mass = $bindable(),
@@ -28,6 +29,23 @@
     <div class="dialog-header">
         <h3>Physics Controls</h3>
         <button class="close-button" onclick={close}>✕</button>
+    </div>
+    <div class="mode-toggle">
+        <label>Simulation Mode</label>
+        <div class="toggle-buttons">
+            <button
+                class:active={simulationMode === 'spring'}
+                onclick={() => simulationMode = 'spring'}
+            >
+                Spring-Damper
+            </button>
+            <button
+                class:active={simulationMode === 'electromagnetic'}
+                onclick={() => simulationMode = 'electromagnetic'}
+            >
+                Electromagnetic
+            </button>
+        </div>
     </div>
     <div class="sliders">
         <div class="slider-control">
@@ -126,6 +144,50 @@
 
     .close-button:hover {
         color: #4CAF50;
+    }
+
+    .mode-toggle {
+        padding: 15px;
+        border-bottom: 1px solid #333;
+    }
+
+    .mode-toggle label {
+        display: block;
+        color: #4CAF50;
+        font-family: system-ui;
+        font-size: 12px;
+        font-weight: 600;
+        margin-bottom: 10px;
+    }
+
+    .toggle-buttons {
+        display: flex;
+        gap: 8px;
+    }
+
+    .toggle-buttons button {
+        flex: 1;
+        padding: 8px 12px;
+        background: #1a1a1a;
+        border: 1px solid #333;
+        border-radius: 4px;
+        color: #888;
+        font-family: system-ui;
+        font-size: 11px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .toggle-buttons button:hover {
+        border-color: #4CAF50;
+        color: #4CAF50;
+    }
+
+    .toggle-buttons button.active {
+        background: #4CAF50;
+        border-color: #4CAF50;
+        color: #1a1a1a;
     }
 
     .sliders {

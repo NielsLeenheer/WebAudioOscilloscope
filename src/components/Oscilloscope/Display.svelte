@@ -9,6 +9,7 @@
     let visualiser;
 
     // Physics parameters (adjustable)
+    let simulationMode = $state('electromagnetic'); // 'spring' or 'electromagnetic'
     let forceMultiplier = $state(0.3);
     let damping = $state(0.60);
     let mass = $state(0.11);
@@ -34,6 +35,7 @@
 
 <div class="display-panel">
     <Physics
+        bind:simulationMode
         bind:forceMultiplier
         bind:damping
         bind:mass
@@ -50,6 +52,7 @@
                 {inputSource}
                 {isPowered}
                 {mode}
+                {simulationMode}
                 {forceMultiplier}
                 {damping}
                 {mass}
