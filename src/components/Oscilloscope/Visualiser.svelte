@@ -39,6 +39,7 @@
     let rightData = null;
     let worker = null;
     let workerBusy = false;
+    let lastFrameTime = 0;
 
     onMount(() => {
         // Initialize Web Worker with OffscreenCanvas
@@ -97,13 +98,17 @@
         }
     }
 
-    function draw() {
+    function draw(currentTime) {
         if (!isPowered) {
             stopVisualization();
             return;
         }
 
         animationId = requestAnimationFrame(draw);
+
+        // Calculate frame delta time (in seconds)
+        const deltaTime = lastFrameTime === 0 ? 1/60 : (currentTime - lastFrameTime) / 1000;
+        lastFrameTime = currentTime;
 
         // Skip this frame if worker is still busy processing previous frame
         if (workerBusy) {
@@ -210,7 +215,8 @@
                     canvasWidth,
                     canvasHeight,
                     visibleWidth,
-                    sampleRate
+                    sampleRate,
+                    deltaTime
                 }
             });
         }

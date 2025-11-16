@@ -48,41 +48,63 @@ function estimateBezierLength(p0x, p0y, p1x, p1y, p2x, p2y) {
 }
 
 // Calculate phosphor excitation based on beam power and velocity (dwell time)
-// Models realistic CRT phosphor behavior:
+// Models realistic CRT phosphor behavior using P31 phosphor characteristics:
 // - Higher beam power (current) = more phosphor excitation
 // - Lower velocity = longer dwell time = more energy deposited = brighter
-// - Phosphor saturation effects at very high energy
-function calculatePhosphorExcitation(speed, velocityDimming, basePower) {
+// - Realistic phosphor saturation based on actual CRT physics
+function calculatePhosphorExcitation(speed, velocityDimming, basePower, deltaTime) {
+    // P31 phosphor constants (medium-short persistence, standard for oscilloscopes)
+    // Decay time: ~40 microseconds to 10% brightness
+    const PHOSPHOR_DECAY_TIME = 40e-6; // 40 microseconds in seconds
+    const BEAM_SPOT_SIZE = 1.5; // Effective beam spot diameter in pixels
+
     // Beam power represents the electron beam current/intensity
     // This is the base energy available for phosphor excitation
-    const beamEnergy = basePower;
+    const beamCurrent = basePower;
 
-    // Dwell time is inversely proportional to velocity
-    // Slower beam = more time for electrons to excite phosphor atoms
-    let dwellFactor = 1.0;
-    if (velocityDimming > 0 && speed > 0) {
-        // Exponential falloff: fast movement = short dwell = less excitation
-        const falloffRate = 20;
-        dwellFactor = Math.exp(-speed / falloffRate);
+    // Calculate velocity in pixels/second (frame-rate independent)
+    // speed is in pixels/frame, deltaTime is in seconds
+    const velocity = deltaTime > 0 ? speed / deltaTime : 0;
 
-        // Apply velocity dimming strength
-        dwellFactor = 1.0 - velocityDimming * (1.0 - dwellFactor);
+    // Dwell time: time the beam spends on a phosphor grain
+    // At low velocities, beam dwells longer; at high velocities, it passes quickly
+    let dwellTime = BEAM_SPOT_SIZE / Math.max(velocity, 1); // seconds
 
-        // Minimum brightness even at very high speeds
-        const minDwell = 0.02 * velocityDimming;
-        dwellFactor = Math.max(dwellFactor, minDwell);
+    // Clamp dwell time to phosphor decay time (beyond this, phosphor stops responding)
+    dwellTime = Math.min(dwellTime, PHOSPHOR_DECAY_TIME);
+
+    // Energy deposited is proportional to beam current × dwell time
+    let depositedEnergy = beamCurrent * (dwellTime / PHOSPHOR_DECAY_TIME);
+
+    // Apply velocity dimming control (allows artistic adjustment)
+    if (velocityDimming < 1.0) {
+        // Mix between full physics (velocityDimming=1) and no dimming (velocityDimming=0)
+        depositedEnergy = beamCurrent * (velocityDimming * (dwellTime / PHOSPHOR_DECAY_TIME) + (1.0 - velocityDimming));
     }
 
-    // Energy deposited = beam energy × dwell time
-    let depositedEnergy = beamEnergy * dwellFactor;
+    // P31 phosphor saturation curve
+    // Real phosphors follow a logarithmic response at high excitation levels
+    // Using a smooth compression curve that matches measured P31 characteristics
+    const SATURATION_KNEE = 0.6; // Energy level where saturation becomes noticeable
+    const SATURATION_STRENGTH = 0.4; // How aggressive the saturation is (0-1)
 
-    // Phosphor saturation: at very high energy, phosphor response becomes sub-linear
-    // This prevents unrealistic brightness at slow speeds with high beam power
-    // Using a soft saturation curve: brightness = energy / (1 + energy/saturationPoint)
-    const saturationPoint = 1.5; // Energy level where saturation starts
-    const brightness = depositedEnergy / (1 + depositedEnergy / saturationPoint);
+    // Logarithmic saturation model: log(1 + energy * k) / log(1 + k)
+    // This gives a smooth, realistic phosphor response curve
+    const k = 10.0; // Compression factor
+    let brightness;
 
-    return brightness;
+    if (depositedEnergy < SATURATION_KNEE) {
+        // Linear region: no saturation
+        brightness = depositedEnergy;
+    } else {
+        // Saturation region: logarithmic compression
+        const excess = depositedEnergy - SATURATION_KNEE;
+        const compressed = Math.log(1 + excess * k) / Math.log(1 + k);
+        brightness = SATURATION_KNEE + compressed * SATURATION_STRENGTH;
+    }
+
+    // Ensure brightness is in valid range
+    return Math.max(0, Math.min(1, brightness));
 }
 
 // Find trigger point: looks for rising edge where signal crosses trigger level
@@ -393,7 +415,7 @@ function simulatePhysics(targets, simulationMode, forceMultiplier, damping, mass
 // ============================================================================
 // RENDERING - Draw the simulated beam path
 // ============================================================================
-function renderTrace(ctx, points, speeds, velocityDimming, basePower) {
+function renderTrace(ctx, points, speeds, velocityDimming, basePower, deltaTime) {
     // Configure canvas for drawing
     ctx.lineWidth = 1.5;
     ctx.lineCap = 'butt'; // Use 'butt' to prevent overlapping caps at connection points
@@ -406,7 +428,7 @@ function renderTrace(ctx, points, speeds, velocityDimming, basePower) {
         const firstMidX = (points[0].x + points[1].x) / 2;
         const firstMidY = (points[0].y + points[1].y) / 2;
 
-        const firstOpacity = calculatePhosphorExcitation(speeds[0] || 0, velocityDimming, basePower);
+        const firstOpacity = calculatePhosphorExcitation(speeds[0] || 0, velocityDimming, basePower, deltaTime);
         ctx.beginPath();
         ctx.moveTo(points[0].x, points[0].y);
         ctx.lineTo(firstMidX, firstMidY);
@@ -428,8 +450,8 @@ function renderTrace(ctx, points, speeds, velocityDimming, basePower) {
             // Get opacities for current and next point
             const currentSpeed = speeds[i] || 0;
             const nextSpeed = speeds[i + 1] || 0;
-            const currentOpacity = calculatePhosphorExcitation(currentSpeed, velocityDimming, basePower);
-            const nextOpacity = calculatePhosphorExcitation(nextSpeed, velocityDimming, basePower);
+            const currentOpacity = calculatePhosphorExcitation(currentSpeed, velocityDimming, basePower, deltaTime);
+            const nextOpacity = calculatePhosphorExcitation(nextSpeed, velocityDimming, basePower, deltaTime);
 
             // Draw curve as multiple sub-segments with interpolated opacity
             for (let s = 0; s < numSubSegments; s++) {
@@ -460,7 +482,7 @@ function renderTrace(ctx, points, speeds, velocityDimming, basePower) {
         const lastMidX = (points[lastIdx - 1].x + points[lastIdx].x) / 2;
         const lastMidY = (points[lastIdx - 1].y + points[lastIdx].y) / 2;
 
-        const lastOpacity = calculatePhosphorExcitation(speeds[lastIdx - 1] || 0, velocityDimming, basePower);
+        const lastOpacity = calculatePhosphorExcitation(speeds[lastIdx - 1] || 0, velocityDimming, basePower, deltaTime);
         ctx.beginPath();
         ctx.moveTo(lastMidX, lastMidY);
         ctx.lineTo(points[lastIdx].x, points[lastIdx].y);
@@ -534,7 +556,8 @@ self.onmessage = function(e) {
             canvasWidth,
             canvasHeight,
             visibleWidth,
-            sampleRate
+            sampleRate,
+            deltaTime
         } = data;
 
         if (!ctx) return;
@@ -577,7 +600,7 @@ self.onmessage = function(e) {
             // RENDERING - Draw the simulated beam path
             // ========================================================================
 
-            renderTrace(ctx, points, speeds, velocityDimming, basePower);
+            renderTrace(ctx, points, speeds, velocityDimming, basePower, deltaTime);
         }
 
         // Send ready message back to main thread
