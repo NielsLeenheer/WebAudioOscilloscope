@@ -53,33 +53,44 @@ function estimateBezierLength(p0x, p0y, p1x, p1y, p2x, p2y) {
 // - Lower velocity = longer dwell time = more energy deposited = brighter
 // - Realistic phosphor saturation based on actual CRT physics
 function calculatePhosphorExcitation(speed, velocityDimming, basePower, deltaTime) {
-    // P31 phosphor constants (medium-short persistence, standard for oscilloscopes)
-    // Decay time: ~40 microseconds to 10% brightness
-    const PHOSPHOR_DECAY_TIME = 40e-6; // 40 microseconds in seconds
-    const BEAM_SPOT_SIZE = 1.5; // Effective beam spot diameter in pixels
-
     // Beam power represents the electron beam current/intensity
-    // This is the base energy available for phosphor excitation
     const beamCurrent = basePower;
 
     // Calculate velocity in pixels/second (frame-rate independent)
     // speed is in pixels/frame, deltaTime is in seconds
     const velocity = deltaTime > 0 ? speed / deltaTime : 0;
 
-    // Dwell time: time the beam spends on a phosphor grain
-    // At low velocities, beam dwells longer; at high velocities, it passes quickly
-    let dwellTime = BEAM_SPOT_SIZE / Math.max(velocity, 1); // seconds
+    // Dwell time model:
+    // The reference velocity is the speed at which dimming becomes noticeable
+    // At typical oscilloscope speeds (100-1000 px/s), we want visible dimming
+    // Below this speed, phosphor is fully excited; above it, dimming occurs
+    const REFERENCE_VELOCITY = 500; // pixels/second where dimming starts
+    const BEAM_SPOT_SIZE = 1.5; // Effective beam spot diameter in pixels
 
-    // Clamp dwell time to phosphor decay time (beyond this, phosphor stops responding)
-    dwellTime = Math.min(dwellTime, PHOSPHOR_DECAY_TIME);
+    // Calculate energy deposition factor based on velocity
+    // Low velocity → full excitation (factor = 1.0)
+    // High velocity → reduced excitation (factor → 0)
+    let energyFactor;
 
-    // Energy deposited is proportional to beam current × dwell time
-    let depositedEnergy = beamCurrent * (dwellTime / PHOSPHOR_DECAY_TIME);
+    if (velocity < BEAM_SPOT_SIZE) {
+        // Very slow or stationary: maximum excitation
+        energyFactor = 1.0;
+    } else {
+        // Energy deposition inversely proportional to velocity
+        // This models the physical reality: faster beam = less time on each phosphor grain
+        energyFactor = (REFERENCE_VELOCITY / velocity);
+
+        // Clamp to reasonable range (don't go below 2% even at extreme speeds)
+        energyFactor = Math.max(0.02, Math.min(1.0, energyFactor));
+    }
 
     // Apply velocity dimming control (allows artistic adjustment)
+    let depositedEnergy;
     if (velocityDimming < 1.0) {
         // Mix between full physics (velocityDimming=1) and no dimming (velocityDimming=0)
-        depositedEnergy = beamCurrent * (velocityDimming * (dwellTime / PHOSPHOR_DECAY_TIME) + (1.0 - velocityDimming));
+        depositedEnergy = beamCurrent * (velocityDimming * energyFactor + (1.0 - velocityDimming));
+    } else {
+        depositedEnergy = beamCurrent * energyFactor;
     }
 
     // P31 phosphor saturation curve
