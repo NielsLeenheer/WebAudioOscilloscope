@@ -14,6 +14,11 @@
     } = $props();
 
     let dialog;
+    let isDragging = $state(false);
+    let dragStartX = $state(0);
+    let dragStartY = $state(0);
+    let dialogX = $state(0);
+    let dialogY = $state(0);
 
     export function open() {
         if (dialog) {
@@ -26,12 +31,31 @@
             dialog.close();
         }
     }
+
+    function startDrag(e) {
+        isDragging = true;
+        dragStartX = e.clientX - dialogX;
+        dragStartY = e.clientY - dialogY;
+        e.preventDefault();
+    }
+
+    function drag(e) {
+        if (!isDragging) return;
+        dialogX = e.clientX - dragStartX;
+        dialogY = e.clientY - dragStartY;
+    }
+
+    function stopDrag() {
+        isDragging = false;
+    }
 </script>
 
-<dialog bind:this={dialog} class="physics-dialog">
-    <div class="dialog-header">
+<svelte:window onmousemove={drag} onmouseup={stopDrag} />
+
+<dialog bind:this={dialog} class="physics-dialog" style="transform: translate({dialogX}px, {dialogY}px)">
+    <div class="dialog-header" onmousedown={startDrag}>
         <h3>Physics Controls</h3>
-        <button class="close-button" onclick={close}>✕</button>
+        <button class="close-button" onclick={close} onmousedown={(e) => e.stopPropagation()}>✕</button>
     </div>
     <div class="mode-toggle">
         <label>Simulation Mode</label>
@@ -138,6 +162,8 @@
         align-items: center;
         padding: 15px;
         border-bottom: 1px solid #333;
+        cursor: move;
+        user-select: none;
     }
 
     .dialog-header h3 {
