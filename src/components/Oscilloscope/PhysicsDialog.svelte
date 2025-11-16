@@ -40,9 +40,34 @@
     }
 
     function drag(e) {
-        if (!isDragging) return;
-        dialogX = e.clientX - dragStartX;
-        dialogY = e.clientY - dragStartY;
+        if (!isDragging || !dialog) return;
+
+        // Calculate new position
+        let newX = e.clientX - dragStartX;
+        let newY = e.clientY - dragStartY;
+
+        // Get dialog dimensions
+        const dialogRect = dialog.getBoundingClientRect();
+        const dialogWidth = dialogRect.width;
+        const dialogHeight = dialogRect.height;
+
+        // Get viewport dimensions
+        const viewportWidth = window.innerWidth;
+        const viewportHeight = window.innerHeight;
+
+        // Constrain to right half of viewport
+        // Left boundary: middle of viewport
+        const minX = -(dialogRect.left - viewportWidth / 2);
+        // Right boundary: viewport right edge minus dialog width
+        const maxX = viewportWidth - dialogRect.left - dialogWidth;
+        // Top boundary: top of viewport
+        const minY = -dialogRect.top;
+        // Bottom boundary: viewport bottom minus dialog height
+        const maxY = viewportHeight - dialogRect.top - dialogHeight;
+
+        // Apply constraints
+        dialogX = Math.max(minX, Math.min(maxX, newX));
+        dialogY = Math.max(minY, Math.min(maxY, newY));
     }
 
     function stopDrag() {
