@@ -46,24 +46,27 @@
         let newX = e.clientX - dragStartX;
         let newY = e.clientY - dragStartY;
 
-        // Get dialog dimensions
+        // Get dialog dimensions and current position
         const dialogRect = dialog.getBoundingClientRect();
-        const dialogWidth = dialogRect.width;
-        const dialogHeight = dialogRect.height;
 
         // Get viewport dimensions
         const viewportWidth = window.innerWidth;
         const viewportHeight = window.innerHeight;
 
-        // Constrain to right half of viewport
-        // Left boundary: middle of viewport
-        const minX = -(dialogRect.left - viewportWidth / 2);
-        // Right boundary: viewport right edge minus dialog width
-        const maxX = viewportWidth - dialogRect.left - dialogWidth;
-        // Top boundary: top of viewport
-        const minY = -dialogRect.top;
-        // Bottom boundary: viewport bottom minus dialog height
-        const maxY = viewportHeight - dialogRect.top - dialogHeight;
+        // Constrain to right half of viewport (oscilloscope area)
+        // The oscilloscope starts at 50% of viewport width
+
+        // Left boundary: dialog's left edge can touch the middle of viewport (start of oscilloscope)
+        const minX = viewportWidth / 2 - dialogRect.left + dialogX;
+
+        // Right boundary: dialog's right edge can touch the right edge of viewport
+        const maxX = viewportWidth - dialogRect.right + dialogX;
+
+        // Top boundary: dialog's top edge can touch the top of viewport
+        const minY = -dialogRect.top + dialogY;
+
+        // Bottom boundary: dialog's bottom edge can touch the bottom of viewport
+        const maxY = viewportHeight - dialogRect.bottom + dialogY;
 
         // Apply constraints
         dialogX = Math.max(minX, Math.min(maxX, newX));
