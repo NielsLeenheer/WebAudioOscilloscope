@@ -1,0 +1,58 @@
+<script>
+    import { Icon } from 'svelte-icon';
+    import webcamIcon from '../../assets/icons/glyph/webcam.svg?raw';
+
+    /**
+     * ViewSelector component - toggles between Oscilloscope and Webcam views
+     * Placed at top-right of the application window
+     */
+    let { currentView = $bindable('oscilloscope') } = $props();
+
+    function toggleView() {
+        currentView = currentView === 'oscilloscope' ? 'webcam' : 'oscilloscope';
+    }
+</script>
+
+<button
+    class="view-selector"
+    class:active={currentView === 'webcam'}
+    onclick={toggleView}
+>
+    <Icon data={webcamIcon} />
+</button>
+
+<style>
+    .view-selector {
+        position: fixed;
+        top: 15px;
+        right: 20px;
+        z-index: 1000;
+        border-radius: 6px;
+        height: 36px;
+        width: 36px;
+        padding: 0;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        user-select: none;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+        transition: all 0.2s;
+        background-color: #2d2d2d;
+        color: #888;
+        border: 1px solid #333;
+    }
+    .view-selector:hover {
+        background-color: #1d1d1d;
+    }
+    
+    .view-selector.active {
+        color: #4CAF50;
+    }
+
+    .view-selector :global(svg) {
+        height: 18px;
+        width: 18px;
+        stroke-width: 0;
+    }
+</style>
