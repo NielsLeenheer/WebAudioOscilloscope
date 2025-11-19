@@ -19,7 +19,6 @@
     onclick={toggleView}
 >
     <Icon data={webcamIcon} />
-    {currentView === 'oscilloscope' ? 'WEBCAM' : 'OSCILLOSCOPE'}
 </button>
 
 <style>
@@ -30,14 +29,12 @@
         z-index: 1000;
         border-radius: 6px;
         height: 36px;
-        padding: 0 16px;
-        font-family: system-ui;
-        font-size: 11pt;
-        font-weight: 600;
+        width: 36px;
+        padding: 0;
         cursor: pointer;
         display: flex;
         align-items: center;
-        gap: 6px;
+        justify-content: center;
         user-select: none;
         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
         transition: all 0.2s;
