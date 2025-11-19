@@ -1,21 +1,26 @@
 <script>
-    import { onMount, onDestroy } from 'svelte';
+    import { onDestroy } from 'svelte';
+    import PowerButton from '../Common/PowerButton.svelte';
 
     let videoElement;
     let stream = null;
     let error = null;
-    let isLoading = true;
+    let isLoading = false;
+    let isPowered = $state(false);
 
-    onMount(async () => {
-        console.log('Webcam component mounted');
+    async function startWebcam() {
+        console.log('Starting webcam...');
 
         // Check if getUserMedia is supported
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
             console.error('getUserMedia not supported');
             error = 'Your browser does not support camera access';
-            isLoading = false;
+            isPowered = false;
             return;
         }
+
+        isLoading = true;
+        error = null;
 
         try {
             console.log('Requesting webcam access...');
@@ -45,11 +50,13 @@
                 console.error('Video element not found');
                 error = 'Video element not initialized';
                 isLoading = false;
+                isPowered = false;
             }
         } catch (err) {
             console.error('Error accessing webcam:', err);
             error = err.message || 'Failed to access camera';
             isLoading = false;
+            isPowered = false;
 
             // Clean up stream if it was created
             if (stream) {
@@ -57,43 +64,99 @@
                 stream = null;
             }
         }
-    });
+    }
 
-    onDestroy(() => {
-        console.log('Webcam component destroyed');
-        // Clean up webcam stream
+    function stopWebcam() {
+        console.log('Stopping webcam...');
         if (stream) {
             stream.getTracks().forEach(track => track.stop());
             stream = null;
         }
+        if (videoElement) {
+            videoElement.srcObject = null;
+        }
+        error = null;
+        isLoading = false;
+    }
+
+    onDestroy(() => {
+        console.log('Webcam component destroyed');
+        stopWebcam();
+    });
+
+    // React to power state changes
+    $effect(() => {
+        if (isPowered) {
+            startWebcam();
+        } else {
+            stopWebcam();
+        }
     });
 </script>
 
-<div class="webcam-container">
-    <video
-        bind:this={videoElement}
-        autoplay
-        playsinline
-        muted
-        style:display={isLoading || error ? 'none' : 'block'}
-    ></video>
+<div class="webcam">
+    <header>
+        <PowerButton variant="dark" bind:isPowered />
+        <h1>Camera</h1>
+    </header>
 
-    {#if isLoading}
-        <div class="message">
-            <p>Requesting webcam access...</p>
-        </div>
-    {:else if error}
-        <div class="message error">
-            <h2>Webcam Access Error</h2>
-            <p>{error}</p>
-            <p class="hint">Please ensure you've granted camera permissions in your browser.</p>
-        </div>
-    {:else}
-        <div class="label">Real Oscilloscope - Camera Feed</div>
-    {/if}
+    <div class="webcam-container">
+        <video
+            bind:this={videoElement}
+            autoplay
+            playsinline
+            muted
+        ></video>
+
+        {#if !isPowered}
+            <div class="message">
+                <p>Camera is off. Click POWER ON to start.</p>
+            </div>
+        {:else if isLoading}
+            <div class="message">
+                <p>Requesting webcam access...</p>
+            </div>
+        {:else if error}
+            <div class="message error">
+                <h2>Webcam Access Error</h2>
+                <p>{error}</p>
+                <p class="hint">Please ensure you've granted camera permissions in your browser.</p>
+            </div>
+        {/if}
+    </div>
 </div>
 
 <style>
+    .webcam {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        background: #0d0d0d;
+        position: relative;
+    }
+
+    header {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        z-index: 10;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 15px 20px;
+        background: rgba(26, 26, 26, 0.7);
+        backdrop-filter: blur(10px);
+        border-bottom: 1px solid rgba(51, 51, 51, 0.5);
+    }
+
+    h1 {
+        margin: 0;
+        color: #555;
+        font-size: 1.5em;
+        margin-left: 0.5em;
+    }
+
     .webcam-container {
         width: 100%;
         height: 100%;
@@ -112,9 +175,16 @@
     }
 
     .message {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
         text-align: center;
         color: #888;
         padding: 40px;
+        background: rgba(13, 13, 13, 0.9);
+        border-radius: 8px;
+        z-index: 5;
     }
 
     .message.error {
@@ -137,20 +207,5 @@
         margin-top: 16px;
         font-size: 12px;
         color: #666;
-    }
-
-    .label {
-        position: absolute;
-        bottom: 20px;
-        left: 50%;
-        transform: translateX(-50%);
-        background: rgba(0, 0, 0, 0.7);
-        color: #4CAF50;
-        padding: 8px 16px;
-        border-radius: 4px;
-        font-family: system-ui;
-        font-size: 12px;
-        font-weight: 500;
-        pointer-events: none;
     }
 </style>
