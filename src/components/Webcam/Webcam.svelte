@@ -70,6 +70,14 @@
 </script>
 
 <div class="webcam-container">
+    <video
+        bind:this={videoElement}
+        autoplay
+        playsinline
+        muted
+        style:display={isLoading || error ? 'none' : 'block'}
+    ></video>
+
     {#if isLoading}
         <div class="message">
             <p>Requesting webcam access...</p>
@@ -81,12 +89,6 @@
             <p class="hint">Please ensure you've granted camera permissions in your browser.</p>
         </div>
     {:else}
-        <video
-            bind:this={videoElement}
-            autoplay
-            playsinline
-            muted
-        ></video>
         <div class="label">Real Oscilloscope - Camera Feed</div>
     {/if}
 </div>
