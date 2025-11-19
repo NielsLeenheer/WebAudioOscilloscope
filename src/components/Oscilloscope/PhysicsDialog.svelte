@@ -85,6 +85,7 @@
         <h3>Physics Controls</h3>
         <button class="close-button" onclick={close} onmousedown={(e) => e.stopPropagation()}>✕</button>
     </div>
+    <!-- Mode toggle hidden - keeping both models as backup
     <div class="mode-toggle">
         <label>Simulation Mode</label>
         <div class="toggle-buttons">
@@ -102,6 +103,7 @@
             </button>
         </div>
     </div>
+    -->
     <div class="sliders">
         {#if simulationMode === 'spring'}
             <div class="slider-control">
