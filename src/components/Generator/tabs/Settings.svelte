@@ -1,7 +1,7 @@
 <script>
     import Card from '../../Common/Card.svelte';
 
-    let { audioEngine, svgAnimationFPS = $bindable(30), svgSamplePoints = $bindable(200), svgOptimizeSegments = $bindable(true), svgDoubleDraw = $bindable(true) } = $props();
+    let { audioEngine, svgAnimationFPS = $bindable(30), svgSamplePoints = $bindable(200), svgOptimizeSegments = $bindable(true), svgDoubleDraw = $bindable(false) } = $props();
 
     let frequency = $state(100);
     let volume = $state(30);

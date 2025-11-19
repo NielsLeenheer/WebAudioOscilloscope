@@ -17,9 +17,9 @@
     let springMass = $state(0.11);
 
     // Electromagnetic model parameters
-    let coilStrength = $state(0.32);
-    let beamInertia = $state(0.06);
-    let fieldDamping = $state(0.44);
+    let coilStrength = $state(0.60);
+    let beamInertia = $state(0.10);
+    let fieldDamping = $state(0.30);
 
     // Common parameters (shared by both modes)
     let persistence = $state(0.100); // Afterglow/fade effect (0=instant fade, 1=long trail)
