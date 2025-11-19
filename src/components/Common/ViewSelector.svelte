@@ -24,7 +24,7 @@
 <style>
     .view-selector {
         position: fixed;
-        top: 20px;
+        top: 15px;
         right: 20px;
         z-index: 1000;
         border-radius: 6px;
@@ -42,11 +42,12 @@
         color: #888;
         border: 1px solid #333;
     }
-
+    .view-selector:hover {
+        background-color: #1d1d1d;
+    }
+    
     .view-selector.active {
-        background-color: #1b5e20;
         color: #4CAF50;
-        border: 1px solid #2d5e30;
     }
 
     .view-selector :global(svg) {
