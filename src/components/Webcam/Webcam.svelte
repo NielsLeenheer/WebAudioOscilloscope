@@ -7,30 +7,60 @@
     let isLoading = true;
 
     onMount(async () => {
+        console.log('Webcam component mounted');
+
+        // Check if getUserMedia is supported
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            console.error('getUserMedia not supported');
+            error = 'Your browser does not support camera access';
+            isLoading = false;
+            return;
+        }
+
         try {
-            // Request webcam access
-            stream = await navigator.mediaDevices.getUserMedia({
+            console.log('Requesting webcam access...');
+
+            // Add timeout to prevent hanging
+            const timeoutPromise = new Promise((_, reject) => {
+                setTimeout(() => reject(new Error('Camera access request timed out')), 10000);
+            });
+
+            const getUserMediaPromise = navigator.mediaDevices.getUserMedia({
                 video: {
                     width: { ideal: 1920 },
-                    height: { ideal: 1080 },
-                    facingMode: 'user'
+                    height: { ideal: 1080 }
                 },
                 audio: false
             });
 
+            stream = await Promise.race([getUserMediaPromise, timeoutPromise]);
+            console.log('Webcam access granted', stream);
+
             if (videoElement) {
                 videoElement.srcObject = stream;
-                videoElement.play();
+                await videoElement.play();
+                isLoading = false;
+                console.log('Video playing');
+            } else {
+                console.error('Video element not found');
+                error = 'Video element not initialized';
                 isLoading = false;
             }
         } catch (err) {
             console.error('Error accessing webcam:', err);
-            error = err.message;
+            error = err.message || 'Failed to access camera';
             isLoading = false;
+
+            // Clean up stream if it was created
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+                stream = null;
+            }
         }
     });
 
     onDestroy(() => {
+        console.log('Webcam component destroyed');
         // Clean up webcam stream
         if (stream) {
             stream.getTracks().forEach(track => track.stop());
