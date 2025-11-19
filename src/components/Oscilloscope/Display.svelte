@@ -9,9 +9,19 @@
     let visualiser;
 
     // Physics parameters (adjustable)
-    let forceMultiplier = $state(0.3);
-    let damping = $state(0.60);
-    let mass = $state(0.11);
+    let simulationMode = $state('electromagnetic'); // 'spring' or 'electromagnetic'
+
+    // Spring-Damper model parameters
+    let springForce = $state(0.3);
+    let springDamping = $state(0.60);
+    let springMass = $state(0.11);
+
+    // Electromagnetic model parameters
+    let coilStrength = $state(0.32);
+    let beamInertia = $state(0.06);
+    let fieldDamping = $state(0.44);
+
+    // Common parameters (shared by both modes)
     let persistence = $state(0.100); // Afterglow/fade effect (0=instant fade, 1=long trail)
     let signalNoise = $state(0.005); // Random noise added to audio signal (0-1)
     let beamPower = $state(0.75); // Beam power (affects opacity: high power = bright, low power = dim)
@@ -34,9 +44,13 @@
 
 <div class="display-panel">
     <Physics
-        bind:forceMultiplier
-        bind:damping
-        bind:mass
+        bind:simulationMode
+        bind:springForce
+        bind:springDamping
+        bind:springMass
+        bind:coilStrength
+        bind:beamInertia
+        bind:fieldDamping
         bind:persistence
         bind:signalNoise
         bind:velocityDimming
@@ -50,9 +64,13 @@
                 {inputSource}
                 {isPowered}
                 {mode}
-                {forceMultiplier}
-                {damping}
-                {mass}
+                {simulationMode}
+                {springForce}
+                {springDamping}
+                {springMass}
+                {coilStrength}
+                {beamInertia}
+                {fieldDamping}
                 {persistence}
                 {signalNoise}
                 {beamPower}

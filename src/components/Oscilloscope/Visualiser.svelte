@@ -7,9 +7,13 @@
         isPowered,
         mode,
         // Physics parameters
-        forceMultiplier,
-        damping,
-        mass,
+        simulationMode,
+        springForce,
+        springDamping,
+        springMass,
+        coilStrength,
+        beamInertia,
+        fieldDamping,
         persistence,
         signalNoise,
         beamPower,
@@ -35,6 +39,7 @@
     let rightData = null;
     let worker = null;
     let workerBusy = false;
+    let lastFrameTime = 0;
 
     onMount(() => {
         // Initialize Web Worker with OffscreenCanvas
@@ -93,13 +98,17 @@
         }
     }
 
-    function draw() {
+    function draw(currentTime) {
         if (!isPowered) {
             stopVisualization();
             return;
         }
 
         animationId = requestAnimationFrame(draw);
+
+        // Calculate frame delta time (in seconds)
+        const deltaTime = lastFrameTime === 0 ? 1/60 : (currentTime - lastFrameTime) / 1000;
+        lastFrameTime = currentTime;
 
         // Skip this frame if worker is still busy processing previous frame
         if (workerBusy) {
@@ -169,6 +178,11 @@
 
         const basePower = 0.2 + (beamPower * 1.4); // Allow up to 3.0 max brightness
 
+        // Select the appropriate physics parameters based on simulation mode
+        const forceMultiplier = simulationMode === 'spring' ? springForce : coilStrength;
+        const mass = simulationMode === 'spring' ? springMass : beamInertia;
+        const damping = simulationMode === 'spring' ? springDamping : fieldDamping;
+
         if (worker) {
             workerBusy = true;
             worker.postMessage({
@@ -180,6 +194,7 @@
                     centerY,
                     scale,
                     visibleScale,
+                    simulationMode,
                     forceMultiplier,
                     damping,
                     mass,
@@ -200,7 +215,8 @@
                     canvasWidth,
                     canvasHeight,
                     visibleWidth,
-                    sampleRate
+                    sampleRate,
+                    deltaTime
                 }
             });
         }

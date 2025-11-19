@@ -4,9 +4,13 @@
     import PhysicsDialog from './PhysicsDialog.svelte';
 
     let {
-        forceMultiplier = $bindable(),
-        damping = $bindable(),
-        mass = $bindable(),
+        simulationMode = $bindable(),
+        springForce = $bindable(),
+        springDamping = $bindable(),
+        springMass = $bindable(),
+        coilStrength = $bindable(),
+        beamInertia = $bindable(),
+        fieldDamping = $bindable(),
         persistence = $bindable(),
         signalNoise = $bindable(),
         velocityDimming = $bindable(),
@@ -28,9 +32,13 @@
 
 <PhysicsDialog
     bind:this={physicsDialog}
-    bind:forceMultiplier
-    bind:damping
-    bind:mass
+    bind:simulationMode
+    bind:springForce
+    bind:springDamping
+    bind:springMass
+    bind:coilStrength
+    bind:beamInertia
+    bind:fieldDamping
     bind:persistence
     bind:signalNoise
     bind:velocityDimming
