@@ -1,22 +1,18 @@
 <script>
     /**
-     * ViewSelector component - switches between Oscilloscope and Webcam views
+     * ViewSelector component - toggles between Oscilloscope and Webcam views
      * Placed at top-right of the application window
      */
     let { currentView = $bindable('oscilloscope') } = $props();
+
+    function toggleView() {
+        currentView = currentView === 'oscilloscope' ? 'webcam' : 'oscilloscope';
+    }
 </script>
 
-<div class="view-selector">
-    <label>
-        <input type="radio" name="view" value="oscilloscope" bind:group={currentView}>
-        <span>Oscilloscope</span>
-    </label>
-
-    <label>
-        <input type="radio" name="view" value="webcam" bind:group={currentView}>
-        <span>Webcam</span>
-    </label>
-</div>
+<button class="view-selector" onclick={toggleView}>
+    {currentView === 'oscilloscope' ? 'Switch to Webcam' : 'Switch to Oscilloscope'}
+</button>
 
 <style>
     .view-selector {
@@ -24,51 +20,33 @@
         top: 20px;
         right: 20px;
         z-index: 1000;
-        border: none;
+        border: 1px solid #333;
         border-radius: 6px;
         background: #2d2d2d;
+        color: #4CAF50;
         font-family: system-ui;
         font-size: 10pt;
-        display: flex;
+        font-weight: 500;
+        padding: 8px 16px;
         height: 32px;
-        align-items: stretch;
-        user-select: none;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-    }
-
-    label {
         display: flex;
         align-items: center;
-        padding: 0px 12px;
         cursor: pointer;
-        color: #888;
+        user-select: none;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
         transition: all 0.2s;
     }
 
-    label:first-child {
-        border-radius: 6px 0 0 6px;
-    }
-
-    label:last-child {
-        border-radius: 0 6px 6px 0;
-    }
-
-    label:has(:focus-visible) {
-        outline: 2px solid #4CAF50;
-    }
-
-    label:has(input:checked) {
-        background: #1b5e20;
-        color: #4CAF50;
-    }
-
-    label:hover:not(:has(input:checked)) {
+    .view-selector:hover {
         background: #333;
-        color: #aaa;
+        border-color: #4CAF50;
     }
 
-    input {
-        position: absolute;
-        opacity: 0;
+    .view-selector:active {
+        background: #1b5e20;
+    }
+
+    .view-selector:focus-visible {
+        outline: 2px solid #4CAF50;
     }
 </style>

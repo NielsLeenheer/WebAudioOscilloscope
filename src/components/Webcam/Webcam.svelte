@@ -108,11 +108,7 @@
             muted
         ></video>
 
-        {#if !isPowered}
-            <div class="message">
-                <p>Camera is off. Click POWER ON to start.</p>
-            </div>
-        {:else if isLoading}
+        {#if isLoading}
             <div class="message">
                 <p>Requesting webcam access...</p>
             </div>
@@ -152,7 +148,7 @@
 
     h1 {
         margin: 0;
-        color: #555;
+        color: rgba(255, 255, 255, 0.6);
         font-size: 1.5em;
         margin-left: 0.5em;
     }
