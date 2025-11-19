@@ -1,17 +1,14 @@
 # Oscilloscope Physics Model
 
-This document explains the physics simulation models used in the Web Audio Oscilloscope to create realistic CRT (Cathode Ray Tube) oscilloscope behavior.
+This document explains the physics simulation used in the Web Audio Oscilloscope to create realistic CRT (Cathode Ray Tube) oscilloscope behavior.
 
 ## Overview
 
-The oscilloscope simulates an electron beam being deflected by electromagnetic coils to trace a waveform on a phosphor screen. Two physics models are implemented:
+The oscilloscope simulates an electron beam being deflected by electromagnetic coils to trace a waveform on a phosphor screen, using a physically accurate electromagnetic model that replicates real CRT oscilloscope behavior.
 
-1. **Electromagnetic Model** (default) - Physically accurate CRT simulation
-2. **Spring-Damper Model** (backup) - Simplified mechanical analogy
+## Physics Simulation
 
-## Electromagnetic Model
-
-This is the primary model, simulating how a real CRT oscilloscope works with electron beams and electromagnetic deflection.
+The simulation models how a real CRT oscilloscope works with electron beams and electromagnetic deflection.
 
 ### Physical Principles
 
@@ -97,7 +94,7 @@ smoothedBeamX = 0.6 × beamX + 0.4 × previousSmoothedBeamX
 smoothedBeamY = 0.6 × beamY + 0.4 × previousSmoothedBeamY
 ```
 
-The 0.6 smoothing factor allows more responsiveness compared to the spring-damper model (0.4), showing more realistic overshoot and self-correction.
+The 0.6 smoothing factor provides good responsiveness while preventing jitter, allowing realistic overshoot and self-correction to be visible.
 
 ### Behavior Characteristics
 
@@ -108,67 +105,9 @@ The 0.6 smoothing factor allows more responsiveness compared to the spring-dampe
 - Without deflection input, beam naturally settles to center
 - Responds to parameter changes like a real CRT
 
-## Spring-Damper Model (Legacy)
-
-A simplified mechanical analogy model, kept as backup.
-
-### Physical Analogy
-
-Imagine the beam position is connected to the target by a spring:
-- Spring pulls beam toward target
-- Mass resists rapid changes
-- Damping removes energy
-
-### Step-by-Step Simulation
-
-#### 1. Calculate Spring Force
-
-```javascript
-forceX = (targetX - currentBeamX) × springForce
-forceY = (targetY - currentBeamY) × springForce
-```
-
-**Parameters:**
-- `springForce` (default: 0.3) - Spring stiffness
-- Higher = stronger pull toward target
-
-#### 2. Calculate Acceleration
-
-```javascript
-accelerationX = forceX / springMass
-accelerationY = forceY / springMass
-```
-
-**Parameters:**
-- `springMass` (default: 0.11) - Inertial mass
-- Higher = more sluggish response
-
-#### 3. Update Velocity with Damping
-
-```javascript
-velocityX = (velocityX + accelerationX) × springDamping
-velocityY = (velocityY + accelerationY) × springDamping
-```
-
-**Parameters:**
-- `springDamping` (default: 0.60) - Energy dissipation (0-1)
-- Lower = more damping
-
-#### 4. Update and Smooth Position
-
-```javascript
-beamX += velocityX
-beamY += velocityY
-
-smoothedBeamX = 0.4 × beamX + 0.6 × previousSmoothedBeamX
-smoothedBeamY = 0.4 × beamY + 0.6 × previousSmoothedBeamY
-```
-
-More smoothing (0.4) than electromagnetic model to compensate for less realistic physics.
-
 ## Phosphor Excitation Model
 
-Both physics models share the same phosphor excitation simulation, which determines how bright the trace appears based on beam behavior.
+The phosphor excitation simulation determines how bright the trace appears based on beam behavior.
 
 ### Physical Principles
 
@@ -268,7 +207,7 @@ if (depositedEnergy < SATURATION_KNEE) {
 
 ## Common Parameters
 
-These parameters are shared by both physics models:
+These parameters control the visual appearance and behavior of the phosphor display:
 
 ### Persistence
 **Default:** 0.100
@@ -322,7 +261,7 @@ deltaTime = (currentFrameTime - lastFrameTime) / 1000  // seconds
 
 ## Parameter Tuning Guide
 
-### For More Overshoot (Electromagnetic Model)
+### For More Overshoot
 - Increase `beamInertia` (more mass = more overshoot)
 - Increase `coilStrength` (stronger force = faster acceleration = more overshoot)
 - Increase `fieldDamping` closer to 1.0 (less energy loss)
@@ -349,7 +288,6 @@ deltaTime = (currentFrameTime - lastFrameTime) / 1000  // seconds
 
 - **Physics Worker:** `/src/workers/physics-worker.js`
   - `simulatePhysicsElectromagnetic()` (lines 276-353)
-  - `simulatePhysicsSpring()` (lines 212-270)
   - `calculatePhosphorExcitation()` (lines 50-119)
   - `renderTrace()` (lines 371+)
 
@@ -372,18 +310,6 @@ The physics simulation runs in a Web Worker (`physics-worker.js`) to:
 - Maintain 60fps animation smoothness
 - Use OffscreenCanvas for rendering
 - Prevent UI blocking during complex simulations
-
-## Comparison: Electromagnetic vs Spring-Damper
-
-| Aspect | Electromagnetic | Spring-Damper |
-|--------|----------------|---------------|
-| **Accuracy** | Physically accurate CRT | Mechanical analogy |
-| **Overshoot** | Natural, velocity-based | Simulated via mass |
-| **Self-correction** | True electromagnetic behavior | Spring restoring force |
-| **Responsiveness** | More realistic (0.6 smoothing) | More smoothed (0.4) |
-| **Default Mode** | Yes (active) | No (backup) |
-| **Parameters** | Coil Strength, Beam Inertia, Field Damping | Force, Mass, Damping |
-| **Use Case** | Realistic CRT simulation | Simplified alternative |
 
 ## Future Improvements
 
