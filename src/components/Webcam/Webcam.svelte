@@ -148,7 +148,7 @@
 
     h1 {
         margin: 0;
-        color: rgba(255, 255, 255, 0.6);
+        color: rgba(255, 255, 255, 0.3);
         font-size: 1.5em;
         margin-left: 0.5em;
     }
