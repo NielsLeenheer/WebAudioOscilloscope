@@ -596,41 +596,29 @@ function renderTraceAlternative(ctx, points, speeds, velocityDimming, basePower,
 
     // Store original points for blue dot visualization
     const originalPoints = points;
+    const originalSpeeds = speeds;
 
-    // Apply Catmull-Rom interpolation if TIME_SEGMENT is smaller than timePerPoint
-    // This creates smooth curves and allows finer temporal resolution
-    const interpolated = interpolatePoints(points, speeds, TIME_SEGMENT, timePerPoint);
-    points = interpolated.points;
-    speeds = interpolated.speeds;
-
-    // Recalculate timePerPoint for interpolated points
-    const interpolatedTimePerPoint = TIME_SEGMENT;
-
-    // Configure canvas for drawing
-    ctx.lineWidth = 1.5;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-
-    // First pass: detect direction changes for highlighting
+    // First pass: detect direction changes on ORIGINAL points (before interpolation)
+    // This ensures blue dots are not affected by TIME_SEGMENT setting
     // Direction changes occur at local velocity minima (beam reversal points)
     // Calculate angle of direction change to determine brightness
     const directionChanges = new Map(); // Map of index -> brightness
-    for (let i = 1; i < points.length - 1; i++) {
-        const prevSpeed = speeds[i - 1] || 0;
-        const currSpeed = speeds[i] || 0;
-        const nextSpeed = speeds[i + 1] || 0;
+    for (let i = 1; i < originalPoints.length - 1; i++) {
+        const prevSpeed = originalSpeeds[i - 1] || 0;
+        const currSpeed = originalSpeeds[i] || 0;
+        const nextSpeed = originalSpeeds[i + 1] || 0;
 
         // Detect local minimum in speed (direction change/reversal point)
         // Also detect when speed drops significantly (approaching zero)
         if (currSpeed < prevSpeed && currSpeed < nextSpeed && currSpeed < 5) {
             // Calculate angle of direction change
             // Incoming velocity vector: from point[i-1] to point[i]
-            const inX = points[i].x - points[i - 1].x;
-            const inY = points[i].y - points[i - 1].y;
+            const inX = originalPoints[i].x - originalPoints[i - 1].x;
+            const inY = originalPoints[i].y - originalPoints[i - 1].y;
 
             // Outgoing velocity vector: from point[i] to point[i+1]
-            const outX = points[i + 1].x - points[i].x;
-            const outY = points[i + 1].y - points[i].y;
+            const outX = originalPoints[i + 1].x - originalPoints[i].x;
+            const outY = originalPoints[i + 1].y - originalPoints[i].y;
 
             // Calculate magnitudes
             const inMag = Math.sqrt(inX * inX + inY * inY);
@@ -664,6 +652,20 @@ function renderTraceAlternative(ctx, points, speeds, velocityDimming, basePower,
             }
         }
     }
+
+    // Apply Catmull-Rom interpolation if TIME_SEGMENT is smaller than timePerPoint
+    // This creates smooth curves and allows finer temporal resolution
+    const interpolated = interpolatePoints(points, speeds, TIME_SEGMENT, timePerPoint);
+    points = interpolated.points;
+    speeds = interpolated.speeds;
+
+    // Recalculate timePerPoint for interpolated points
+    const interpolatedTimePerPoint = TIME_SEGMENT;
+
+    // Configure canvas for drawing
+    ctx.lineWidth = 1.5;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
 
     // Second pass: render segments
     let segmentStartIdx = 0;
