@@ -503,21 +503,72 @@ function renderTracePhosphor(ctx, points, speeds, velocityDimming, basePower, de
 }
 
 // ============================================================================
-// RENDERING - Alternative Model (To be developed)
+// RENDERING - Alternative Model (Time-based segmentation)
 // ============================================================================
-function renderTraceAlternative(ctx, points, speeds, velocityDimming, basePower, deltaTime) {
-    // Currently identical to phosphor model
-    // This will be customized later for different rendering approach
-    renderTracePhosphor(ctx, points, speeds, velocityDimming, basePower, deltaTime);
+function renderTraceAlternative(ctx, points, speeds, velocityDimming, basePower, deltaTime, sampleRate) {
+    // Time-based segmentation approach:
+    // - Segment traces based on fixed time intervals
+    // - Fast beam movement = points spread out over time segment
+    // - Slow beam movement = points closer together over time segment
+
+    if (points.length < 2) return;
+
+    // Fixed time interval for each segment (in seconds)
+    const TIME_SEGMENT = 0.0005; // 0.5ms per segment
+
+    // Time per point (assuming points correspond to audio samples)
+    // Each point represents one sample from the physics simulation
+    const timePerPoint = 1 / sampleRate;
+
+    // Configure canvas for drawing
+    ctx.lineWidth = 1.5;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    let segmentStartIdx = 0;
+    let accumulatedTime = 0;
+
+    for (let i = 1; i < points.length; i++) {
+        accumulatedTime += timePerPoint;
+
+        // When we've accumulated enough time, draw the segment
+        if (accumulatedTime >= TIME_SEGMENT || i === points.length - 1) {
+            // Calculate average speed for this time segment
+            let totalDistance = 0;
+            for (let j = segmentStartIdx + 1; j <= i && j < speeds.length; j++) {
+                totalDistance += speeds[j] || 0;
+            }
+            const avgSpeed = totalDistance / Math.max(1, i - segmentStartIdx);
+
+            // Calculate opacity based on average speed of the segment
+            const opacity = calculatePhosphorExcitation(avgSpeed, velocityDimming, basePower, deltaTime);
+
+            // Draw line from segment start to current point
+            ctx.beginPath();
+            ctx.moveTo(points[segmentStartIdx].x, points[segmentStartIdx].y);
+
+            // Draw through all points in this time segment
+            for (let j = segmentStartIdx + 1; j <= i; j++) {
+                ctx.lineTo(points[j].x, points[j].y);
+            }
+
+            ctx.strokeStyle = `rgba(76, 175, 80, ${opacity})`;
+            ctx.stroke();
+
+            // Reset for next segment
+            segmentStartIdx = i;
+            accumulatedTime = 0;
+        }
+    }
 }
 
 // ============================================================================
 // RENDERING DISPATCHER
 // Chooses the appropriate rendering model based on renderingMode
 // ============================================================================
-function renderTrace(ctx, points, speeds, velocityDimming, basePower, deltaTime, renderingMode) {
+function renderTrace(ctx, points, speeds, velocityDimming, basePower, deltaTime, renderingMode, sampleRate) {
     if (renderingMode === 'alternative') {
-        return renderTraceAlternative(ctx, points, speeds, velocityDimming, basePower, deltaTime);
+        return renderTraceAlternative(ctx, points, speeds, velocityDimming, basePower, deltaTime, sampleRate);
     } else {
         // Default to phosphor model
         return renderTracePhosphor(ctx, points, speeds, velocityDimming, basePower, deltaTime);
@@ -634,7 +685,7 @@ self.onmessage = function(e) {
             // RENDERING - Draw the simulated beam path
             // ========================================================================
 
-            renderTrace(ctx, points, speeds, velocityDimming, basePower, deltaTime, renderingMode);
+            renderTrace(ctx, points, speeds, velocityDimming, basePower, deltaTime, renderingMode, sampleRate);
         }
 
         // Send ready message back to main thread

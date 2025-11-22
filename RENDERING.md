@@ -205,17 +205,91 @@ This represents P31 phosphor (green), commonly used in oscilloscopes.
 
 ## Alternative Rendering Model
 
-The alternative model (`renderTraceAlternative`, lines 508-512) is currently a placeholder:
+The alternative model (`renderTraceAlternative`, lines 508-563) implements **time-based segmentation**, a fundamentally different approach from the phosphor model's spatial segmentation.
 
+### Time-Based Segmentation Concept
+
+Instead of segmenting based on spatial distance (curve length), the alternative model segments based on **fixed time intervals**:
+
+- **Fast beam movement** → Points are spread out spatially within a time segment
+- **Slow beam movement** → Points are clustered closer together within a time segment
+
+This models the beam as having a constant "temporal quantum" - each drawn segment represents the same amount of time, regardless of how far the beam traveled.
+
+### Implementation Details
+
+**Fixed Time Quantum:**
 ```javascript
-function renderTraceAlternative(ctx, points, speeds, velocityDimming, basePower, deltaTime) {
-    // Currently identical to phosphor model
-    // This will be customized later for different rendering approach
-    renderTracePhosphor(ctx, points, speeds, velocityDimming, basePower, deltaTime);
-}
+const TIME_SEGMENT = 0.0005; // 0.5ms per segment
 ```
 
-This is intentionally left empty for future experimentation with different rendering techniques while maintaining the dual-model architecture.
+Each rendered segment represents 0.5 milliseconds of beam movement.
+
+**Time Calculation:**
+```javascript
+const timePerPoint = 1 / sampleRate;
+```
+
+Since each point corresponds to one audio sample from the physics simulation, the time between consecutive points is `1 / sampleRate` (e.g., ~20.8µs at 48kHz sample rate).
+
+**Segmentation Algorithm:**
+
+1. Start at first point, initialize time accumulator to 0
+2. Iterate through points, accumulating time (`timePerPoint` per point)
+3. When accumulated time reaches `TIME_SEGMENT`, finalize the segment:
+   - Calculate average speed for the segment (total distance / number of points)
+   - Calculate opacity using `calculatePhosphorExcitation()` with average speed
+   - Draw straight lines connecting all points in the segment
+4. Reset accumulator and continue from current point
+
+**Opacity Calculation:**
+
+Unlike the phosphor model which interpolates opacity along curves, the alternative model uses a **single opacity per time segment**:
+
+```javascript
+const avgSpeed = totalDistance / Math.max(1, i - segmentStartIdx);
+const opacity = calculatePhosphorExcitation(avgSpeed, velocityDimming, basePower, deltaTime);
+```
+
+This creates distinct visual "quanta" where each time segment has uniform brightness.
+
+### Visual Characteristics
+
+The time-based approach produces different visual effects compared to phosphor rendering:
+
+1. **Spatial Variation**
+   - Fast movements create longer segments (more pixels per 0.5ms)
+   - Slow movements create shorter segments (fewer pixels per 0.5ms)
+   - Segment length varies with beam velocity
+
+2. **Uniform Temporal Opacity**
+   - Each time segment has constant opacity
+   - No smooth gradients within a segment
+   - Creates a more "quantized" appearance
+
+3. **Drawing Style**
+   - Uses straight lines (`lineTo`) instead of Bézier curves
+   - `lineCap: 'round'` softens segment endpoints
+   - Simpler rendering path, potentially faster
+
+### Comparison: Phosphor vs Alternative
+
+| Aspect | Phosphor Model | Alternative Model |
+|--------|----------------|-------------------|
+| Segmentation basis | Spatial (curve length) | Temporal (fixed time) |
+| Segment length | Variable by curve estimation | Variable by beam velocity |
+| Opacity variation | Smooth gradients (ease-in) | Uniform per segment |
+| Drawing primitive | Quadratic Bézier curves | Straight lines |
+| Sub-segmentation | Adaptive (1-8 sub-segments) | None (one segment = one draw call) |
+| Visual style | Smooth, organic | Quantized, temporal |
+
+### Use Cases
+
+The alternative model may be more suitable for:
+- Visualizing temporal patterns in the signal
+- Creating a more "digital" or "sampled" aesthetic
+- Performance optimization (fewer draw calls)
+- Emphasizing velocity changes over time
 
 ## Performance Considerations
 
@@ -239,13 +313,20 @@ This is intentionally left empty for future experimentation with different rende
 
 ## Future Development
 
-The alternative rendering model could explore:
+The dual-model architecture makes experimentation safe - the phosphor model remains functional while new approaches are developed in the alternative model.
 
-- Different phosphor types (P7, P11, etc.)
-- Bloom/glow effects
-- Point-based rendering instead of curves
-- Different opacity calculation methods
+### Potential Enhancements for Alternative Model
+
+- **Adjustable time quantum**: Make `TIME_SEGMENT` a user-controllable parameter
+- **Gradient within segments**: Interpolate opacity across points within each time segment
+- **Temporal patterns**: Add visual effects based on time-domain characteristics
+- **Segment styling**: Different visual treatments for different velocity ranges
+
+### Other Rendering Possibilities
+
+Both models could explore:
+- Different phosphor types (P7, P11, etc.) with varying persistence characteristics
+- Bloom/glow effects for overdriven signals
 - HDR rendering techniques
-- Scanline effects
-
-The dual-model architecture makes experimentation safe - the phosphor model remains functional while new approaches are developed.
+- Color variations based on velocity or signal amplitude
+- Scanline effects for enhanced CRT realism
