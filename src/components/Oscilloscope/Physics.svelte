@@ -8,6 +8,8 @@
         renderingMode = $bindable(),
         debugMode = $bindable(),
         timeSegment = $bindable(),
+        dotOpacity = $bindable(),
+        dotSizeVariation = $bindable(),
         springForce = $bindable(),
         springDamping = $bindable(),
         springMass = $bindable(),
@@ -39,6 +41,8 @@
     bind:renderingMode
     bind:debugMode
     bind:timeSegment
+    bind:dotOpacity
+    bind:dotSizeVariation
     bind:springForce
     bind:springDamping
     bind:springMass

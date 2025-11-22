@@ -4,6 +4,8 @@
         renderingMode = $bindable(),
         debugMode = $bindable(),
         timeSegment = $bindable(),
+        dotOpacity = $bindable(),
+        dotSizeVariation = $bindable(),
         springForce = $bindable(),
         springDamping = $bindable(),
         springMass = $bindable(),
@@ -193,11 +195,24 @@
         {#if debugMode}
             <div class="slider-control">
                 <label>Time Segment</label>
-                <input type="range" min="0.005" max="0.2" step="0.005" bind:value={timeSegment} />
+                <input type="range" min="0.001" max="0.050" step="0.001" bind:value={timeSegment} />
                 <span class="value">{timeSegment.toFixed(3)}</span>
             </div>
             <div class="value-display" style="grid-column: 1 / 4; margin-top: -8px; margin-bottom: 8px;">
                 Temporal resolution: {timeSegment}ms per segment
+            </div>
+            <div class="slider-control">
+                <label>Dot Opacity</label>
+                <input type="range" min="0.0" max="1.0" step="0.01" bind:value={dotOpacity} />
+                <span class="value">{dotOpacity.toFixed(2)}</span>
+            </div>
+            <div class="slider-control">
+                <label>Dot Size Var</label>
+                <input type="range" min="1" max="10" step="0.1" bind:value={dotSizeVariation} />
+                <span class="value">{dotSizeVariation.toFixed(1)}</span>
+            </div>
+            <div class="value-display" style="grid-column: 1 / 4; margin-top: -8px; margin-bottom: 8px;">
+                Dot size at 180°: {dotSizeVariation.toFixed(1)}x base size
             </div>
         {/if}
     </div>

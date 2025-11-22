@@ -508,7 +508,7 @@ function renderTracePhosphor(ctx, points, speeds, velocityDimming, basePower, de
 // ============================================================================
 // RENDERING - Alternative Model (Time-based segmentation)
 // ============================================================================
-function renderTraceAlternative(ctx, points, speeds, velocityDimming, basePower, deltaTime, sampleRate, debugMode, timeSegment) {
+function renderTraceAlternative(ctx, points, speeds, velocityDimming, basePower, deltaTime, sampleRate, debugMode, timeSegment, dotOpacity, dotSizeVariation) {
     // Time-based segmentation approach:
     // - Segment traces based on fixed time intervals
     // - Fast beam movement = points spread out over time segment
@@ -638,29 +638,29 @@ function renderTraceAlternative(ctx, points, speeds, velocityDimming, basePower,
     }
 
     // Debug visualization: show segment endpoints as red dots
+    // Dot size scales with angle of direction change based on dotSizeVariation
     if (debugMode) {
-        // Red dots for segment endpoints
-        ctx.fillStyle = 'rgba(255, 0, 0, 0.8)';
-        for (const point of segmentEndpoints) {
-            ctx.beginPath();
-            ctx.arc(point.x, point.y, 2, 0, Math.PI * 2);
-            ctx.fill();
-        }
+        // Red dots for segment endpoints with size based on angle
+        for (let i = 0; i < segmentEndpoints.length; i++) {
+            const point = segmentEndpoints[i];
 
-        // Purple dot for trace start point
-        if (points.length > 0) {
-            ctx.fillStyle = 'rgba(147, 51, 234, 1.0)'; // Purple
-            ctx.beginPath();
-            ctx.arc(points[0].x, points[0].y, 4, 0, Math.PI * 2);
-            ctx.fill();
-        }
+            // Find the corresponding point index in the points array
+            const pointIdx = points.indexOf(point);
 
-        // Blue dot for trace end point
-        if (points.length > 0) {
-            const endPoint = points[points.length - 1];
-            ctx.fillStyle = 'rgba(59, 130, 246, 1.0)'; // Blue
+            // Get brightness (angle-based) from directionChanges map
+            // If this point has a direction change, scale size accordingly
+            const brightness = directionChanges.get(pointIdx) || 0;
+
+            // Calculate dot size based on angle and dotSizeVariation
+            // dotSizeVariation: 1 = all same size, 10 = 180° dots are 10x larger
+            // Base size is 2px, scales up to 2 * dotSizeVariation for 180° changes
+            const baseSize = 2;
+            const sizeMultiplier = 1 + (brightness * (dotSizeVariation - 1));
+            const dotSize = baseSize * sizeMultiplier;
+
+            ctx.fillStyle = `rgba(255, 0, 0, ${dotOpacity})`;
             ctx.beginPath();
-            ctx.arc(endPoint.x, endPoint.y, 4, 0, Math.PI * 2);
+            ctx.arc(point.x, point.y, dotSize, 0, Math.PI * 2);
             ctx.fill();
         }
     }
@@ -670,9 +670,9 @@ function renderTraceAlternative(ctx, points, speeds, velocityDimming, basePower,
 // RENDERING DISPATCHER
 // Chooses the appropriate rendering model based on renderingMode
 // ============================================================================
-function renderTrace(ctx, points, speeds, velocityDimming, basePower, deltaTime, renderingMode, sampleRate, debugMode, timeSegment) {
+function renderTrace(ctx, points, speeds, velocityDimming, basePower, deltaTime, renderingMode, sampleRate, debugMode, timeSegment, dotOpacity, dotSizeVariation) {
     if (renderingMode === 'alternative') {
-        return renderTraceAlternative(ctx, points, speeds, velocityDimming, basePower, deltaTime, sampleRate, debugMode, timeSegment);
+        return renderTraceAlternative(ctx, points, speeds, velocityDimming, basePower, deltaTime, sampleRate, debugMode, timeSegment, dotOpacity, dotSizeVariation);
     } else {
         // Default to phosphor model
         return renderTracePhosphor(ctx, points, speeds, velocityDimming, basePower, deltaTime);
@@ -727,6 +727,8 @@ self.onmessage = function(e) {
             renderingMode,
             debugMode,
             timeSegment,
+            dotOpacity,
+            dotSizeVariation,
             forceMultiplier,
             damping,
             mass,
@@ -791,7 +793,7 @@ self.onmessage = function(e) {
             // RENDERING - Draw the simulated beam path
             // ========================================================================
 
-            renderTrace(ctx, points, speeds, velocityDimming, basePower, deltaTime, renderingMode, sampleRate, debugMode, timeSegment);
+            renderTrace(ctx, points, speeds, velocityDimming, basePower, deltaTime, renderingMode, sampleRate, debugMode, timeSegment, dotOpacity, dotSizeVariation);
         }
 
         // Send ready message back to main thread
