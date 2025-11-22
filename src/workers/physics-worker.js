@@ -540,17 +540,8 @@ function renderTraceAlternative(ctx, points, speeds, velocityDimming, basePower,
             }
             const avgSpeed = totalDistance / Math.max(1, i - segmentStartIdx);
 
-            // Alternative opacity model: faster = brighter (opposite of phosphor)
-            // Normalize speed to a reasonable range and apply power curve
-            const normalizedSpeed = Math.min(avgSpeed / 100, 1.0); // Normalize to 0-1 range
-            const speedFactor = Math.pow(normalizedSpeed, 0.5); // Square root for smooth curve
-
-            // Combine with beam power and velocity dimming control
-            // velocityDimming = 0: constant brightness
-            // velocityDimming = 1: full speed-based variation
-            const baseOpacity = basePower * 0.4; // Minimum opacity
-            const speedOpacity = basePower * 0.6 * speedFactor; // Speed-based component
-            const opacity = baseOpacity + (velocityDimming * speedOpacity);
+            // Use phosphor excitation model: faster = dimmer (less dwell time)
+            const opacity = calculatePhosphorExcitation(avgSpeed, velocityDimming, basePower, deltaTime);
 
             // Draw line from segment start to current point
             ctx.beginPath();
@@ -561,7 +552,7 @@ function renderTraceAlternative(ctx, points, speeds, velocityDimming, basePower,
                 ctx.lineTo(points[j].x, points[j].y);
             }
 
-            ctx.strokeStyle = `rgba(76, 175, 80, ${Math.min(1.0, opacity)})`;
+            ctx.strokeStyle = `rgba(76, 175, 80, ${opacity})`;
             ctx.stroke();
 
             // Reset for next segment

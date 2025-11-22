@@ -238,32 +238,26 @@ Since each point corresponds to one audio sample from the physics simulation, th
 2. Iterate through points, accumulating time (`timePerPoint` per point)
 3. When accumulated time reaches `TIME_SEGMENT` (0.25ms), finalize the segment:
    - Calculate average speed for the segment (total distance / number of points)
-   - Calculate opacity using inverted speed curve (faster = brighter)
+   - Calculate opacity using phosphor excitation model (faster = dimmer)
    - Draw straight lines connecting all points in the segment
 4. Reset accumulator and continue from current point
 
 **Opacity Calculation:**
 
-Unlike the phosphor model which uses physics-based phosphor excitation, the alternative model uses an **inverted speed-to-opacity relationship**:
+The alternative model uses the same physics-based phosphor excitation model as the phosphor renderer:
 
 ```javascript
-const normalizedSpeed = Math.min(avgSpeed / 100, 1.0); // Normalize to 0-1 range
-const speedFactor = Math.pow(normalizedSpeed, 0.5); // Square root for smooth curve
-const baseOpacity = basePower * 0.4; // Minimum opacity
-const speedOpacity = basePower * 0.6 * speedFactor; // Speed-based component
-const opacity = baseOpacity + (velocityDimming * speedOpacity);
+const avgSpeed = totalDistance / Math.max(1, i - segmentStartIdx);
+const opacity = calculatePhosphorExcitation(avgSpeed, velocityDimming, basePower, deltaTime);
 ```
 
-**Key Differences from Phosphor Model:**
-- **Faster = brighter** (opposite of phosphor physics where faster = dimmer due to less dwell time)
-- Square root curve provides smooth brightness transitions
-- `velocityDimming` controls the strength of speed-based variation:
-  - 0 = constant brightness (all segments same opacity)
-  - 1 = full speed-based variation (fast segments brightest)
-- Base opacity (40%) ensures slow segments are still visible
-- Speed opacity (60%) varies with velocity
+**Key Characteristics:**
+- **Faster = dimmer** (less dwell time, less phosphor excitation)
+- **Slower = brighter** (more dwell time, more phosphor excitation)
+- Uses the same P31 phosphor saturation model as the phosphor renderer
+- Each time segment has a single, uniform opacity based on average speed
 
-This creates distinct visual "quanta" where each time segment has uniform brightness based on its average speed.
+This creates distinct visual "quanta" where each time segment has uniform brightness based on its average speed, following the same physics as the phosphor model but applied to time-based segments instead of spatial curves.
 
 ### Visual Characteristics
 
@@ -274,12 +268,12 @@ The time-based approach produces different visual effects compared to phosphor r
    - Slow movements create shorter segments (fewer pixels per 0.25ms)
    - Segment length varies with beam velocity
 
-2. **Inverted Brightness Model**
-   - Fast segments are **brighter** (opposite of phosphor physics)
-   - Slow segments are dimmer but still visible (40% base opacity)
-   - Square root curve provides smooth brightness scaling
+2. **Physics-Based Opacity**
+   - Fast segments are **dimmer** (same as phosphor physics)
+   - Slow segments are brighter (more dwell time)
+   - Uses P31 phosphor excitation model with saturation curve
    - Each time segment has constant opacity (no gradients within segment)
-   - Creates a more "quantized" appearance with emphasis on velocity
+   - Creates a more "quantized" appearance with temporal segmentation
 
 3. **Drawing Style**
    - Uses straight lines (`lineTo`) instead of Bézier curves
@@ -293,10 +287,10 @@ The time-based approach produces different visual effects compared to phosphor r
 | Segmentation basis | Spatial (curve length) | Temporal (0.25ms quanta) |
 | Segment length | Variable by curve estimation | Variable by beam velocity |
 | Opacity variation | Smooth gradients (ease-in) | Uniform per segment |
-| Opacity/speed curve | Faster = dimmer (physics) | Faster = brighter (inverted) |
+| Opacity/speed curve | Faster = dimmer (physics) | Faster = dimmer (same physics) |
 | Drawing primitive | Quadratic Bézier curves | Straight lines |
 | Sub-segmentation | Adaptive (1-8 sub-segments) | None (one segment = one draw call) |
-| Visual style | Smooth, organic | Quantized, velocity-emphasized |
+| Visual style | Smooth, organic | Quantized, temporal |
 
 ### Use Cases
 
