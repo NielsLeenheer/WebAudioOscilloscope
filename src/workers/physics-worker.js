@@ -647,15 +647,24 @@ function renderTraceAlternative(ctx, points, speeds, velocityDimming, basePower,
             // Find the corresponding point index in the points array
             const pointIdx = points.indexOf(point);
 
-            // Get brightness (angle-based) from directionChanges map
-            // If this point has a direction change, scale size accordingly
-            const brightness = directionChanges.get(pointIdx) || 0;
+            // Check for direction changes in a range around this segment endpoint
+            // This handles cases where reversals don't align exactly with time segments
+            const searchRadius = Math.ceil(points.length * 0.05); // Search ±5% of points
+            let maxBrightness = 0;
+
+            for (let offset = -searchRadius; offset <= searchRadius; offset++) {
+                const checkIdx = pointIdx + offset;
+                if (checkIdx >= 0 && checkIdx < points.length) {
+                    const brightness = directionChanges.get(checkIdx) || 0;
+                    maxBrightness = Math.max(maxBrightness, brightness);
+                }
+            }
 
             // Calculate dot size based on angle and dotSizeVariation
             // dotSizeVariation: 1 = all same size, 10 = 180° dots are 10x larger
             // Base size is 2px, scales up to 2 * dotSizeVariation for 180° changes
             const baseSize = 2;
-            const sizeMultiplier = 1 + (brightness * (dotSizeVariation - 1));
+            const sizeMultiplier = 1 + (maxBrightness * (dotSizeVariation - 1));
             const dotSize = baseSize * sizeMultiplier;
 
             ctx.fillStyle = `rgba(255, 0, 0, ${dotOpacity})`;
