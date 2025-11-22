@@ -514,7 +514,7 @@ function renderTraceAlternative(ctx, points, speeds, velocityDimming, basePower,
     if (points.length < 2) return;
 
     // Fixed time interval for each segment (in seconds)
-    const TIME_SEGMENT = 0.0005; // 0.5ms per segment
+    const TIME_SEGMENT = 0.00025; // 0.25ms per segment (2x more segments than before)
 
     // Time per point (assuming points correspond to audio samples)
     // Each point represents one sample from the physics simulation
@@ -540,8 +540,17 @@ function renderTraceAlternative(ctx, points, speeds, velocityDimming, basePower,
             }
             const avgSpeed = totalDistance / Math.max(1, i - segmentStartIdx);
 
-            // Calculate opacity based on average speed of the segment
-            const opacity = calculatePhosphorExcitation(avgSpeed, velocityDimming, basePower, deltaTime);
+            // Alternative opacity model: faster = brighter (opposite of phosphor)
+            // Normalize speed to a reasonable range and apply power curve
+            const normalizedSpeed = Math.min(avgSpeed / 100, 1.0); // Normalize to 0-1 range
+            const speedFactor = Math.pow(normalizedSpeed, 0.5); // Square root for smooth curve
+
+            // Combine with beam power and velocity dimming control
+            // velocityDimming = 0: constant brightness
+            // velocityDimming = 1: full speed-based variation
+            const baseOpacity = basePower * 0.4; // Minimum opacity
+            const speedOpacity = basePower * 0.6 * speedFactor; // Speed-based component
+            const opacity = baseOpacity + (velocityDimming * speedOpacity);
 
             // Draw line from segment start to current point
             ctx.beginPath();
@@ -552,7 +561,7 @@ function renderTraceAlternative(ctx, points, speeds, velocityDimming, basePower,
                 ctx.lineTo(points[j].x, points[j].y);
             }
 
-            ctx.strokeStyle = `rgba(76, 175, 80, ${opacity})`;
+            ctx.strokeStyle = `rgba(76, 175, 80, ${Math.min(1.0, opacity)})`;
             ctx.stroke();
 
             // Reset for next segment

@@ -220,10 +220,10 @@ This models the beam as having a constant "temporal quantum" - each drawn segmen
 
 **Fixed Time Quantum:**
 ```javascript
-const TIME_SEGMENT = 0.0005; // 0.5ms per segment
+const TIME_SEGMENT = 0.00025; // 0.25ms per segment
 ```
 
-Each rendered segment represents 0.5 milliseconds of beam movement.
+Each rendered segment represents 0.25 milliseconds of beam movement.
 
 **Time Calculation:**
 ```javascript
@@ -236,36 +236,50 @@ Since each point corresponds to one audio sample from the physics simulation, th
 
 1. Start at first point, initialize time accumulator to 0
 2. Iterate through points, accumulating time (`timePerPoint` per point)
-3. When accumulated time reaches `TIME_SEGMENT`, finalize the segment:
+3. When accumulated time reaches `TIME_SEGMENT` (0.25ms), finalize the segment:
    - Calculate average speed for the segment (total distance / number of points)
-   - Calculate opacity using `calculatePhosphorExcitation()` with average speed
+   - Calculate opacity using inverted speed curve (faster = brighter)
    - Draw straight lines connecting all points in the segment
 4. Reset accumulator and continue from current point
 
 **Opacity Calculation:**
 
-Unlike the phosphor model which interpolates opacity along curves, the alternative model uses a **single opacity per time segment**:
+Unlike the phosphor model which uses physics-based phosphor excitation, the alternative model uses an **inverted speed-to-opacity relationship**:
 
 ```javascript
-const avgSpeed = totalDistance / Math.max(1, i - segmentStartIdx);
-const opacity = calculatePhosphorExcitation(avgSpeed, velocityDimming, basePower, deltaTime);
+const normalizedSpeed = Math.min(avgSpeed / 100, 1.0); // Normalize to 0-1 range
+const speedFactor = Math.pow(normalizedSpeed, 0.5); // Square root for smooth curve
+const baseOpacity = basePower * 0.4; // Minimum opacity
+const speedOpacity = basePower * 0.6 * speedFactor; // Speed-based component
+const opacity = baseOpacity + (velocityDimming * speedOpacity);
 ```
 
-This creates distinct visual "quanta" where each time segment has uniform brightness.
+**Key Differences from Phosphor Model:**
+- **Faster = brighter** (opposite of phosphor physics where faster = dimmer due to less dwell time)
+- Square root curve provides smooth brightness transitions
+- `velocityDimming` controls the strength of speed-based variation:
+  - 0 = constant brightness (all segments same opacity)
+  - 1 = full speed-based variation (fast segments brightest)
+- Base opacity (40%) ensures slow segments are still visible
+- Speed opacity (60%) varies with velocity
+
+This creates distinct visual "quanta" where each time segment has uniform brightness based on its average speed.
 
 ### Visual Characteristics
 
 The time-based approach produces different visual effects compared to phosphor rendering:
 
 1. **Spatial Variation**
-   - Fast movements create longer segments (more pixels per 0.5ms)
-   - Slow movements create shorter segments (fewer pixels per 0.5ms)
+   - Fast movements create longer segments (more pixels per 0.25ms)
+   - Slow movements create shorter segments (fewer pixels per 0.25ms)
    - Segment length varies with beam velocity
 
-2. **Uniform Temporal Opacity**
-   - Each time segment has constant opacity
-   - No smooth gradients within a segment
-   - Creates a more "quantized" appearance
+2. **Inverted Brightness Model**
+   - Fast segments are **brighter** (opposite of phosphor physics)
+   - Slow segments are dimmer but still visible (40% base opacity)
+   - Square root curve provides smooth brightness scaling
+   - Each time segment has constant opacity (no gradients within segment)
+   - Creates a more "quantized" appearance with emphasis on velocity
 
 3. **Drawing Style**
    - Uses straight lines (`lineTo`) instead of Bézier curves
@@ -276,12 +290,13 @@ The time-based approach produces different visual effects compared to phosphor r
 
 | Aspect | Phosphor Model | Alternative Model |
 |--------|----------------|-------------------|
-| Segmentation basis | Spatial (curve length) | Temporal (fixed time) |
+| Segmentation basis | Spatial (curve length) | Temporal (0.25ms quanta) |
 | Segment length | Variable by curve estimation | Variable by beam velocity |
 | Opacity variation | Smooth gradients (ease-in) | Uniform per segment |
+| Opacity/speed curve | Faster = dimmer (physics) | Faster = brighter (inverted) |
 | Drawing primitive | Quadratic Bézier curves | Straight lines |
 | Sub-segmentation | Adaptive (1-8 sub-segments) | None (one segment = one draw call) |
-| Visual style | Smooth, organic | Quantized, temporal |
+| Visual style | Smooth, organic | Quantized, velocity-emphasized |
 
 ### Use Cases
 
