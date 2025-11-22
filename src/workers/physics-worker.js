@@ -508,7 +508,7 @@ function renderTracePhosphor(ctx, points, speeds, velocityDimming, basePower, de
 // ============================================================================
 // RENDERING - Alternative Model (Time-based segmentation)
 // ============================================================================
-function renderTraceAlternative(ctx, points, speeds, velocityDimming, basePower, deltaTime, sampleRate) {
+function renderTraceAlternative(ctx, points, speeds, velocityDimming, basePower, deltaTime, sampleRate, debugMode) {
     // Time-based segmentation approach:
     // - Segment traces based on fixed time intervals
     // - Fast beam movement = points spread out over time segment
@@ -585,6 +585,7 @@ function renderTraceAlternative(ctx, points, speeds, velocityDimming, basePower,
     // Second pass: render segments
     let segmentStartIdx = 0;
     let accumulatedTime = 0;
+    const segmentEndpoints = []; // Track segment endpoints for debug visualization
 
     for (let i = 1; i < points.length; i++) {
         accumulatedTime += timePerPoint;
@@ -613,6 +614,11 @@ function renderTraceAlternative(ctx, points, speeds, velocityDimming, basePower,
             ctx.strokeStyle = `rgba(76, 175, 80, ${opacity})`;
             ctx.stroke();
 
+            // Track segment endpoint for debug visualization
+            if (debugMode && i < points.length - 1) {
+                segmentEndpoints.push(points[i]);
+            }
+
             // Reset for next segment
             segmentStartIdx = i;
             accumulatedTime = 0;
@@ -630,15 +636,25 @@ function renderTraceAlternative(ctx, points, speeds, velocityDimming, basePower,
         ctx.arc(point.x, point.y, 1.5, 0, Math.PI * 2);
         ctx.fill();
     }
+
+    // Debug visualization: show segment endpoints as red dots
+    if (debugMode) {
+        ctx.fillStyle = 'rgba(255, 0, 0, 0.8)';
+        for (const point of segmentEndpoints) {
+            ctx.beginPath();
+            ctx.arc(point.x, point.y, 2, 0, Math.PI * 2);
+            ctx.fill();
+        }
+    }
 }
 
 // ============================================================================
 // RENDERING DISPATCHER
 // Chooses the appropriate rendering model based on renderingMode
 // ============================================================================
-function renderTrace(ctx, points, speeds, velocityDimming, basePower, deltaTime, renderingMode, sampleRate) {
+function renderTrace(ctx, points, speeds, velocityDimming, basePower, deltaTime, renderingMode, sampleRate, debugMode) {
     if (renderingMode === 'alternative') {
-        return renderTraceAlternative(ctx, points, speeds, velocityDimming, basePower, deltaTime, sampleRate);
+        return renderTraceAlternative(ctx, points, speeds, velocityDimming, basePower, deltaTime, sampleRate, debugMode);
     } else {
         // Default to phosphor model
         return renderTracePhosphor(ctx, points, speeds, velocityDimming, basePower, deltaTime);
@@ -691,6 +707,7 @@ self.onmessage = function(e) {
             visibleScale,
             simulationMode,
             renderingMode,
+            debugMode,
             forceMultiplier,
             damping,
             mass,
@@ -755,7 +772,7 @@ self.onmessage = function(e) {
             // RENDERING - Draw the simulated beam path
             // ========================================================================
 
-            renderTrace(ctx, points, speeds, velocityDimming, basePower, deltaTime, renderingMode, sampleRate);
+            renderTrace(ctx, points, speeds, velocityDimming, basePower, deltaTime, renderingMode, sampleRate, debugMode);
         }
 
         // Send ready message back to main thread

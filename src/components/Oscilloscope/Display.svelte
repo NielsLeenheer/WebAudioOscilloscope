@@ -11,6 +11,7 @@
     // Physics parameters (adjustable)
     let simulationMode = $state('electromagnetic'); // 'spring' or 'electromagnetic'
     let renderingMode = $state('phosphor'); // 'phosphor' or 'alternative'
+    let debugMode = $state(false); // Debug visualization toggle
 
     // Spring-Damper model parameters
     let springForce = $state(0.3);
@@ -47,6 +48,7 @@
     <Physics
         bind:simulationMode
         bind:renderingMode
+        bind:debugMode
         bind:springForce
         bind:springDamping
         bind:springMass
@@ -68,6 +70,7 @@
                 {mode}
                 {simulationMode}
                 {renderingMode}
+                {debugMode}
                 {springForce}
                 {springDamping}
                 {springMass}

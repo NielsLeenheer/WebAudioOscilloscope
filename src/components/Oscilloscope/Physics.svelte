@@ -6,6 +6,7 @@
     let {
         simulationMode = $bindable(),
         renderingMode = $bindable(),
+        debugMode = $bindable(),
         springForce = $bindable(),
         springDamping = $bindable(),
         springMass = $bindable(),
@@ -35,6 +36,7 @@
     bind:this={physicsDialog}
     bind:simulationMode
     bind:renderingMode
+    bind:debugMode
     bind:springForce
     bind:springDamping
     bind:springMass

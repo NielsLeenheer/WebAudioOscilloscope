@@ -2,6 +2,7 @@
     let {
         simulationMode = $bindable(),
         renderingMode = $bindable(),
+        debugMode = $bindable(),
         springForce = $bindable(),
         springDamping = $bindable(),
         springMass = $bindable(),
@@ -176,6 +177,17 @@
             <label>Decay</label>
             <input type="range" min="128" max="16384" step="128" bind:value={decay} />
             <span class="value">{decay}</span>
+        </div>
+        <div class="mode-separator"></div>
+        <div class="control-group checkbox-group">
+            <label for="debugMode">Debug Mode</label>
+            <input
+                type="checkbox"
+                id="debugMode"
+                bind:checked={debugMode}
+            >
+            <span></span>
+            <div class="value-display">Show segment endpoints (red dots)</div>
         </div>
     </div>
 </dialog>
@@ -363,5 +375,34 @@
         border-radius: 50%;
         cursor: pointer;
         border: none;
+    }
+
+    .checkbox-group {
+        grid-template-columns: 104px auto 1fr;
+        margin-top: 8px;
+    }
+
+    .checkbox-group input[type="checkbox"] {
+        width: 18px;
+        height: 18px;
+        cursor: pointer;
+        margin: 6px 0;
+    }
+
+    .checkbox-group label {
+        cursor: pointer;
+        user-select: none;
+        color: #4CAF50;
+        font-family: system-ui;
+        font-size: 12px;
+        font-weight: 600;
+    }
+
+    .checkbox-group .value-display {
+        grid-column: 2 / 4;
+        font-size: 11px;
+        color: #999;
+        font-style: italic;
+        margin-top: 0;
     }
 </style>
