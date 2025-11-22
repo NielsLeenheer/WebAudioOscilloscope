@@ -208,20 +208,20 @@
                 <span class="value">{dotOpacity.toFixed(2)}</span>
             </div>
             <div class="slider-control">
-                <label>Dot Size Var</label>
-                <input type="range" min="1" max="10" step="0.1" bind:value={dotSizeVariation} />
-                <span class="value">{dotSizeVariation.toFixed(1)}</span>
-            </div>
-            <div class="value-display" style="grid-column: 1 / 4; margin-top: -8px; margin-bottom: 8px;">
-                Dot size at 180°: {dotSizeVariation.toFixed(1)}x base size
-            </div>
-            <div class="slider-control">
                 <label>Sample Dots</label>
                 <input type="range" min="0.0" max="1.0" step="0.01" bind:value={sampleDotOpacity} />
                 <span class="value">{sampleDotOpacity.toFixed(2)}</span>
             </div>
             <div class="value-display" style="grid-column: 1 / 4; margin-top: -8px; margin-bottom: 8px;">
                 Blue dots at every sample point
+            </div>
+            <div class="slider-control">
+                <label>Dot Size Var</label>
+                <input type="range" min="1" max="10" step="0.1" bind:value={dotSizeVariation} />
+                <span class="value">{dotSizeVariation.toFixed(1)}</span>
+            </div>
+            <div class="value-display" style="grid-column: 1 / 4; margin-top: -8px; margin-bottom: 8px;">
+                Blue dot size at 180° angle: {dotSizeVariation.toFixed(1)}x
             </div>
         {/if}
     </div>

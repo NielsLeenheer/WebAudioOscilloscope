@@ -721,50 +721,38 @@ function renderTraceAlternative(ctx, points, speeds, velocityDimming, basePower,
     }
 
     // Debug visualization: show segment endpoints as red dots
-    // Dot size scales with angle of direction change based on dotSizeVariation
-    if (debugMode) {
-        // Red dots for segment endpoints with size based on angle
+    // Red dots show time-based segmentation (constant size)
+    if (debugMode && dotOpacity > 0) {
+        ctx.fillStyle = `rgba(255, 0, 0, ${dotOpacity})`;
         for (let i = 0; i < segmentEndpoints.length; i++) {
             const point = segmentEndpoints[i];
-
-            // Find the corresponding point index in the points array
-            const pointIdx = points.indexOf(point);
-
-            // Check for direction changes in a small range around this segment endpoint
-            // This handles cases where reversals don't align exactly with time segments
-            const searchRadius = 3; // Search ±3 points
-            let maxBrightness = 0;
-
-            for (let offset = -searchRadius; offset <= searchRadius; offset++) {
-                const checkIdx = pointIdx + offset;
-                if (checkIdx >= 0 && checkIdx < points.length) {
-                    const brightness = directionChanges.get(checkIdx) || 0;
-                    maxBrightness = Math.max(maxBrightness, brightness);
-                }
-            }
-
-            // Calculate dot size based on angle and dotSizeVariation
-            // dotSizeVariation: 1 = all same size, 10 = 180° dots are 10x larger
-            // Base size is 2px, scales up to 2 * dotSizeVariation for 180° changes
-            const baseSize = 2;
-            const sizeMultiplier = 1 + (maxBrightness * (dotSizeVariation - 1));
-            const dotSize = baseSize * sizeMultiplier;
-
-            ctx.fillStyle = `rgba(255, 0, 0, ${dotOpacity})`;
             ctx.beginPath();
-            ctx.arc(point.x, point.y, dotSize, 0, Math.PI * 2);
+            ctx.arc(point.x, point.y, 2, 0, Math.PI * 2);
             ctx.fill();
         }
     }
 
     // Fourth pass: show blue dots at every ORIGINAL sample point to visualize temporal resolution
     // Use originalPoints to show actual sample rate, not interpolated points
+    // Dot size scales with angle of direction change based on dotSizeVariation
     if (debugMode && sampleDotOpacity > 0) {
-        ctx.fillStyle = `rgba(59, 130, 246, ${sampleDotOpacity})`; // Blue color
         for (let i = 0; i < originalPoints.length; i++) {
             const point = originalPoints[i];
+
+            // Get brightness (angle-based) from directionChanges map
+            // directionChanges is indexed by original points before interpolation
+            const brightness = directionChanges.get(i) || 0;
+
+            // Calculate dot size based on angle and dotSizeVariation
+            // dotSizeVariation: 1 = all same size, 10 = 180° dots are 10x larger
+            // Base size is 1px, scales up to 1 * dotSizeVariation for 180° changes
+            const baseSize = 1;
+            const sizeMultiplier = 1 + (brightness * (dotSizeVariation - 1));
+            const dotSize = baseSize * sizeMultiplier;
+
+            ctx.fillStyle = `rgba(59, 130, 246, ${sampleDotOpacity})`; // Blue color
             ctx.beginPath();
-            ctx.arc(point.x, point.y, 1, 0, Math.PI * 2);
+            ctx.arc(point.x, point.y, dotSize, 0, Math.PI * 2);
             ctx.fill();
         }
     }
