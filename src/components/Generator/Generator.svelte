@@ -16,7 +16,7 @@
     let svgAnimationFPS = $state(30);
     let svgSamplePoints = $state(200);
     let svgOptimizeSegments = $state(true);
-    let svgDoubleDraw = $state(true);
+    let svgDoubleDraw = $state(false);
 
     // SVG input shared between Draw tab and SVG tab
     let svgInput = $state('');

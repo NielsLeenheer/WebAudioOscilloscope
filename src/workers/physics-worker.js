@@ -60,11 +60,10 @@ function calculatePhosphorExcitation(speed, velocityDimming, basePower, deltaTim
     // speed is in pixels/frame, deltaTime is in seconds
     const velocity = deltaTime > 0 ? speed / deltaTime : 0;
 
-    // Dwell time model:
+    // Dwell time model (recalibrated for realistic scope behavior):
     // The reference velocity is the speed at which dimming becomes noticeable
-    // At typical oscilloscope speeds (100-1000 px/s), we want visible dimming
-    // Below this speed, phosphor is fully excited; above it, dimming occurs
-    const REFERENCE_VELOCITY = 500; // pixels/second where dimming starts
+    // Real scopes show very aggressive dimming - fast movements are almost invisible
+    const REFERENCE_VELOCITY = 300; // pixels/second where dimming starts
     const BEAM_SPOT_SIZE = 1.5; // Effective beam spot diameter in pixels
 
     // Calculate energy deposition factor based on velocity
@@ -80,8 +79,12 @@ function calculatePhosphorExcitation(speed, velocityDimming, basePower, deltaTim
         // This models the physical reality: faster beam = less time on each phosphor grain
         energyFactor = (REFERENCE_VELOCITY / velocity);
 
-        // Clamp to reasonable range (don't go below 2% even at extreme speeds)
-        energyFactor = Math.max(0.02, Math.min(1.0, energyFactor));
+        // Apply power curve for aggressive dimming at high speeds
+        // Use 1.5 power instead of 2 for less aggressive curve
+        energyFactor = Math.pow(energyFactor, 1.5);
+
+        // Clamp to minimum (fast movements dim but still visible)
+        energyFactor = Math.max(0.01, Math.min(1.0, energyFactor));
     }
 
     // Apply velocity dimming control (allows artistic adjustment)
@@ -424,9 +427,9 @@ function simulatePhysics(targets, simulationMode, forceMultiplier, damping, mass
 }
 
 // ============================================================================
-// RENDERING - Draw the simulated beam path
+// RENDERING - Phosphor Model (Current/Default)
 // ============================================================================
-function renderTrace(ctx, points, speeds, velocityDimming, basePower, deltaTime) {
+function renderTracePhosphor(ctx, points, speeds, velocityDimming, basePower, deltaTime) {
     // Configure canvas for drawing
     ctx.lineWidth = 1.5;
     ctx.lineCap = 'butt'; // Use 'butt' to prevent overlapping caps at connection points
@@ -502,6 +505,266 @@ function renderTrace(ctx, points, speeds, velocityDimming, basePower, deltaTime)
     }
 }
 
+// ============================================================================
+// INTERPOLATION - Catmull-Rom Spline
+// Creates smooth curves through points for sub-sample temporal resolution
+// ============================================================================
+function catmullRomInterpolate(p0, p1, p2, p3, t) {
+    // Catmull-Rom spline interpolation between p1 and p2
+    // p0 and p3 are control points for curve shape
+    // t is interpolation parameter (0 to 1)
+    const t2 = t * t;
+    const t3 = t2 * t;
+
+    return {
+        x: 0.5 * (
+            (2 * p1.x) +
+            (-p0.x + p2.x) * t +
+            (2 * p0.x - 5 * p1.x + 4 * p2.x - p3.x) * t2 +
+            (-p0.x + 3 * p1.x - 3 * p2.x + p3.x) * t3
+        ),
+        y: 0.5 * (
+            (2 * p1.y) +
+            (-p0.y + p2.y) * t +
+            (2 * p0.y - 5 * p1.y + 4 * p2.y - p3.y) * t2 +
+            (-p0.y + 3 * p1.y - 3 * p2.y + p3.y) * t3
+        )
+    };
+}
+
+function interpolatePoints(points, speeds, targetTimePerPoint, actualTimePerPoint) {
+    // If target resolution is coarser than actual, no interpolation needed
+    if (targetTimePerPoint >= actualTimePerPoint) {
+        return { points, speeds };
+    }
+
+    // Calculate how many interpolated points we need between each pair
+    const pointsPerSegment = Math.ceil(actualTimePerPoint / targetTimePerPoint);
+
+    const interpolatedPoints = [];
+    const interpolatedSpeeds = [];
+
+    for (let i = 0; i < points.length; i++) {
+        // Get surrounding points for Catmull-Rom spline
+        const p0 = points[Math.max(0, i - 1)];
+        const p1 = points[i];
+        const p2 = points[Math.min(points.length - 1, i + 1)];
+        const p3 = points[Math.min(points.length - 1, i + 2)];
+
+        // Add the actual sample point
+        interpolatedPoints.push(p1);
+        interpolatedSpeeds.push(speeds[i] || 0);
+
+        // Add interpolated points between p1 and p2 (except for last point)
+        if (i < points.length - 1) {
+            for (let j = 1; j < pointsPerSegment; j++) {
+                const t = j / pointsPerSegment;
+                const interpolated = catmullRomInterpolate(p0, p1, p2, p3, t);
+                interpolatedPoints.push(interpolated);
+
+                // Interpolate speed linearly
+                const speed1 = speeds[i] || 0;
+                const speed2 = speeds[i + 1] || 0;
+                interpolatedSpeeds.push(speed1 + (speed2 - speed1) * t);
+            }
+        }
+    }
+
+    return {
+        points: interpolatedPoints,
+        speeds: interpolatedSpeeds
+    };
+}
+
+// ============================================================================
+// RENDERING - Alternative Model (Time-based segmentation)
+// ============================================================================
+function renderTraceAlternative(ctx, points, speeds, velocityDimming, basePower, deltaTime, sampleRate, debugMode, timeSegment, dotOpacity, dotSizeVariation, sampleDotOpacity) {
+    // Time-based segmentation approach:
+    // - Segment traces based on fixed time intervals
+    // - Fast beam movement = points spread out over time segment
+    // - Slow beam movement = points closer together over time segment
+
+    if (points.length < 2) return;
+
+    // Time interval for each segment (in seconds, configurable via debug slider)
+    const TIME_SEGMENT = timeSegment / 1000; // Convert from milliseconds to seconds
+
+    // Time per point (assuming points correspond to audio samples)
+    // Each point represents one sample from the physics simulation
+    const timePerPoint = 1 / sampleRate;
+
+    // Store original points for blue dot visualization
+    const originalPoints = points;
+    const originalSpeeds = speeds;
+
+    // First pass: detect direction changes on ORIGINAL points (before interpolation)
+    // This ensures blue dots are not affected by TIME_SEGMENT setting
+    // Calculate angle of direction change to determine brightness
+    const directionChanges = new Map(); // Map of index -> brightness
+    for (let i = 1; i < originalPoints.length - 1; i++) {
+        // Calculate angle of direction change between velocity vectors
+        // Incoming velocity vector: from point[i-1] to point[i]
+        const inX = originalPoints[i].x - originalPoints[i - 1].x;
+        const inY = originalPoints[i].y - originalPoints[i - 1].y;
+
+        // Outgoing velocity vector: from point[i] to point[i+1]
+        const outX = originalPoints[i + 1].x - originalPoints[i].x;
+        const outY = originalPoints[i + 1].y - originalPoints[i].y;
+
+        // Calculate magnitudes
+        const inMag = Math.sqrt(inX * inX + inY * inY);
+        const outMag = Math.sqrt(outX * outX + outY * outY);
+
+        if (inMag > 0 && outMag > 0) {
+            // Calculate dot product
+            const dotProduct = inX * outX + inY * outY;
+
+            // Calculate cosine of angle
+            const cosAngle = dotProduct / (inMag * outMag);
+
+            // Clamp to valid range for acos
+            const clampedCos = Math.max(-1, Math.min(1, cosAngle));
+
+            // Calculate angle in radians, then convert to degrees
+            const angleRad = Math.acos(clampedCos);
+            const angleDeg = angleRad * (180 / Math.PI);
+
+            // Map angle to brightness
+            // 0° = no change, no dot (brightness = 0)
+            // 180° = complete reversal, brightest (brightness = 1)
+            // Use a power curve for more natural falloff
+            const normalizedAngle = angleDeg / 180; // 0 to 1
+            const brightness = Math.pow(normalizedAngle, 1.5); // Power curve emphasizes larger angles
+
+            // Only add if brightness is significant (angle > ~30°)
+            if (brightness > 0.05) {
+                directionChanges.set(i, brightness);
+            }
+        }
+    }
+
+    // Apply Catmull-Rom interpolation if TIME_SEGMENT is smaller than timePerPoint
+    // This creates smooth curves and allows finer temporal resolution
+    const interpolated = interpolatePoints(points, speeds, TIME_SEGMENT, timePerPoint);
+    points = interpolated.points;
+    speeds = interpolated.speeds;
+
+    // Recalculate timePerPoint for interpolated points
+    const interpolatedTimePerPoint = TIME_SEGMENT;
+
+    // Configure canvas for drawing
+    ctx.lineWidth = 1.5;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    // Second pass: render segments
+    let segmentStartIdx = 0;
+    let accumulatedTime = 0;
+    const segmentEndpoints = []; // Track segment endpoints for debug visualization
+
+    for (let i = 1; i < points.length; i++) {
+        accumulatedTime += interpolatedTimePerPoint;
+
+        // When we've accumulated enough time, draw the segment
+        if (accumulatedTime >= TIME_SEGMENT || i === points.length - 1) {
+            // Calculate average speed for this time segment
+            let totalDistance = 0;
+            for (let j = segmentStartIdx + 1; j <= i && j < speeds.length; j++) {
+                totalDistance += speeds[j] || 0;
+            }
+            const avgSpeed = totalDistance / Math.max(1, i - segmentStartIdx);
+
+            // Use phosphor excitation model: faster = dimmer (less dwell time)
+            const opacity = calculatePhosphorExcitation(avgSpeed, velocityDimming, basePower, deltaTime);
+
+            // Draw line from segment start to current point
+            ctx.beginPath();
+            ctx.moveTo(points[segmentStartIdx].x, points[segmentStartIdx].y);
+
+            // Draw through all points in this time segment
+            for (let j = segmentStartIdx + 1; j <= i; j++) {
+                ctx.lineTo(points[j].x, points[j].y);
+            }
+
+            ctx.strokeStyle = `rgba(76, 175, 80, ${opacity})`;
+            ctx.stroke();
+
+            // Track segment endpoint for debug visualization
+            if (debugMode && i < points.length - 1) {
+                segmentEndpoints.push(points[i]);
+            }
+
+            // Reset for next segment
+            segmentStartIdx = i;
+            accumulatedTime = 0;
+        }
+    }
+
+    // Third pass: highlight direction changes with green dots (beam dwell time)
+    // Brightness is proportional to angle of direction change (180° = brightest)
+    // Use originalPoints since directionChanges is indexed by original points
+    for (const [idx, brightness] of directionChanges) {
+        const point = originalPoints[idx];
+        const opacity = basePower * brightness;
+
+        ctx.fillStyle = `rgba(76, 175, 80, ${opacity})`; // Green color
+        ctx.beginPath();
+        ctx.arc(point.x, point.y, 1.5, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    // Debug visualization: show segment endpoints as red dots
+    // Red dots show time-based segmentation (constant size)
+    if (debugMode && dotOpacity > 0) {
+        ctx.fillStyle = `rgba(255, 0, 0, ${dotOpacity})`;
+        for (let i = 0; i < segmentEndpoints.length; i++) {
+            const point = segmentEndpoints[i];
+            ctx.beginPath();
+            ctx.arc(point.x, point.y, 2, 0, Math.PI * 2);
+            ctx.fill();
+        }
+    }
+
+    // Fourth pass: show blue dots at every ORIGINAL sample point to visualize temporal resolution
+    // Use originalPoints to show actual sample rate, not interpolated points
+    // Dot size scales with angle of direction change based on dotSizeVariation
+    if (debugMode && sampleDotOpacity > 0) {
+        for (let i = 0; i < originalPoints.length; i++) {
+            const point = originalPoints[i];
+
+            // Get brightness (angle-based) from directionChanges map
+            // directionChanges is indexed by original points before interpolation
+            const brightness = directionChanges.get(i) || 0;
+
+            // Calculate dot size based on angle and dotSizeVariation
+            // dotSizeVariation: 1 = all same size, 10 = 180° dots are 10x larger
+            // Base size is 1px, scales up to 1 * dotSizeVariation for 180° changes
+            const baseSize = 1;
+            const sizeMultiplier = 1 + (brightness * (dotSizeVariation - 1));
+            const dotSize = baseSize * sizeMultiplier;
+
+            ctx.fillStyle = `rgba(59, 130, 246, ${sampleDotOpacity})`; // Blue color
+            ctx.beginPath();
+            ctx.arc(point.x, point.y, dotSize, 0, Math.PI * 2);
+            ctx.fill();
+        }
+    }
+}
+
+// ============================================================================
+// RENDERING DISPATCHER
+// Chooses the appropriate rendering model based on renderingMode
+// ============================================================================
+function renderTrace(ctx, points, speeds, velocityDimming, basePower, deltaTime, renderingMode, sampleRate, debugMode, timeSegment, dotOpacity, dotSizeVariation, sampleDotOpacity) {
+    if (renderingMode === 'alternative') {
+        return renderTraceAlternative(ctx, points, speeds, velocityDimming, basePower, deltaTime, sampleRate, debugMode, timeSegment, dotOpacity, dotSizeVariation, sampleDotOpacity);
+    } else {
+        // Default to phosphor model
+        return renderTracePhosphor(ctx, points, speeds, velocityDimming, basePower, deltaTime);
+    }
+}
+
 self.onmessage = function(e) {
     const { type, data } = e.data;
 
@@ -547,6 +810,12 @@ self.onmessage = function(e) {
             scale,
             visibleScale,
             simulationMode,
+            renderingMode,
+            debugMode,
+            timeSegment,
+            dotOpacity,
+            dotSizeVariation,
+            sampleDotOpacity,
             forceMultiplier,
             damping,
             mass,
@@ -611,7 +880,7 @@ self.onmessage = function(e) {
             // RENDERING - Draw the simulated beam path
             // ========================================================================
 
-            renderTrace(ctx, points, speeds, velocityDimming, basePower, deltaTime);
+            renderTrace(ctx, points, speeds, velocityDimming, basePower, deltaTime, renderingMode, sampleRate, debugMode, timeSegment, dotOpacity, dotSizeVariation, sampleDotOpacity);
         }
 
         // Send ready message back to main thread

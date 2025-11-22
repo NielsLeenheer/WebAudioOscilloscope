@@ -5,6 +5,12 @@
 
     let {
         simulationMode = $bindable(),
+        renderingMode = $bindable(),
+        debugMode = $bindable(),
+        timeSegment = $bindable(),
+        dotOpacity = $bindable(),
+        dotSizeVariation = $bindable(),
+        sampleDotOpacity = $bindable(),
         springForce = $bindable(),
         springDamping = $bindable(),
         springMass = $bindable(),
@@ -33,6 +39,12 @@
 <PhysicsDialog
     bind:this={physicsDialog}
     bind:simulationMode
+    bind:renderingMode
+    bind:debugMode
+    bind:timeSegment
+    bind:dotOpacity
+    bind:dotSizeVariation
+    bind:sampleDotOpacity
     bind:springForce
     bind:springDamping
     bind:springMass

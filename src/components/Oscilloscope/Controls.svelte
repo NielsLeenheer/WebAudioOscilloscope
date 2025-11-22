@@ -27,12 +27,12 @@
     let timeDivFine = $state(1.0); // Fine adjustment multiplier (0.5 to 2.5)
 
     // Internal state for channel A
-    let amplBaseA = $state(8); // Index into amplSteps (default 1V)
+    let amplBaseA = $state(5); // Index into amplSteps (default 0.1V)
     let amplFineA = $state(1.0); // Fine adjustment multiplier (0.5 to 2.5)
     let internalPositionA = $state(0.0); // Position A: vertical offset for channel A (-1.0 to 1.0)
 
     // Internal state for channel B
-    let amplBaseB = $state(8); // Index into amplSteps (default 1V)
+    let amplBaseB = $state(5); // Index into amplSteps (default 0.1V)
     let amplFineB = $state(1.0); // Fine adjustment multiplier (0.5 to 2.5)
     let internalPositionB = $state(0.0); // Position B: vertical offset for channel B (-1.0 to 1.0)
 

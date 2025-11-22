@@ -10,6 +10,12 @@
 
     // Physics parameters (adjustable)
     let simulationMode = $state('electromagnetic'); // 'spring' or 'electromagnetic'
+    let renderingMode = $state('alternative'); // 'phosphor' or 'alternative'
+    let debugMode = $state(false); // Debug visualization toggle
+    let timeSegment = $state(0.010); // Temporal resolution in milliseconds (debug parameter)
+    let dotOpacity = $state(0.5); // Debug dot opacity for segment endpoints (0.0 to 1.0)
+    let dotSizeVariation = $state(1.0); // Debug dot size variation based on angle (1 = all same, 10 = 10x variation)
+    let sampleDotOpacity = $state(0.0); // Debug dot opacity for sample points (0.0 to 1.0)
 
     // Spring-Damper model parameters
     let springForce = $state(0.3);
@@ -17,13 +23,13 @@
     let springMass = $state(0.11);
 
     // Electromagnetic model parameters
-    let coilStrength = $state(0.32);
-    let beamInertia = $state(0.06);
-    let fieldDamping = $state(0.44);
+    let coilStrength = $state(0.60);
+    let beamInertia = $state(0.10);
+    let fieldDamping = $state(0.30);
 
     // Common parameters (shared by both modes)
     let persistence = $state(0.100); // Afterglow/fade effect (0=instant fade, 1=long trail)
-    let signalNoise = $state(0.005); // Random noise added to audio signal (0-1)
+    let signalNoise = $state(0.003); // Random noise added to audio signal (0-1)
     let beamPower = $state(0.75); // Beam power (affects opacity: high power = bright, low power = dim)
     let velocityDimming = $state(1.0); // How much fast movements dim (0=no dimming, 1=maximum dimming)
     let focus = $state(0.2); // Focus control (-1.0 to 1.0, 0.0 = perfect focus, abs value = blur amount)
@@ -45,6 +51,12 @@
 <div class="display-panel">
     <Physics
         bind:simulationMode
+        bind:renderingMode
+        bind:debugMode
+        bind:timeSegment
+        bind:dotOpacity
+        bind:dotSizeVariation
+        bind:sampleDotOpacity
         bind:springForce
         bind:springDamping
         bind:springMass
@@ -65,6 +77,12 @@
                 {isPowered}
                 {mode}
                 {simulationMode}
+                {renderingMode}
+                {debugMode}
+                {timeSegment}
+                {dotOpacity}
+                {dotSizeVariation}
+                {sampleDotOpacity}
                 {springForce}
                 {springDamping}
                 {springMass}

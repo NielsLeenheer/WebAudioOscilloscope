@@ -142,10 +142,16 @@ export function generateClockPoints(showFace = true, showTicks = false) {
     const minuteAngle = ((minutes + seconds / 60) * 6 - 90) * Math.PI / 180;
     const secondAngle = (seconds * 6 - 90) * Math.PI / 180;
 
+    // Point distribution based on path length for uniform spatial density:
+    // Total path length: face(5.65) + hour(1.0) + minute(1.4) + second(1.3) + dot(0.31) ≈ 9.67 units
+    // Total points: 251 (same as before)
+    // Points per unit: ~26 points/unit
+
     // Draw outer circle (clock face) if enabled
+    // Path length: 2π × 0.9 ≈ 5.65 units → 147 points
     if (showFace) {
         const facePoints = [];
-        const circlePoints = 100;
+        const circlePoints = 147;
         for (let i = 0; i < circlePoints; i++) {
             const angle = (i / circlePoints) * 2 * Math.PI;
             facePoints.push([0.9 * Math.cos(angle), -0.9 * Math.sin(angle)]);
@@ -175,53 +181,57 @@ export function generateClockPoints(showFace = true, showTicks = false) {
     }
 
     // Draw hour hand (from center to 0.5 radius)
+    // Path length: 0.5 × 2 = 1.0 units → 26 points (13 out + 13 back)
     const hourHandPoints = [];
-    for (let i = 0; i <= 20; i++) {
-        const t = i / 20;
+    for (let i = 0; i <= 13; i++) {
+        const t = i / 13;
         const r = t * 0.5;
         hourHandPoints.push([r * Math.cos(hourAngle), -r * Math.sin(hourAngle)]);
     }
     // Return to center
-    for (let i = 20; i >= 0; i--) {
-        const t = i / 20;
+    for (let i = 13; i >= 0; i--) {
+        const t = i / 13;
         const r = t * 0.5;
         hourHandPoints.push([r * Math.cos(hourAngle), -r * Math.sin(hourAngle)]);
     }
     segments.push(hourHandPoints);
 
     // Draw minute hand (from center to 0.7 radius)
+    // Path length: 0.7 × 2 = 1.4 units → 36 points (18 out + 18 back)
     const minuteHandPoints = [];
-    for (let i = 0; i <= 25; i++) {
-        const t = i / 25;
+    for (let i = 0; i <= 18; i++) {
+        const t = i / 18;
         const r = t * 0.7;
         minuteHandPoints.push([r * Math.cos(minuteAngle), -r * Math.sin(minuteAngle)]);
     }
     // Return to center
-    for (let i = 25; i >= 0; i--) {
-        const t = i / 25;
+    for (let i = 18; i >= 0; i--) {
+        const t = i / 18;
         const r = t * 0.7;
         minuteHandPoints.push([r * Math.cos(minuteAngle), -r * Math.sin(minuteAngle)]);
     }
     segments.push(minuteHandPoints);
 
-    // Draw second hand (from center to 0.65 radius, thinner)
+    // Draw second hand (from center to 0.65 radius)
+    // Path length: 0.65 × 2 = 1.3 units → 34 points (17 out + 17 back)
     const secondHandPoints = [];
-    for (let i = 0; i <= 20; i++) {
-        const t = i / 20;
+    for (let i = 0; i <= 17; i++) {
+        const t = i / 17;
         const r = t * 0.65;
         secondHandPoints.push([r * Math.cos(secondAngle), -r * Math.sin(secondAngle)]);
     }
     // Return to center
-    for (let i = 20; i >= 0; i--) {
-        const t = i / 20;
+    for (let i = 17; i >= 0; i--) {
+        const t = i / 17;
         const r = t * 0.65;
         secondHandPoints.push([r * Math.cos(secondAngle), -r * Math.sin(secondAngle)]);
     }
     segments.push(secondHandPoints);
 
     // Draw center dot
+    // Path length: 2π × 0.05 ≈ 0.31 units → 8 points
     const centerDotPoints = [];
-    const dotPoints = 15;
+    const dotPoints = 8;
     for (let i = 0; i < dotPoints; i++) {
         const angle = (i / dotPoints) * 2 * Math.PI;
         centerDotPoints.push([0.05 * Math.cos(angle), -0.05 * Math.sin(angle)]);

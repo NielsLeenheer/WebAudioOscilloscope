@@ -1,6 +1,12 @@
 <script>
     let {
         simulationMode = $bindable(),
+        renderingMode = $bindable(),
+        debugMode = $bindable(),
+        timeSegment = $bindable(),
+        dotOpacity = $bindable(),
+        dotSizeVariation = $bindable(),
+        sampleDotOpacity = $bindable(),
         springForce = $bindable(),
         springDamping = $bindable(),
         springMass = $bindable(),
@@ -105,6 +111,11 @@
     </div>
     -->
     <div class="sliders">
+        <div class="slider-control">
+            <label>Noise</label>
+            <input type="range" min="0" max="0.2" step="0.001" bind:value={signalNoise} />
+            <span class="value">{signalNoise.toFixed(3)}</span>
+        </div>
         {#if simulationMode === 'spring'}
             <div class="slider-control">
                 <label>Force</label>
@@ -138,15 +149,28 @@
                 <span class="value">{fieldDamping.toFixed(2)}</span>
             </div>
         {/if}
+        <div class="mode-separator"></div>
+        <div class="mode-toggle-inline">
+            <label>Rendering</label>
+            <div class="toggle-buttons">
+                <button
+                    class:active={renderingMode === 'phosphor'}
+                    onclick={() => renderingMode = 'phosphor'}
+                >
+                    Phosphor
+                </button>
+                <button
+                    class:active={renderingMode === 'alternative'}
+                    onclick={() => renderingMode = 'alternative'}
+                >
+                    Alternative
+                </button>
+            </div>
+        </div>
         <div class="slider-control">
             <label>Persistence</label>
             <input type="range" min="0.0" max="0.95" step="0.005" bind:value={persistence} />
             <span class="value">{persistence.toFixed(3)}</span>
-        </div>
-        <div class="slider-control">
-            <label>Noise</label>
-            <input type="range" min="0" max="0.2" step="0.001" bind:value={signalNoise} />
-            <span class="value">{signalNoise.toFixed(3)}</span>
         </div>
         <div class="slider-control">
             <label>Dimming</label>
@@ -158,6 +182,48 @@
             <input type="range" min="128" max="16384" step="128" bind:value={decay} />
             <span class="value">{decay}</span>
         </div>
+        <div class="mode-separator"></div>
+        <div class="control-group checkbox-group">
+            <label for="debugMode">Debug Mode</label>
+            <input
+                type="checkbox"
+                id="debugMode"
+                bind:checked={debugMode}
+            >
+            <span></span>
+            <div class="value-display">Show segment endpoints (red dots)</div>
+        </div>
+        {#if debugMode}
+            <div class="slider-control">
+                <label>Time Segment</label>
+                <input type="range" min="0.001" max="0.050" step="0.001" bind:value={timeSegment} />
+                <span class="value">{timeSegment.toFixed(3)}</span>
+            </div>
+            <div class="value-display" style="grid-column: 1 / 4; margin-top: -8px; margin-bottom: 8px;">
+                Temporal resolution: {timeSegment}ms per segment
+            </div>
+            <div class="slider-control">
+                <label>Dot Opacity</label>
+                <input type="range" min="0.0" max="1.0" step="0.01" bind:value={dotOpacity} />
+                <span class="value">{dotOpacity.toFixed(2)}</span>
+            </div>
+            <div class="slider-control">
+                <label>Sample Dots</label>
+                <input type="range" min="0.0" max="1.0" step="0.01" bind:value={sampleDotOpacity} />
+                <span class="value">{sampleDotOpacity.toFixed(2)}</span>
+            </div>
+            <div class="value-display" style="grid-column: 1 / 4; margin-top: -8px; margin-bottom: 8px;">
+                Blue dots at every sample point
+            </div>
+            <div class="slider-control">
+                <label>Dot Size Var</label>
+                <input type="range" min="1" max="10" step="0.1" bind:value={dotSizeVariation} />
+                <span class="value">{dotSizeVariation.toFixed(1)}</span>
+            </div>
+            <div class="value-display" style="grid-column: 1 / 4; margin-top: -8px; margin-bottom: 8px;">
+                Blue dot size at 180° angle: {dotSizeVariation.toFixed(1)}x
+            </div>
+        {/if}
     </div>
 </dialog>
 
@@ -274,6 +340,26 @@
         padding: 15px;
     }
 
+    .mode-separator {
+        height: 1px;
+        background: #333;
+        margin: 10px 0;
+    }
+
+    .mode-toggle-inline {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        margin: 5px 0;
+    }
+
+    .mode-toggle-inline label {
+        color: #4CAF50;
+        font-family: system-ui;
+        font-size: 12px;
+        font-weight: 600;
+    }
+
     .slider-control {
         display: grid;
         grid-template-columns: 80px 1fr 50px;
@@ -324,5 +410,34 @@
         border-radius: 50%;
         cursor: pointer;
         border: none;
+    }
+
+    .checkbox-group {
+        grid-template-columns: 104px auto 1fr;
+        margin-top: 8px;
+    }
+
+    .checkbox-group input[type="checkbox"] {
+        width: 18px;
+        height: 18px;
+        cursor: pointer;
+        margin: 6px 0;
+    }
+
+    .checkbox-group label {
+        cursor: pointer;
+        user-select: none;
+        color: #4CAF50;
+        font-family: system-ui;
+        font-size: 12px;
+        font-weight: 600;
+    }
+
+    .checkbox-group .value-display {
+        grid-column: 2 / 4;
+        font-size: 11px;
+        color: #999;
+        font-style: italic;
+        margin-top: 0;
     }
 </style>
