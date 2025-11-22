@@ -14,8 +14,8 @@ The rendering system is the final stage in a three-stage pipeline:
 
 The system supports two rendering modes (selectable via the Physics dialog):
 
-- **Phosphor** (default) - Realistic CRT phosphor emulation
-- **Alternative** (placeholder) - Currently mirrors phosphor, reserved for future experimentation
+- **Alternative** (default) - Time-based segmentation with Catmull-Rom interpolation and direction change highlighting
+- **Phosphor** - Traditional CRT phosphor emulation with Bézier curves
 
 ### Rendering Dispatcher
 
@@ -207,25 +207,53 @@ This represents P31 phosphor (green), commonly used in oscilloscopes.
 
 ## Alternative Rendering Model
 
-The alternative model (`renderTraceAlternative`, lines 508-563) implements **time-based segmentation**, a fundamentally different approach from the phosphor model's spatial segmentation.
+The alternative model (`renderTraceAlternative`) implements **time-based segmentation with Catmull-Rom interpolation**, a fundamentally different approach from the phosphor model's spatial segmentation.
 
 ### Time-Based Segmentation Concept
 
-Instead of segmenting based on spatial distance (curve length), the alternative model segments based on **fixed time intervals**:
+Instead of segmenting based on spatial distance (curve length), the alternative model segments based on **configurable time intervals**:
 
 - **Fast beam movement** → Points are spread out spatially within a time segment
 - **Slow beam movement** → Points are clustered closer together within a time segment
 
 This models the beam as having a constant "temporal quantum" - each drawn segment represents the same amount of time, regardless of how far the beam traveled.
 
-### Implementation Details
+### Catmull-Rom Spline Interpolation
 
-**Fixed Time Quantum:**
+When the time segment resolution is finer than the sample rate (TIME_SEGMENT < ~0.021ms at 48kHz), the system applies **Catmull-Rom spline interpolation** to generate smooth curves between sample points.
+
+**Key Functions:**
+
 ```javascript
-const TIME_SEGMENT = 0.0001; // 0.1ms per segment
+function catmullRomInterpolate(p0, p1, p2, p3, t) {
+    // Interpolates between p1 and p2
+    // p0 and p3 are control points for curve shape
+    // t is interpolation parameter (0 to 1)
+}
+
+function interpolatePoints(points, speeds, targetTimePerPoint, actualTimePerPoint) {
+    // Creates virtual points between samples
+    // Only interpolates when targetTimePerPoint < actualTimePerPoint
+}
 ```
 
-Each rendered segment represents 0.1 milliseconds of beam movement (2.5x higher temporal resolution than previous version).
+**Benefits:**
+- Allows temporal resolution finer than the sample rate
+- Smooth curves that pass through all original sample points
+- More accurate representation of continuous waveforms
+- Enables sub-sample temporal segmentation
+
+### Implementation Details
+
+**User-Configurable Time Quantum:**
+```javascript
+const TIME_SEGMENT = timeSegment / 1000; // Default: 0.010ms, range: 0.001-0.050ms
+```
+
+The time segment is user-adjustable via the Physics dialog (debug mode):
+- **Range:** 0.001ms to 0.050ms
+- **Default:** 0.010ms (10 microseconds per segment)
+- **Step:** 0.001ms (1 microsecond granularity)
 
 **Time Calculation:**
 ```javascript
@@ -234,38 +262,96 @@ const timePerPoint = 1 / sampleRate;
 
 Since each point corresponds to one audio sample from the physics simulation, the time between consecutive points is `1 / sampleRate` (e.g., ~20.8µs at 48kHz sample rate).
 
-**Segmentation Algorithm:**
+**Rendering Pipeline:**
 
-**First Pass - Direction Change Detection:**
-1. Scan through all points to detect local velocity minima
-2. Mark points where speed < previous AND speed < next AND speed < 5 px/frame
-3. For each detected point, calculate the angle of direction change:
-   - Incoming velocity vector: from point[i-1] to point[i]
-   - Outgoing velocity vector: from point[i] to point[i+1]
-   - Angle = arccos(dot product / (magnitude1 × magnitude2))
-4. Map angle to brightness using power curve:
-   - 0° = no brightness (no direction change)
+The alternative model uses a **four-pass rendering algorithm**, executed on the **original sample points before interpolation** to ensure stability:
+
+**First Pass - Direction Change Detection (Pre-Interpolation):**
+
+This pass operates on `originalPoints` to detect direction changes based purely on the actual physics-simulated data:
+
+1. For each point i in the original sample data (1 to length-1):
+   - Calculate incoming velocity vector: from point[i-1] to point[i]
+   - Calculate outgoing velocity vector: from point[i] to point[i+1]
+2. Calculate the angle between velocity vectors:
+   - Dot product: `inX × outX + inY × outY`
+   - Magnitudes: `sqrt(inX² + inY²)` and `sqrt(outX² + outY²)`
+   - Angle (degrees): `arccos(dotProduct / (mag1 × mag2)) × 180/π`
+3. Map angle to brightness using power curve:
+   - 0° = no brightness (smooth continuation)
    - 180° = maximum brightness (complete reversal)
    - Formula: `brightness = (angle/180)^1.5`
-5. Filter out dots with brightness < 0.05 (angles < ~30°)
+   - Power curve (^1.5) emphasizes larger angles
+4. Store in `directionChanges` map if brightness > 0.05 (angles > ~30°)
 
-**Second Pass - Segment Rendering:**
+**Critical:** Detection happens BEFORE interpolation, so blue dot positions and sizes remain stable regardless of TIME_SEGMENT setting.
+
+**Second Pass - Catmull-Rom Interpolation (Conditional):**
+
+If TIME_SEGMENT < timePerPoint (finer than sample rate):
+1. Apply Catmull-Rom spline interpolation between all original points
+2. Generate virtual points to achieve desired temporal resolution
+3. Calculate number of interpolated points: `ceil(timePerPoint / TIME_SEGMENT)`
+4. Interpolate both positions and speeds linearly
+5. Update points array with interpolated data
+
+Result: Smooth curves passing through all original sample points with sub-sample temporal resolution.
+
+**Third Pass - Time-Based Segment Rendering:**
+
+Operates on interpolated points (or original points if no interpolation):
+
 1. Start at first point, initialize time accumulator to 0
-2. Iterate through points, accumulating time (`timePerPoint` per point)
-3. When accumulated time reaches `TIME_SEGMENT` (0.1ms), finalize the segment:
+2. Iterate through points, accumulating time (`interpolatedTimePerPoint` per point)
+3. When accumulated time reaches `TIME_SEGMENT`, finalize the segment:
    - Calculate average speed for the segment (total distance / number of points)
    - Calculate opacity using phosphor excitation model (faster = dimmer)
-   - Draw straight lines connecting all points in the segment
-4. Reset accumulator and continue from current point
+   - Draw **straight lines** connecting all points in the segment
+4. Store segment endpoint for debug visualization
+5. Reset accumulator and continue from current point
 
-**Third Pass - Direction Change Highlighting:**
-1. Draw dots (radius 1.5px) at all detected direction change points
-2. Opacity = `basePower × brightness` where brightness is based on angle:
-   - 180° direction change → full brightness (complete reversal)
-   - Small angles (< 30°) → no visible dot
-   - Power curve (^1.5) emphasizes larger angles
-3. Simulates realistic beam dwell time: sharper turns = longer dwell = brighter dots
-4. Matches behavior observed on real scopes where waveform peaks are brightest
+**Fourth Pass - Direction Change Highlighting (Green Dots):**
+
+Always visible (not debug-only), shows realistic beam dwell time:
+
+1. For each entry in `directionChanges` map (from First Pass):
+   - Use `originalPoints[idx]` for position (stable, not interpolated)
+   - Opacity = `basePower × brightness`
+2. Draw green dot (radius 1.5px) at each direction change point:
+   ```javascript
+   ctx.fillStyle = `rgba(76, 175, 80, ${opacity})`;
+   ```
+3. Brightness based on angle:
+   - 180° direction change → maximum brightness (complete reversal)
+   - Small angles (< 30°) → invisible (filtered by brightness > 0.05)
+   - Medium angles → proportional brightness
+4. Simulates realistic CRT behavior:
+   - Sharper turns = longer dwell time = brighter phosphor excitation
+   - Matches real oscilloscope where waveform peaks and reversals are brightest
+
+**Fifth Pass - Debug Visualizations (Optional):**
+
+Only visible when Debug Mode is enabled in Physics dialog:
+
+- **Red Dots** (segment endpoints):
+  - Position: Interpolated segment endpoints from Third Pass
+  - Size: Constant 2px radius
+  - Color/Opacity: `rgba(255, 0, 0, ${dotOpacity})`
+  - Control: "Dot Opacity" slider (0.0-1.0, default 0.5)
+  - Purpose: Visualize time-based segmentation resolution
+  - Note: Count exceeds blue dots when TIME_SEGMENT < ~0.021ms (sub-sample)
+
+- **Blue Dots** (sample points):
+  - Position: `originalPoints` (actual physics-simulated samples)
+  - Size: Angle-based via "Dot Size Var" slider (1-10×, default 1.0):
+    - Base size: 1px radius
+    - Size multiplier: `1 + brightness × (dotSizeVariation - 1)`
+    - At 180° with slider=10: 10px radius
+    - Scales with `directionChanges` brightness from First Pass
+  - Color/Opacity: `rgba(59, 130, 246, ${sampleDotOpacity})`
+  - Control: "Sample Dots" slider (0.0-1.0, default 0.0)
+  - Purpose: Visualize actual sample rate and direction changes
+  - Stability: Positions and sizes remain constant regardless of TIME_SEGMENT
 
 **Opacity Calculation:**
 
@@ -289,53 +375,78 @@ This creates distinct visual "quanta" where each time segment has uniform bright
 The time-based approach produces different visual effects compared to phosphor rendering:
 
 1. **Spatial Variation**
-   - Fast movements create longer segments (more pixels per 0.1ms)
-   - Slow movements create shorter segments (fewer pixels per 0.1ms)
+   - Fast movements create longer segments (more pixels per time quantum)
+   - Slow movements create shorter segments (fewer pixels per time quantum)
    - Segment length varies with beam velocity
-   - High temporal resolution (0.1ms quanta) captures fine detail
+   - User-configurable temporal resolution (0.001-0.050ms, default 0.010ms)
 
-2. **Physics-Based Opacity**
+2. **Catmull-Rom Interpolation**
+   - Smooth curves when TIME_SEGMENT < sample rate (~0.021ms)
+   - Curves pass through all original sample points
+   - Virtual points generated between samples
+   - Enables sub-sample temporal resolution
+
+3. **Physics-Based Opacity**
    - Fast segments are **dimmer** (same as phosphor physics)
    - Slow segments are brighter (more dwell time)
    - Uses P31 phosphor excitation model with saturation curve
    - Each time segment has constant opacity (no gradients within segment)
-   - Creates a more "quantized" appearance with temporal segmentation
+   - Creates a "quantized" appearance with temporal segmentation
 
-3. **Drawing Style**
+4. **Drawing Style**
    - Uses straight lines (`lineTo`) instead of Bézier curves
    - `lineCap: 'round'` softens segment endpoints
    - Simpler rendering path, potentially faster
 
-4. **Direction Change Highlighting**
-   - Dots appear at beam reversal points with angle-based brightness
+5. **Direction Change Highlighting (Green Dots)**
+   - Always visible - not a debug feature
+   - Appears at ALL angle changes (not limited to low-speed reversals)
    - Brightness proportional to direction change angle:
      - 180° (complete reversal) = brightest
-     - 30° or less = invisible
+     - 30° or less = invisible (filtered out)
      - Power curve (^1.5) for natural falloff
-   - Simulates realistic dwell time: sharper turns = longer dwell
+   - Simulates realistic dwell time: sharper turns = longer dwell = brighter
    - Matches behavior observed on real oscilloscopes where peaks are brightest
-   - Detection: local velocity minima (speed < 5 px/frame) + angle calculation
+   - Stable: Based on originalPoints, unaffected by interpolation
+
+6. **Debug Visualizations** (optional, physics dialog)
+   - Red dots: Time segment endpoints (constant 2px size)
+   - Blue dots: Sample points with angle-based sizing (1-10× multiplier)
+   - Helps understand temporal resolution vs sample rate relationship
 
 ### Comparison: Phosphor vs Alternative
 
 | Aspect | Phosphor Model | Alternative Model |
 |--------|----------------|-------------------|
-| Segmentation basis | Spatial (curve length) | Temporal (0.1ms quanta) |
-| Segment length | Variable by curve estimation | Variable by beam velocity |
-| Opacity variation | Smooth gradients (ease-in) | Uniform per segment |
-| Opacity/speed curve | Faster = dimmer (physics) | Faster = dimmer (same physics) |
-| Drawing primitive | Quadratic Bézier curves | Straight lines |
-| Sub-segmentation | Adaptive (1-8 sub-segments) | None (one segment = one draw call) |
-| Direction highlights | None | Bright dots at reversals |
-| Visual style | Smooth, organic | Quantized, temporal |
+| **Default** | No (legacy) | **Yes** (current default) |
+| **Segmentation basis** | Spatial (curve length) | Temporal (user-configurable quanta) |
+| **Temporal resolution** | Fixed by sample rate | 0.001-0.050ms (default 0.010ms) |
+| **Interpolation** | None | Catmull-Rom splines (sub-sample) |
+| **Segment length** | Variable by curve estimation | Variable by beam velocity |
+| **Opacity variation** | Smooth gradients (ease-in-quartic) | Uniform per segment |
+| **Opacity/speed curve** | Faster = dimmer (physics) | Faster = dimmer (same physics) |
+| **Drawing primitive** | Quadratic Bézier curves | Straight lines (interpolated) |
+| **Sub-segmentation** | Adaptive (1-8 sub-segments) | None (one segment = one draw call) |
+| **Direction highlights** | None | Green dots (always visible) |
+| **Debug visualizations** | None | Red dots (segments), Blue dots (samples) |
+| **Visual style** | Smooth, organic | Smooth + quantized temporal |
 
 ### Use Cases
 
-The alternative model may be more suitable for:
-- Visualizing temporal patterns in the signal
-- Creating a more "digital" or "sampled" aesthetic
-- Performance optimization (fewer draw calls)
-- Emphasizing velocity changes over time
+**Alternative Model (Default):**
+Best for most use cases due to:
+- More realistic beam dwell time visualization (green dots)
+- User-configurable temporal resolution
+- Sub-sample interpolation for smooth curves
+- Debug tools for understanding signal characteristics
+- Modern, accurate representation of CRT physics
+
+**Phosphor Model (Legacy):**
+May be preferred for:
+- Traditional smooth organic appearance
+- Simpler rendering without debug features
+- Historical accuracy to original implementation
+- Lower computational overhead (no interpolation)
 
 ## Performance Considerations
 
@@ -344,35 +455,59 @@ The alternative model may be more suitable for:
    - Canvas control transferred via `transferControlToOffscreen()`
    - Keeps main thread responsive
 
-2. **Adaptive Sub-segmentation**
-   - Longer curves get more sub-segments
-   - Prevents excessive drawing overhead
-   - Maintains smooth gradients
+2. **Catmull-Rom Interpolation (Alternative Model)**
+   - Only computed when TIME_SEGMENT < sample rate
+   - Adds virtual points but reduces segment count
+   - Net performance depends on TIME_SEGMENT setting
+   - Typically negligible impact with default settings
 
 3. **Frame Skipping**
    - Worker busy flag prevents frame overlap
    - Drops frames if worker is still processing
 
-4. **Curve Estimation**
-   - Length estimation uses 10 samples
-   - Balance between accuracy and performance
+4. **Rendering Passes**
+   - Alternative model: Up to 5 passes (1 pre-pass, 4 render passes)
+   - Phosphor model: Single pass with sub-segmentation
+   - Debug visualizations add minimal overhead when disabled
+
+## Default Configuration
+
+The oscilloscope ships with these rendering defaults:
+
+```javascript
+renderingMode: 'alternative'  // Alternative model is default
+timeSegment: 0.010            // 10 microseconds (0.010ms)
+signalNoise: 0.003            // 0.3% noise
+persistence: 0.100            // 10% persistence/afterglow
+velocityDimming: 1.0          // Full physics-based dimming
+debugMode: false              // Debug dots hidden
+dotSizeVariation: 1.0         // Uniform blue dot size (1× multiplier)
+```
 
 ## Future Development
 
-The dual-model architecture makes experimentation safe - the phosphor model remains functional while new approaches are developed in the alternative model.
+The dual-model architecture makes experimentation safe - both models remain functional and users can switch between them.
 
-### Potential Enhancements for Alternative Model
+### Completed Enhancements (Alternative Model)
 
-- **Adjustable time quantum**: Make `TIME_SEGMENT` a user-controllable parameter
-- **Gradient within segments**: Interpolate opacity across points within each time segment
-- **Temporal patterns**: Add visual effects based on time-domain characteristics
-- **Segment styling**: Different visual treatments for different velocity ranges
+- ✅ User-adjustable time quantum (TIME_SEGMENT slider)
+- ✅ Sub-sample interpolation (Catmull-Rom splines)
+- ✅ Direction change detection and highlighting (green dots)
+- ✅ Debug visualizations (red/blue dots)
+- ✅ Angle-based brightness for realistic dwell time
 
-### Other Rendering Possibilities
+### Potential Future Enhancements
 
-Both models could explore:
-- Different phosphor types (P7, P11, etc.) with varying persistence characteristics
+**Alternative Model:**
+- Gradient within segments: Interpolate opacity across points within each time segment
+- Temporal patterns: Visual effects based on time-domain characteristics
+- Configurable dot colors and styles
+- HDR bloom effects for bright direction changes
+
+**Both Models:**
+- Different phosphor types (P7, P11, P15, etc.) with varying persistence
 - Bloom/glow effects for overdriven signals
 - HDR rendering techniques
 - Color variations based on velocity or signal amplitude
 - Scanline effects for enhanced CRT realism
+- Adjustable phosphor saturation curves
