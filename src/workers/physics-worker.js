@@ -63,7 +63,7 @@ function calculatePhosphorExcitation(speed, velocityDimming, basePower, deltaTim
     // Dwell time model (recalibrated for realistic scope behavior):
     // The reference velocity is the speed at which dimming becomes noticeable
     // Real scopes show very aggressive dimming - fast movements are almost invisible
-    const REFERENCE_VELOCITY = 200; // pixels/second where dimming starts (lowered from 500)
+    const REFERENCE_VELOCITY = 300; // pixels/second where dimming starts
     const BEAM_SPOT_SIZE = 1.5; // Effective beam spot diameter in pixels
 
     // Calculate energy deposition factor based on velocity
@@ -79,12 +79,12 @@ function calculatePhosphorExcitation(speed, velocityDimming, basePower, deltaTim
         // This models the physical reality: faster beam = less time on each phosphor grain
         energyFactor = (REFERENCE_VELOCITY / velocity);
 
-        // Apply power curve for more aggressive dimming at high speeds
-        // Square the factor to make fast movements much dimmer
-        energyFactor = energyFactor * energyFactor;
+        // Apply power curve for aggressive dimming at high speeds
+        // Use 1.5 power instead of 2 for less aggressive curve
+        energyFactor = Math.pow(energyFactor, 1.5);
 
-        // Clamp to very low minimum (fast movements almost invisible, like real scopes)
-        energyFactor = Math.max(0.001, Math.min(1.0, energyFactor));
+        // Clamp to minimum (fast movements dim but still visible)
+        energyFactor = Math.max(0.01, Math.min(1.0, energyFactor));
     }
 
     // Apply velocity dimming control (allows artistic adjustment)
@@ -517,7 +517,7 @@ function renderTraceAlternative(ctx, points, speeds, velocityDimming, basePower,
     if (points.length < 2) return;
 
     // Fixed time interval for each segment (in seconds)
-    const TIME_SEGMENT = 0.00005; // 0.05ms per segment (2x increase in temporal resolution)
+    const TIME_SEGMENT = 0.000025; // 0.025ms per segment (2x increase in temporal resolution)
 
     // Time per point (assuming points correspond to audio samples)
     // Each point represents one sample from the physics simulation
