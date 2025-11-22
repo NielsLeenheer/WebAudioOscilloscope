@@ -214,11 +214,50 @@ function doubleDrawSegments(segments) {
 export function extractPathPoints(pathData, numSamples = 200, optimize = true, doubleDraw = true) {
     // Split path into segments
     const pathSegments = splitPathIntoSegments(pathData);
-    const segments = [];
 
-    // Sample each segment
-    pathSegments.forEach(segmentData => {
-        const segmentPoints = samplePathSegment(segmentData, Math.floor(numSamples / pathSegments.length));
+    // Calculate length for each segment
+    const segmentLengths = pathSegments.map(segmentData => {
+        try {
+            const properties = new svgPathProperties(segmentData);
+            const length = properties.getTotalLength();
+            return isFinite(length) && length > 0 ? length : 0;
+        } catch (error) {
+            console.warn('Could not calculate segment length:', error.message);
+            return 0;
+        }
+    });
+
+    // Calculate total path length
+    const totalLength = segmentLengths.reduce((sum, len) => sum + len, 0);
+
+    if (totalLength === 0) {
+        throw new Error('Total path length is zero - cannot sample path');
+    }
+
+    const segments = [];
+    let samplesUsed = 0;
+
+    // Sample each segment proportionally based on its length
+    pathSegments.forEach((segmentData, index) => {
+        const segmentLength = segmentLengths[index];
+
+        // Skip zero-length segments
+        if (segmentLength === 0) return;
+
+        // Calculate proportional number of samples for this segment
+        // For the last segment, use remaining samples to ensure we use exactly numSamples
+        let segmentSamples;
+        if (index === pathSegments.length - 1) {
+            segmentSamples = numSamples - samplesUsed;
+        } else {
+            segmentSamples = Math.floor(numSamples * (segmentLength / totalLength));
+        }
+
+        // Ensure at least 2 samples per segment (start and end point)
+        segmentSamples = Math.max(2, segmentSamples);
+        samplesUsed += segmentSamples;
+
+        const segmentPoints = samplePathSegment(segmentData, segmentSamples);
         if (segmentPoints.length > 0) {
             segments.push(segmentPoints);
         }
@@ -304,28 +343,63 @@ export function extractPointsFromElement(element, samples) {
                 if (pathData) {
                     const pathSegments = splitPathIntoSegments(pathData);
 
-                    // Sample each segment separately
-                    pathSegments.forEach(segmentData => {
-                        const segmentPoints = samplePathSegment(segmentData, Math.floor(samples / pathSegments.length));
-
-                        // Apply transformation matrix to all points in this segment
-                        if (matrix && svg) {
-                            const transformedPoints = segmentPoints.map(([x, y]) => {
-                                const svgPoint = svg.createSVGPoint();
-                                svgPoint.x = x;
-                                svgPoint.y = y;
-                                const transformed = svgPoint.matrixTransform(matrix);
-                                return [transformed.x, transformed.y];
-                            });
-                            if (transformedPoints.length > 0) {
-                                segments.push(transformedPoints);
-                            }
-                        } else {
-                            if (segmentPoints.length > 0) {
-                                segments.push(segmentPoints);
-                            }
+                    // Calculate length for each segment
+                    const segmentLengths = pathSegments.map(segmentData => {
+                        try {
+                            const properties = new svgPathProperties(segmentData);
+                            const length = properties.getTotalLength();
+                            return isFinite(length) && length > 0 ? length : 0;
+                        } catch (error) {
+                            return 0;
                         }
                     });
+
+                    // Calculate total path length
+                    const totalLength = segmentLengths.reduce((sum, len) => sum + len, 0);
+
+                    if (totalLength > 0) {
+                        let samplesUsed = 0;
+
+                        // Sample each segment proportionally based on its length
+                        pathSegments.forEach((segmentData, index) => {
+                            const segmentLength = segmentLengths[index];
+
+                            // Skip zero-length segments
+                            if (segmentLength === 0) return;
+
+                            // Calculate proportional number of samples for this segment
+                            let segmentSamples;
+                            if (index === pathSegments.length - 1) {
+                                segmentSamples = samples - samplesUsed;
+                            } else {
+                                segmentSamples = Math.floor(samples * (segmentLength / totalLength));
+                            }
+
+                            // Ensure at least 2 samples per segment
+                            segmentSamples = Math.max(2, segmentSamples);
+                            samplesUsed += segmentSamples;
+
+                            const segmentPoints = samplePathSegment(segmentData, segmentSamples);
+
+                            // Apply transformation matrix to all points in this segment
+                            if (matrix && svg) {
+                                const transformedPoints = segmentPoints.map(([x, y]) => {
+                                    const svgPoint = svg.createSVGPoint();
+                                    svgPoint.x = x;
+                                    svgPoint.y = y;
+                                    const transformed = svgPoint.matrixTransform(matrix);
+                                    return [transformed.x, transformed.y];
+                                });
+                                if (transformedPoints.length > 0) {
+                                    segments.push(transformedPoints);
+                                }
+                            } else {
+                                if (segmentPoints.length > 0) {
+                                    segments.push(segmentPoints);
+                                }
+                            }
+                        });
+                    }
                 }
             } else {
                 // For non-path elements (circle, rect, etc.), treat as single segment
