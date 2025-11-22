@@ -216,15 +216,18 @@ function interpretSignals(processedLeft, processedRight, mode, scale, visibleSca
     const expAmplDivB = amplDivB;
 
     // Virtual space constants
-    // In virtual space, the visible area is normalized to a specific range
-    // visibleScale represents 200 virtual units (the radius of visible area in old pixel space)
-    // We need to convert this to virtual units: 200px / (canvasSize/2) = 200 / 200 = 1.0 for standard 400px canvas
-    const VIRTUAL_VISIBLE_RADIUS = 1.0; // Full radius in virtual space
+    // visibleScale in original code = 60 pixels (pixelsPerDivision * VOLTAGE_CALIBRATION)
+    // Canvas radius = 300 pixels (for 600x600 canvas)
+    // visibleScale in virtual units = 60/300 = 0.2
+    // visibleWidth in original code = 400 pixels
+    // visibleWidth in virtual units = 400/300 = 1.333
+    const VIRTUAL_AMPL_SCALE = 0.2;  // For amplitude scaling (visibleScale in virtual units)
+    const VIRTUAL_VISIBLE_WIDTH = 1.333;  // For time-domain waveforms (visibleWidth in virtual units)
 
     if (mode === 'xy') {
         // X/Y mode: left channel = X (with A controls), right channel = Y (with B controls)
-        // X position offset in virtual space
-        const xOffset = xPosition * VIRTUAL_VISIBLE_RADIUS;
+        // X position offset in virtual space (uses VIRTUAL_VISIBLE_WIDTH for consistency with time domain)
+        const xOffset = xPosition * VIRTUAL_VISIBLE_WIDTH;
 
         // Use only the most recent samples to avoid overdraw from large buffer
         // Decay parameter controls how many points to render
@@ -232,13 +235,13 @@ function interpretSignals(processedLeft, processedRight, mode, scale, visibleSca
 
         for (let i = startIdx; i < processedLeft.length; i++) {
             // Left channel (A) controls horizontal with AMPL/DIV A and POSITION A
-            // Signals are already in [-1, 1], scale by virtual visible radius and apply amplitude division
-            const posOffsetA = positionA * VIRTUAL_VISIBLE_RADIUS * 2;
-            const targetX = processedLeft[i] * VIRTUAL_VISIBLE_RADIUS / expAmplDivA + posOffsetA + xOffset;
+            // Signals are already in [-1, 1], scale by VIRTUAL_AMPL_SCALE and apply amplitude division
+            const posOffsetA = positionA * VIRTUAL_AMPL_SCALE * 2;
+            const targetX = processedLeft[i] * VIRTUAL_AMPL_SCALE / expAmplDivA + posOffsetA + xOffset;
 
             // Right channel (B) controls vertical with AMPL/DIV B and POSITION B (but inverted for Y axis)
-            const posOffsetB = positionB * VIRTUAL_VISIBLE_RADIUS * 2;
-            const targetY = -processedRight[i] * VIRTUAL_VISIBLE_RADIUS / expAmplDivB + posOffsetB;
+            const posOffsetB = positionB * VIRTUAL_AMPL_SCALE * 2;
+            const targetY = -processedRight[i] * VIRTUAL_AMPL_SCALE / expAmplDivB + posOffsetB;
 
             targets.push({ x: targetX, y: targetY });
         }
@@ -271,19 +274,19 @@ function interpretSignals(processedLeft, processedRight, mode, scale, visibleSca
         const endIndex = Math.min(startIndex + samplesToDisplay, channelData.length);
 
         // X position offset in virtual space
-        const xOffset = xPosition * VIRTUAL_VISIBLE_RADIUS;
+        const xOffset = xPosition * VIRTUAL_VISIBLE_WIDTH;
 
         // Create target coordinates for the triggered portion in virtual space
         for (let i = startIndex; i < endIndex; i++) {
             const relativeIndex = i - startIndex;
             // X position is based on time with position offset
-            // Spread waveform across virtual visible width (normalized to 1.0 radius)
+            // Spread waveform across VIRTUAL_VISIBLE_WIDTH
             // X POS offset shifts it left/right for alignment
-            const targetX = (relativeIndex / samplesToDisplay) * VIRTUAL_VISIBLE_RADIUS * 2 - VIRTUAL_VISIBLE_RADIUS + xOffset;
+            const targetX = (relativeIndex / samplesToDisplay) * VIRTUAL_VISIBLE_WIDTH - VIRTUAL_VISIBLE_WIDTH / 2 + xOffset;
             // Y position is based on amplitude with AMPL/DIV and Y position offset
-            // Use virtual visible radius for amplitude calculations
-            const yOffset = position * VIRTUAL_VISIBLE_RADIUS * 2; // Scale the position offset
-            const targetY = -channelData[i] * VIRTUAL_VISIBLE_RADIUS / amplDiv + yOffset;
+            // Use VIRTUAL_AMPL_SCALE for amplitude calculations
+            const yOffset = position * VIRTUAL_AMPL_SCALE * 2; // Scale the position offset
+            const targetY = -channelData[i] * VIRTUAL_AMPL_SCALE / amplDiv + yOffset;
             targets.push({ x: targetX, y: targetY });
         }
     }
