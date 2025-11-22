@@ -7,6 +7,9 @@ let smoothedBeamX = 0;
 let smoothedBeamY = 0;
 let offscreenCanvas = null;
 let ctx = null;
+let devicePixelRatio = 1;
+let logicalWidth = 600;
+let logicalHeight = 600;
 
 // ============================================================================
 // VIRTUAL COORDINATE SYSTEM
@@ -842,9 +845,18 @@ self.onmessage = function(e) {
     const { type, data } = e.data;
 
     if (type === 'init') {
-        // Receive the OffscreenCanvas
+        // Receive the OffscreenCanvas and high-DPI settings
         offscreenCanvas = data.canvas;
+        devicePixelRatio = data.devicePixelRatio || 1;
+        logicalWidth = data.logicalWidth || 600;
+        logicalHeight = data.logicalHeight || 600;
+
         ctx = offscreenCanvas.getContext('2d');
+
+        // Scale context for high-DPI displays
+        // This makes all drawing operations automatically scale to the higher resolution
+        ctx.scale(devicePixelRatio, devicePixelRatio);
+
         return;
     }
 
@@ -860,9 +872,10 @@ self.onmessage = function(e) {
 
     if (type === 'clear') {
         // Clear the canvas completely (power off)
+        // Use logical dimensions since context is scaled by devicePixelRatio
         if (!ctx || !offscreenCanvas) return;
         ctx.fillStyle = 'rgb(26, 31, 26)';
-        ctx.fillRect(0, 0, offscreenCanvas.width, offscreenCanvas.height);
+        ctx.fillRect(0, 0, logicalWidth, logicalHeight);
 
         // Reset beam position
         beamX = 0;
