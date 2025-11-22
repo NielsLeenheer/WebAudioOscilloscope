@@ -530,7 +530,8 @@ function renderTraceAlternative(ctx, points, speeds, velocityDimming, basePower,
 
     // First pass: detect direction changes for highlighting
     // Direction changes occur at local velocity minima (beam reversal points)
-    const directionChanges = new Set();
+    // Calculate angle of direction change to determine brightness
+    const directionChanges = new Map(); // Map of index -> brightness
     for (let i = 1; i < points.length - 1; i++) {
         const prevSpeed = speeds[i - 1] || 0;
         const currSpeed = speeds[i] || 0;
@@ -539,7 +540,45 @@ function renderTraceAlternative(ctx, points, speeds, velocityDimming, basePower,
         // Detect local minimum in speed (direction change/reversal point)
         // Also detect when speed drops significantly (approaching zero)
         if (currSpeed < prevSpeed && currSpeed < nextSpeed && currSpeed < 5) {
-            directionChanges.add(i);
+            // Calculate angle of direction change
+            // Incoming velocity vector: from point[i-1] to point[i]
+            const inX = points[i].x - points[i - 1].x;
+            const inY = points[i].y - points[i - 1].y;
+
+            // Outgoing velocity vector: from point[i] to point[i+1]
+            const outX = points[i + 1].x - points[i].x;
+            const outY = points[i + 1].y - points[i].y;
+
+            // Calculate magnitudes
+            const inMag = Math.sqrt(inX * inX + inY * inY);
+            const outMag = Math.sqrt(outX * outX + outY * outY);
+
+            if (inMag > 0 && outMag > 0) {
+                // Calculate dot product
+                const dotProduct = inX * outX + inY * outY;
+
+                // Calculate cosine of angle
+                const cosAngle = dotProduct / (inMag * outMag);
+
+                // Clamp to valid range for acos
+                const clampedCos = Math.max(-1, Math.min(1, cosAngle));
+
+                // Calculate angle in radians, then convert to degrees
+                const angleRad = Math.acos(clampedCos);
+                const angleDeg = angleRad * (180 / Math.PI);
+
+                // Map angle to brightness
+                // 0° = no change, no dot (brightness = 0)
+                // 180° = complete reversal, brightest (brightness = 1)
+                // Use a power curve for more natural falloff
+                const normalizedAngle = angleDeg / 180; // 0 to 1
+                const brightness = Math.pow(normalizedAngle, 1.5); // Power curve emphasizes larger angles
+
+                // Only add if brightness is significant (angle > ~30°)
+                if (brightness > 0.05) {
+                    directionChanges.set(i, brightness);
+                }
+            }
         }
     }
 
@@ -581,10 +620,12 @@ function renderTraceAlternative(ctx, points, speeds, velocityDimming, basePower,
     }
 
     // Third pass: highlight direction changes with bright dots
-    // These represent points where the beam dwells due to direction reversal
-    ctx.fillStyle = `rgba(76, 175, 80, ${basePower})`;
-    for (const idx of directionChanges) {
+    // Brightness is proportional to angle of direction change (180° = brightest)
+    for (const [idx, brightness] of directionChanges) {
         const point = points[idx];
+        const opacity = basePower * brightness;
+
+        ctx.fillStyle = `rgba(76, 175, 80, ${opacity})`;
         ctx.beginPath();
         ctx.arc(point.x, point.y, 1.5, 0, Math.PI * 2);
         ctx.fill();

@@ -239,7 +239,15 @@ Since each point corresponds to one audio sample from the physics simulation, th
 **First Pass - Direction Change Detection:**
 1. Scan through all points to detect local velocity minima
 2. Mark points where speed < previous AND speed < next AND speed < 5 px/frame
-3. These are beam reversal points where the beam changes direction
+3. For each detected point, calculate the angle of direction change:
+   - Incoming velocity vector: from point[i-1] to point[i]
+   - Outgoing velocity vector: from point[i] to point[i+1]
+   - Angle = arccos(dot product / (magnitude1 × magnitude2))
+4. Map angle to brightness using power curve:
+   - 0° = no brightness (no direction change)
+   - 180° = maximum brightness (complete reversal)
+   - Formula: `brightness = (angle/180)^1.5`
+5. Filter out dots with brightness < 0.05 (angles < ~30°)
 
 **Second Pass - Segment Rendering:**
 1. Start at first point, initialize time accumulator to 0
@@ -251,9 +259,13 @@ Since each point corresponds to one audio sample from the physics simulation, th
 4. Reset accumulator and continue from current point
 
 **Third Pass - Direction Change Highlighting:**
-1. Draw bright dots (radius 1.5px) at all detected direction change points
-2. Opacity = `basePower` (full brightness, no dimming)
-3. Simulates beam dwell time at reversal points observed on real scopes
+1. Draw dots (radius 1.5px) at all detected direction change points
+2. Opacity = `basePower × brightness` where brightness is based on angle:
+   - 180° direction change → full brightness (complete reversal)
+   - Small angles (< 30°) → no visible dot
+   - Power curve (^1.5) emphasizes larger angles
+3. Simulates realistic beam dwell time: sharper turns = longer dwell = brighter dots
+4. Matches behavior observed on real scopes where waveform peaks are brightest
 
 **Opacity Calculation:**
 
@@ -295,10 +307,14 @@ The time-based approach produces different visual effects compared to phosphor r
    - Simpler rendering path, potentially faster
 
 4. **Direction Change Highlighting**
-   - Bright dots appear at beam reversal points
-   - Simulates dwell time when beam changes direction
-   - Matches behavior observed on real oscilloscopes
-   - Detection: local velocity minima (speed < 5 px/frame)
+   - Dots appear at beam reversal points with angle-based brightness
+   - Brightness proportional to direction change angle:
+     - 180° (complete reversal) = brightest
+     - 30° or less = invisible
+     - Power curve (^1.5) for natural falloff
+   - Simulates realistic dwell time: sharper turns = longer dwell
+   - Matches behavior observed on real oscilloscopes where peaks are brightest
+   - Detection: local velocity minima (speed < 5 px/frame) + angle calculation
 
 ### Comparison: Phosphor vs Alternative
 
