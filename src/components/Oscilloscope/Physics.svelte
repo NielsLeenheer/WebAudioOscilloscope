@@ -10,6 +10,7 @@
         timeSegment = $bindable(),
         dotOpacity = $bindable(),
         dotSizeVariation = $bindable(),
+        sampleDotOpacity = $bindable(),
         springForce = $bindable(),
         springDamping = $bindable(),
         springMass = $bindable(),
@@ -43,6 +44,7 @@
     bind:timeSegment
     bind:dotOpacity
     bind:dotSizeVariation
+    bind:sampleDotOpacity
     bind:springForce
     bind:springDamping
     bind:springMass

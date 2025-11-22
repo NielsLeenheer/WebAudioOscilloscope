@@ -6,6 +6,7 @@
         timeSegment = $bindable(),
         dotOpacity = $bindable(),
         dotSizeVariation = $bindable(),
+        sampleDotOpacity = $bindable(),
         springForce = $bindable(),
         springDamping = $bindable(),
         springMass = $bindable(),
@@ -213,6 +214,14 @@
             </div>
             <div class="value-display" style="grid-column: 1 / 4; margin-top: -8px; margin-bottom: 8px;">
                 Dot size at 180°: {dotSizeVariation.toFixed(1)}x base size
+            </div>
+            <div class="slider-control">
+                <label>Sample Dots</label>
+                <input type="range" min="0.0" max="1.0" step="0.01" bind:value={sampleDotOpacity} />
+                <span class="value">{sampleDotOpacity.toFixed(2)}</span>
+            </div>
+            <div class="value-display" style="grid-column: 1 / 4; margin-top: -8px; margin-bottom: 8px;">
+                Blue dots at every sample point
             </div>
         {/if}
     </div>

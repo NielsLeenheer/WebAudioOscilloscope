@@ -508,7 +508,7 @@ function renderTracePhosphor(ctx, points, speeds, velocityDimming, basePower, de
 // ============================================================================
 // RENDERING - Alternative Model (Time-based segmentation)
 // ============================================================================
-function renderTraceAlternative(ctx, points, speeds, velocityDimming, basePower, deltaTime, sampleRate, debugMode, timeSegment, dotOpacity, dotSizeVariation) {
+function renderTraceAlternative(ctx, points, speeds, velocityDimming, basePower, deltaTime, sampleRate, debugMode, timeSegment, dotOpacity, dotSizeVariation, sampleDotOpacity) {
     // Time-based segmentation approach:
     // - Segment traces based on fixed time intervals
     // - Fast beam movement = points spread out over time segment
@@ -673,15 +673,26 @@ function renderTraceAlternative(ctx, points, speeds, velocityDimming, basePower,
             ctx.fill();
         }
     }
+
+    // Fourth pass: show blue dots at every sample point to visualize temporal resolution
+    if (debugMode && sampleDotOpacity > 0) {
+        ctx.fillStyle = `rgba(59, 130, 246, ${sampleDotOpacity})`; // Blue color
+        for (let i = 0; i < points.length; i++) {
+            const point = points[i];
+            ctx.beginPath();
+            ctx.arc(point.x, point.y, 1, 0, Math.PI * 2);
+            ctx.fill();
+        }
+    }
 }
 
 // ============================================================================
 // RENDERING DISPATCHER
 // Chooses the appropriate rendering model based on renderingMode
 // ============================================================================
-function renderTrace(ctx, points, speeds, velocityDimming, basePower, deltaTime, renderingMode, sampleRate, debugMode, timeSegment, dotOpacity, dotSizeVariation) {
+function renderTrace(ctx, points, speeds, velocityDimming, basePower, deltaTime, renderingMode, sampleRate, debugMode, timeSegment, dotOpacity, dotSizeVariation, sampleDotOpacity) {
     if (renderingMode === 'alternative') {
-        return renderTraceAlternative(ctx, points, speeds, velocityDimming, basePower, deltaTime, sampleRate, debugMode, timeSegment, dotOpacity, dotSizeVariation);
+        return renderTraceAlternative(ctx, points, speeds, velocityDimming, basePower, deltaTime, sampleRate, debugMode, timeSegment, dotOpacity, dotSizeVariation, sampleDotOpacity);
     } else {
         // Default to phosphor model
         return renderTracePhosphor(ctx, points, speeds, velocityDimming, basePower, deltaTime);
@@ -738,6 +749,7 @@ self.onmessage = function(e) {
             timeSegment,
             dotOpacity,
             dotSizeVariation,
+            sampleDotOpacity,
             forceMultiplier,
             damping,
             mass,
@@ -802,7 +814,7 @@ self.onmessage = function(e) {
             // RENDERING - Draw the simulated beam path
             // ========================================================================
 
-            renderTrace(ctx, points, speeds, velocityDimming, basePower, deltaTime, renderingMode, sampleRate, debugMode, timeSegment, dotOpacity, dotSizeVariation);
+            renderTrace(ctx, points, speeds, velocityDimming, basePower, deltaTime, renderingMode, sampleRate, debugMode, timeSegment, dotOpacity, dotSizeVariation, sampleDotOpacity);
         }
 
         // Send ready message back to main thread
