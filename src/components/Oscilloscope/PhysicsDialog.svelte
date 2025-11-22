@@ -3,6 +3,7 @@
         simulationMode = $bindable(),
         renderingMode = $bindable(),
         debugMode = $bindable(),
+        timeSegment = $bindable(),
         springForce = $bindable(),
         springDamping = $bindable(),
         springMass = $bindable(),
@@ -189,6 +190,16 @@
             <span></span>
             <div class="value-display">Show segment endpoints (red dots)</div>
         </div>
+        {#if debugMode}
+            <div class="slider-control">
+                <label>Time Segment</label>
+                <input type="range" min="0.005" max="0.2" step="0.005" bind:value={timeSegment} />
+                <span class="value">{timeSegment.toFixed(3)}</span>
+            </div>
+            <div class="value-display" style="grid-column: 1 / 4; margin-top: -8px; margin-bottom: 8px;">
+                Temporal resolution: {timeSegment}ms per segment
+            </div>
+        {/if}
     </div>
 </dialog>
 

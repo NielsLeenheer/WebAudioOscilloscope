@@ -508,7 +508,7 @@ function renderTracePhosphor(ctx, points, speeds, velocityDimming, basePower, de
 // ============================================================================
 // RENDERING - Alternative Model (Time-based segmentation)
 // ============================================================================
-function renderTraceAlternative(ctx, points, speeds, velocityDimming, basePower, deltaTime, sampleRate, debugMode) {
+function renderTraceAlternative(ctx, points, speeds, velocityDimming, basePower, deltaTime, sampleRate, debugMode, timeSegment) {
     // Time-based segmentation approach:
     // - Segment traces based on fixed time intervals
     // - Fast beam movement = points spread out over time segment
@@ -516,8 +516,8 @@ function renderTraceAlternative(ctx, points, speeds, velocityDimming, basePower,
 
     if (points.length < 2) return;
 
-    // Fixed time interval for each segment (in seconds)
-    const TIME_SEGMENT = 0.000025; // 0.025ms per segment (2x increase in temporal resolution)
+    // Time interval for each segment (in seconds, configurable via debug slider)
+    const TIME_SEGMENT = timeSegment / 1000; // Convert from milliseconds to seconds
 
     // Time per point (assuming points correspond to audio samples)
     // Each point represents one sample from the physics simulation
@@ -670,9 +670,9 @@ function renderTraceAlternative(ctx, points, speeds, velocityDimming, basePower,
 // RENDERING DISPATCHER
 // Chooses the appropriate rendering model based on renderingMode
 // ============================================================================
-function renderTrace(ctx, points, speeds, velocityDimming, basePower, deltaTime, renderingMode, sampleRate, debugMode) {
+function renderTrace(ctx, points, speeds, velocityDimming, basePower, deltaTime, renderingMode, sampleRate, debugMode, timeSegment) {
     if (renderingMode === 'alternative') {
-        return renderTraceAlternative(ctx, points, speeds, velocityDimming, basePower, deltaTime, sampleRate, debugMode);
+        return renderTraceAlternative(ctx, points, speeds, velocityDimming, basePower, deltaTime, sampleRate, debugMode, timeSegment);
     } else {
         // Default to phosphor model
         return renderTracePhosphor(ctx, points, speeds, velocityDimming, basePower, deltaTime);
@@ -726,6 +726,7 @@ self.onmessage = function(e) {
             simulationMode,
             renderingMode,
             debugMode,
+            timeSegment,
             forceMultiplier,
             damping,
             mass,
@@ -790,7 +791,7 @@ self.onmessage = function(e) {
             // RENDERING - Draw the simulated beam path
             // ========================================================================
 
-            renderTrace(ctx, points, speeds, velocityDimming, basePower, deltaTime, renderingMode, sampleRate, debugMode);
+            renderTrace(ctx, points, speeds, velocityDimming, basePower, deltaTime, renderingMode, sampleRate, debugMode, timeSegment);
         }
 
         // Send ready message back to main thread

@@ -7,6 +7,7 @@
         simulationMode = $bindable(),
         renderingMode = $bindable(),
         debugMode = $bindable(),
+        timeSegment = $bindable(),
         springForce = $bindable(),
         springDamping = $bindable(),
         springMass = $bindable(),
@@ -37,6 +38,7 @@
     bind:simulationMode
     bind:renderingMode
     bind:debugMode
+    bind:timeSegment
     bind:springForce
     bind:springDamping
     bind:springMass

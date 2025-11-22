@@ -12,6 +12,7 @@
     let simulationMode = $state('electromagnetic'); // 'spring' or 'electromagnetic'
     let renderingMode = $state('phosphor'); // 'phosphor' or 'alternative'
     let debugMode = $state(false); // Debug visualization toggle
+    let timeSegment = $state(0.025); // Temporal resolution in milliseconds (debug parameter)
 
     // Spring-Damper model parameters
     let springForce = $state(0.3);
@@ -49,6 +50,7 @@
         bind:simulationMode
         bind:renderingMode
         bind:debugMode
+        bind:timeSegment
         bind:springForce
         bind:springDamping
         bind:springMass
@@ -71,6 +73,7 @@
                 {simulationMode}
                 {renderingMode}
                 {debugMode}
+                {timeSegment}
                 {springForce}
                 {springDamping}
                 {springMass}
