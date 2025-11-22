@@ -8,6 +8,7 @@
         mode,
         // Physics parameters
         simulationMode,
+        renderingMode,
         springForce,
         springDamping,
         springMass,
@@ -195,6 +196,7 @@
                     scale,
                     visibleScale,
                     simulationMode,
+                    renderingMode,
                     forceMultiplier,
                     damping,
                     mass,

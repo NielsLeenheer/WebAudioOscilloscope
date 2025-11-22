@@ -424,9 +424,9 @@ function simulatePhysics(targets, simulationMode, forceMultiplier, damping, mass
 }
 
 // ============================================================================
-// RENDERING - Draw the simulated beam path
+// RENDERING - Phosphor Model (Current/Default)
 // ============================================================================
-function renderTrace(ctx, points, speeds, velocityDimming, basePower, deltaTime) {
+function renderTracePhosphor(ctx, points, speeds, velocityDimming, basePower, deltaTime) {
     // Configure canvas for drawing
     ctx.lineWidth = 1.5;
     ctx.lineCap = 'butt'; // Use 'butt' to prevent overlapping caps at connection points
@@ -502,6 +502,28 @@ function renderTrace(ctx, points, speeds, velocityDimming, basePower, deltaTime)
     }
 }
 
+// ============================================================================
+// RENDERING - Alternative Model (To be developed)
+// ============================================================================
+function renderTraceAlternative(ctx, points, speeds, velocityDimming, basePower, deltaTime) {
+    // Currently identical to phosphor model
+    // This will be customized later for different rendering approach
+    renderTracePhosphor(ctx, points, speeds, velocityDimming, basePower, deltaTime);
+}
+
+// ============================================================================
+// RENDERING DISPATCHER
+// Chooses the appropriate rendering model based on renderingMode
+// ============================================================================
+function renderTrace(ctx, points, speeds, velocityDimming, basePower, deltaTime, renderingMode) {
+    if (renderingMode === 'alternative') {
+        return renderTraceAlternative(ctx, points, speeds, velocityDimming, basePower, deltaTime);
+    } else {
+        // Default to phosphor model
+        return renderTracePhosphor(ctx, points, speeds, velocityDimming, basePower, deltaTime);
+    }
+}
+
 self.onmessage = function(e) {
     const { type, data } = e.data;
 
@@ -547,6 +569,7 @@ self.onmessage = function(e) {
             scale,
             visibleScale,
             simulationMode,
+            renderingMode,
             forceMultiplier,
             damping,
             mass,
@@ -611,7 +634,7 @@ self.onmessage = function(e) {
             // RENDERING - Draw the simulated beam path
             // ========================================================================
 
-            renderTrace(ctx, points, speeds, velocityDimming, basePower, deltaTime);
+            renderTrace(ctx, points, speeds, velocityDimming, basePower, deltaTime, renderingMode);
         }
 
         // Send ready message back to main thread

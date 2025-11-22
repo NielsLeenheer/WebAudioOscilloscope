@@ -1,6 +1,7 @@
 <script>
     let {
         simulationMode = $bindable(),
+        renderingMode = $bindable(),
         springForce = $bindable(),
         springDamping = $bindable(),
         springMass = $bindable(),
@@ -105,6 +106,11 @@
     </div>
     -->
     <div class="sliders">
+        <div class="slider-control">
+            <label>Noise</label>
+            <input type="range" min="0" max="0.2" step="0.001" bind:value={signalNoise} />
+            <span class="value">{signalNoise.toFixed(3)}</span>
+        </div>
         {#if simulationMode === 'spring'}
             <div class="slider-control">
                 <label>Force</label>
@@ -138,15 +144,28 @@
                 <span class="value">{fieldDamping.toFixed(2)}</span>
             </div>
         {/if}
+        <div class="mode-separator"></div>
+        <div class="mode-toggle-inline">
+            <label>Rendering</label>
+            <div class="toggle-buttons">
+                <button
+                    class:active={renderingMode === 'phosphor'}
+                    onclick={() => renderingMode = 'phosphor'}
+                >
+                    Phosphor
+                </button>
+                <button
+                    class:active={renderingMode === 'alternative'}
+                    onclick={() => renderingMode = 'alternative'}
+                >
+                    Alternative
+                </button>
+            </div>
+        </div>
         <div class="slider-control">
             <label>Persistence</label>
             <input type="range" min="0.0" max="0.95" step="0.005" bind:value={persistence} />
             <span class="value">{persistence.toFixed(3)}</span>
-        </div>
-        <div class="slider-control">
-            <label>Noise</label>
-            <input type="range" min="0" max="0.2" step="0.001" bind:value={signalNoise} />
-            <span class="value">{signalNoise.toFixed(3)}</span>
         </div>
         <div class="slider-control">
             <label>Dimming</label>
@@ -272,6 +291,26 @@
         flex-direction: column;
         gap: 10px;
         padding: 15px;
+    }
+
+    .mode-separator {
+        height: 1px;
+        background: #333;
+        margin: 10px 0;
+    }
+
+    .mode-toggle-inline {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        margin: 5px 0;
+    }
+
+    .mode-toggle-inline label {
+        color: #4CAF50;
+        font-family: system-ui;
+        font-size: 12px;
+        font-weight: 600;
     }
 
     .slider-control {
