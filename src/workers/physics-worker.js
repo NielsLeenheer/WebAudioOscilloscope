@@ -8,12 +8,50 @@ let smoothedBeamY = 0;
 let offscreenCanvas = null;
 let ctx = null;
 
+// ============================================================================
+// VIRTUAL COORDINATE SYSTEM
+// Resolution-independent coordinate conversion utilities
+// Virtual space: [-1, 1] normalized coordinates where 1.0 = full canvas radius
+// ============================================================================
+const VirtualUnits = {
+    // Convert virtual distance to pixels
+    toPixels: (virtualDist, canvasSize) => virtualDist * (canvasSize / 2),
+
+    // Convert pixel distance to virtual units
+    fromPixels: (pixelDist, canvasSize) => pixelDist / (canvasSize / 2),
+
+    // Convert virtual point to pixel coordinates
+    pointToPixels: (virtualPoint, canvasWidth, canvasHeight) => {
+        const scaleX = canvasWidth / 2;
+        const scaleY = canvasHeight / 2;
+        return {
+            x: canvasWidth / 2 + virtualPoint.x * scaleX,
+            y: canvasHeight / 2 + virtualPoint.y * scaleY
+        };
+    },
+
+    // Convert pixel point to virtual coordinates
+    pointFromPixels: (pixelPoint, canvasWidth, canvasHeight) => {
+        const scaleX = canvasWidth / 2;
+        const scaleY = canvasHeight / 2;
+        return {
+            x: (pixelPoint.x - canvasWidth / 2) / scaleX,
+            y: (pixelPoint.y - canvasHeight / 2) / scaleY
+        };
+    },
+
+    // Get the scale factor for converting virtual units to pixels
+    getScale: (canvasWidth, canvasHeight) => {
+        return Math.min(canvasWidth, canvasHeight) / 2;
+    }
+};
+
 // Position smoothing factor (0-1): higher = less smoothing, lower = more smoothing
 const SMOOTHING_ALPHA = 0.4;
 
 // Number of sub-segments to split each curve into for gradual opacity transitions
 const MAX_SUBSEGMENTS = 8;
-const MIN_SUBSEGMENT_LENGTH = 4; // Minimum pixels per sub-segment
+const MIN_SUBSEGMENT_LENGTH_RATIO = 0.01; // 1% of canvas (4px on 400px canvas)
 
 // Ease-in function for opacity transitions (quartic: slow start with delay, then accelerate)
 // Mimics physics behavior where magnetic force takes time to overcome inertia
@@ -52,32 +90,35 @@ function estimateBezierLength(p0x, p0y, p1x, p1y, p2x, p2y) {
 // - Higher beam power (current) = more phosphor excitation
 // - Lower velocity = longer dwell time = more energy deposited = brighter
 // - Realistic phosphor saturation based on actual CRT physics
+// NOW RESOLUTION-INDEPENDENT: Uses virtual units instead of pixels
 function calculatePhosphorExcitation(speed, velocityDimming, basePower, deltaTime) {
     // Beam power represents the electron beam current/intensity
     const beamCurrent = basePower;
 
-    // Calculate velocity in pixels/second (frame-rate independent)
-    // speed is in pixels/frame, deltaTime is in seconds
+    // Calculate velocity in virtual units/second (frame-rate independent and resolution-independent)
+    // speed is in virtual units/frame, deltaTime is in seconds
     const velocity = deltaTime > 0 ? speed / deltaTime : 0;
 
     // Dwell time model (recalibrated for realistic scope behavior):
     // The reference velocity is the speed at which dimming becomes noticeable
     // Real scopes show very aggressive dimming - fast movements are almost invisible
-    const REFERENCE_VELOCITY = 300; // pixels/second where dimming starts
-    const BEAM_SPOT_SIZE = 1.5; // Effective beam spot diameter in pixels
+    // VIRTUAL_REFERENCE_VELOCITY: in virtual units/second (resolution-independent)
+    // 0.5 = half canvas radius per second, consistent across all canvas sizes
+    const VIRTUAL_REFERENCE_VELOCITY = 0.5; // Virtual units/second where dimming starts
+    const VIRTUAL_BEAM_SPOT_SIZE = 0.003; // Effective beam spot size in virtual units (0.3% of canvas)
 
     // Calculate energy deposition factor based on velocity
     // Low velocity → full excitation (factor = 1.0)
     // High velocity → reduced excitation (factor → 0)
     let energyFactor;
 
-    if (velocity < BEAM_SPOT_SIZE) {
+    if (velocity < VIRTUAL_BEAM_SPOT_SIZE) {
         // Very slow or stationary: maximum excitation
         energyFactor = 1.0;
     } else {
         // Energy deposition inversely proportional to velocity
         // This models the physical reality: faster beam = less time on each phosphor grain
-        energyFactor = (REFERENCE_VELOCITY / velocity);
+        energyFactor = (VIRTUAL_REFERENCE_VELOCITY / velocity);
 
         // Apply power curve for aggressive dimming at high speeds
         // Use 1.5 power instead of 2 for less aggressive curve
@@ -164,7 +205,8 @@ function processSignals(leftData, rightData, signalNoise) {
 
 // ============================================================================
 // STAGE B: INTERPRETATION
-// Convert processed signals to target coordinates based on mode
+// Convert processed signals to target coordinates in VIRTUAL space [-1, 1]
+// Audio signals are already normalized, so they map directly to virtual coordinates
 // ============================================================================
 function interpretSignals(processedLeft, processedRight, mode, scale, visibleScale, centerX, centerY, canvasWidth, timeDiv, triggerLevel, triggerChannel, amplDivA, positionA, amplDivB, positionB, xPosition, visibleWidth, sampleRate, decay) {
     const targets = [];
@@ -173,10 +215,16 @@ function interpretSignals(processedLeft, processedRight, mode, scale, visibleSca
     const expAmplDivA = amplDivA;
     const expAmplDivB = amplDivB;
 
+    // Virtual space constants
+    // In virtual space, the visible area is normalized to a specific range
+    // visibleScale represents 200 virtual units (the radius of visible area in old pixel space)
+    // We need to convert this to virtual units: 200px / (canvasSize/2) = 200 / 200 = 1.0 for standard 400px canvas
+    const VIRTUAL_VISIBLE_RADIUS = 1.0; // Full radius in virtual space
+
     if (mode === 'xy') {
         // X/Y mode: left channel = X (with A controls), right channel = Y (with B controls)
-        // X position offset - scale by visibleWidth so position control shifts within visible area
-        const xOffset = xPosition * visibleWidth;
+        // X position offset in virtual space
+        const xOffset = xPosition * VIRTUAL_VISIBLE_RADIUS;
 
         // Use only the most recent samples to avoid overdraw from large buffer
         // Decay parameter controls how many points to render
@@ -184,13 +232,13 @@ function interpretSignals(processedLeft, processedRight, mode, scale, visibleSca
 
         for (let i = startIdx; i < processedLeft.length; i++) {
             // Left channel (A) controls horizontal with AMPL/DIV A and POSITION A
-            // Use visibleScale for XY mode to respect AMPL/DIV settings for visible viewport
-            const posOffsetA = positionA * visibleScale * 2;
-            const targetX = processedLeft[i] * visibleScale / expAmplDivA + posOffsetA + xOffset;
+            // Signals are already in [-1, 1], scale by virtual visible radius and apply amplitude division
+            const posOffsetA = positionA * VIRTUAL_VISIBLE_RADIUS * 2;
+            const targetX = processedLeft[i] * VIRTUAL_VISIBLE_RADIUS / expAmplDivA + posOffsetA + xOffset;
 
             // Right channel (B) controls vertical with AMPL/DIV B and POSITION B (but inverted for Y axis)
-            const posOffsetB = positionB * visibleScale * 2;
-            const targetY = -processedRight[i] * visibleScale / expAmplDivB + posOffsetB;
+            const posOffsetB = positionB * VIRTUAL_VISIBLE_RADIUS * 2;
+            const targetY = -processedRight[i] * VIRTUAL_VISIBLE_RADIUS / expAmplDivB + posOffsetB;
 
             targets.push({ x: targetX, y: targetY });
         }
@@ -222,21 +270,20 @@ function interpretSignals(processedLeft, processedRight, mode, scale, visibleSca
         const startIndex = triggerIndex;
         const endIndex = Math.min(startIndex + samplesToDisplay, channelData.length);
 
-        // X position offset (convert from -1 to 1 range to pixel offset)
-        // Scale by visibleWidth so position control shifts within visible area
-        const xOffset = xPosition * visibleWidth;
+        // X position offset in virtual space
+        const xOffset = xPosition * VIRTUAL_VISIBLE_RADIUS;
 
-        // Create target coordinates for the triggered portion
+        // Create target coordinates for the triggered portion in virtual space
         for (let i = startIndex; i < endIndex; i++) {
             const relativeIndex = i - startIndex;
             // X position is based on time with position offset
-            // Spread waveform across visible width (400px) for accurate TIME/DIV calibration
+            // Spread waveform across virtual visible width (normalized to 1.0 radius)
             // X POS offset shifts it left/right for alignment
-            const targetX = (relativeIndex / samplesToDisplay) * visibleWidth - visibleWidth / 2 + xOffset;
+            const targetX = (relativeIndex / samplesToDisplay) * VIRTUAL_VISIBLE_RADIUS * 2 - VIRTUAL_VISIBLE_RADIUS + xOffset;
             // Y position is based on amplitude with AMPL/DIV and Y position offset
-            // Use visibleScale for amplitude calculations (based on visible 400px area)
-            const yOffset = position * visibleScale * 2; // Scale the position offset
-            const targetY = -channelData[i] * visibleScale / amplDiv + yOffset;
+            // Use virtual visible radius for amplitude calculations
+            const yOffset = position * VIRTUAL_VISIBLE_RADIUS * 2; // Scale the position offset
+            const targetY = -channelData[i] * VIRTUAL_VISIBLE_RADIUS / amplDiv + yOffset;
             targets.push({ x: targetX, y: targetY });
         }
     }
@@ -246,16 +293,17 @@ function interpretSignals(processedLeft, processedRight, mode, scale, visibleSca
 
 // ============================================================================
 // STAGE C: PHYSICS SIMULATION - Spring-Damper Model (Original)
-// Apply spring-damper physics to beam
+// Apply spring-damper physics to beam in VIRTUAL space
+// Physics operates in resolution-independent virtual coordinates
 // ============================================================================
-function simulatePhysicsSpring(targets, forceMultiplier, damping, mass, scale, centerX, centerY) {
+function simulatePhysicsSpring(targets, forceMultiplier, damping, mass, scale, centerX, centerY, canvasWidth, canvasHeight) {
     const points = [];
     const speeds = [];
 
     for (let i = 0; i < targets.length; i++) {
         const target = targets[i];
 
-        // Calculate force (like a spring pulling beam to target)
+        // Calculate force (like a spring pulling beam to target) in virtual space
         const forceX = (target.x - beamX) * forceMultiplier;
         const forceY = (target.y - beamY) * forceMultiplier;
 
@@ -268,8 +316,8 @@ function simulatePhysicsSpring(targets, forceMultiplier, damping, mass, scale, c
         velocityY += accelY;
 
         // Clamp velocity to prevent extreme instability with very high force values
-        // Max velocity scales with sqrt(force/mass) and allows very high speeds for CRT beam
-        const maxVelocity = Math.sqrt(forceMultiplier / mass) * scale * 5.0;
+        // Max velocity in virtual units - now resolution independent
+        const maxVelocity = Math.sqrt(forceMultiplier / mass) * 5.0; // Virtual units per frame
         const currentSpeed = Math.sqrt(velocityX * velocityX + velocityY * velocityY);
         if (currentSpeed > maxVelocity) {
             const scale_factor = maxVelocity / currentSpeed;
@@ -281,7 +329,7 @@ function simulatePhysicsSpring(targets, forceMultiplier, damping, mass, scale, c
         velocityX *= damping;
         velocityY *= damping;
 
-        // Update position
+        // Update position in virtual space
         beamX += velocityX;
         beamY += velocityY;
 
@@ -295,35 +343,38 @@ function simulatePhysicsSpring(targets, forceMultiplier, damping, mass, scale, c
             smoothedBeamX = 0;
             smoothedBeamY = 0;
         } else {
-            // Clamp beam position to reasonable bounds (prevent runaway)
-            const maxPosition = scale * 10;
+            // Clamp beam position to reasonable bounds in virtual space (prevent runaway)
+            const maxPosition = 10.0; // Virtual units (10x the visible radius)
             beamX = Math.max(-maxPosition, Math.min(maxPosition, beamX));
             beamY = Math.max(-maxPosition, Math.min(maxPosition, beamY));
 
-            // Clamp velocities to prevent extreme values
-            const maxVelocity = scale * 2;
-            velocityX = Math.max(-maxVelocity, Math.min(maxVelocity, velocityX));
-            velocityY = Math.max(-maxVelocity, Math.min(maxVelocity, velocityY));
+            // Clamp velocities to prevent extreme values in virtual space
+            const maxVel = 2.0; // Virtual units per frame
+            velocityX = Math.max(-maxVel, Math.min(maxVel, velocityX));
+            velocityY = Math.max(-maxVel, Math.min(maxVel, velocityY));
         }
 
-        // Apply exponential smoothing to positions
+        // Apply exponential smoothing to positions in virtual space
         // This creates naturally smooth movement while preserving physics accuracy
         smoothedBeamX = SMOOTHING_ALPHA * beamX + (1 - SMOOTHING_ALPHA) * smoothedBeamX;
         smoothedBeamY = SMOOTHING_ALPHA * beamY + (1 - SMOOTHING_ALPHA) * smoothedBeamY;
 
-        // Convert to screen coordinates using smoothed positions
-        const screenX = centerX + smoothedBeamX;
-        const screenY = centerY + smoothedBeamY;
+        // Convert from virtual space to pixel coordinates for rendering
+        const pixelPoint = VirtualUnits.pointToPixels(
+            { x: smoothedBeamX, y: smoothedBeamY },
+            canvasWidth,
+            canvasHeight
+        );
 
-        points.push({ x: screenX, y: screenY });
+        // Store both pixel and virtual coordinates for speed calculation
+        points.push(pixelPoint);
 
-        // Calculate speed for this point
+        // Calculate speed in virtual units for this point
         if (points.length > 1) {
-            const prev = points[points.length - 2];
-            const dx = screenX - prev.x;
-            const dy = screenY - prev.y;
-            const speed = Math.sqrt(dx * dx + dy * dy);
-            speeds.push(speed);
+            const dx = velocityX;
+            const dy = velocityY;
+            const virtualSpeed = Math.sqrt(dx * dx + dy * dy);
+            speeds.push(virtualSpeed);
         }
     }
 
@@ -332,9 +383,10 @@ function simulatePhysicsSpring(targets, forceMultiplier, damping, mass, scale, c
 
 // ============================================================================
 // STAGE C: PHYSICS SIMULATION - Electromagnetic Deflection Model (New)
-// Simulates realistic CRT electron beam deflection by electromagnetic coils
+// Simulates realistic CRT electron beam deflection by electromagnetic coils in VIRTUAL space
+// Physics operates in resolution-independent virtual coordinates
 // ============================================================================
-function simulatePhysicsElectromagnetic(targets, forceMultiplier, damping, mass, scale, centerX, centerY) {
+function simulatePhysicsElectromagnetic(targets, forceMultiplier, damping, mass, scale, centerX, centerY, canvasWidth, canvasHeight) {
     const points = [];
     const speeds = [];
 
@@ -347,7 +399,7 @@ function simulatePhysicsElectromagnetic(targets, forceMultiplier, damping, mass,
         // 3. The beam has inertia and will overshoot the target position
         // 4. The deflection force is proportional to the difference between target and current position
 
-        // Calculate the deflection force (magnetic field pulling beam toward target)
+        // Calculate the deflection force (magnetic field pulling beam toward target) in virtual space
         // The force is proportional to (target - current), like the coil current driving the deflection
         const forceX = (target.x - beamX) * forceMultiplier;
         const forceY = (target.y - beamY) * forceMultiplier;
@@ -365,7 +417,7 @@ function simulatePhysicsElectromagnetic(targets, forceMultiplier, damping, mass,
         velocityX *= damping;
         velocityY *= damping;
 
-        // Update beam position
+        // Update beam position in virtual space
         beamX += velocityX;
         beamY += velocityY;
 
@@ -378,13 +430,13 @@ function simulatePhysicsElectromagnetic(targets, forceMultiplier, damping, mass,
             smoothedBeamX = 0;
             smoothedBeamY = 0;
         } else {
-            // Clamp beam position to reasonable bounds
-            const maxPosition = scale * 10;
+            // Clamp beam position to reasonable bounds in virtual space
+            const maxPosition = 10.0; // Virtual units (10x the visible radius)
             beamX = Math.max(-maxPosition, Math.min(maxPosition, beamX));
             beamY = Math.max(-maxPosition, Math.min(maxPosition, beamY));
 
-            // Clamp velocities
-            const maxVelocity = scale * 3;
+            // Clamp velocities in virtual space
+            const maxVelocity = 3.0; // Virtual units per frame
             velocityX = Math.max(-maxVelocity, Math.min(maxVelocity, velocityX));
             velocityY = Math.max(-maxVelocity, Math.min(maxVelocity, velocityY));
         }
@@ -394,19 +446,21 @@ function simulatePhysicsElectromagnetic(targets, forceMultiplier, damping, mass,
         smoothedBeamX = EM_SMOOTHING * beamX + (1 - EM_SMOOTHING) * smoothedBeamX;
         smoothedBeamY = EM_SMOOTHING * beamY + (1 - EM_SMOOTHING) * smoothedBeamY;
 
-        // Convert to screen coordinates
-        const screenX = centerX + smoothedBeamX;
-        const screenY = centerY + smoothedBeamY;
+        // Convert from virtual space to pixel coordinates for rendering
+        const pixelPoint = VirtualUnits.pointToPixels(
+            { x: smoothedBeamX, y: smoothedBeamY },
+            canvasWidth,
+            canvasHeight
+        );
 
-        points.push({ x: screenX, y: screenY });
+        points.push(pixelPoint);
 
-        // Calculate speed for this point
+        // Calculate speed in virtual units for this point
         if (points.length > 1) {
-            const prev = points[points.length - 2];
-            const dx = screenX - prev.x;
-            const dy = screenY - prev.y;
-            const speed = Math.sqrt(dx * dx + dy * dy);
-            speeds.push(speed);
+            const dx = velocityX;
+            const dy = velocityY;
+            const virtualSpeed = Math.sqrt(dx * dx + dy * dy);
+            speeds.push(virtualSpeed);
         }
     }
 
@@ -417,21 +471,27 @@ function simulatePhysicsElectromagnetic(targets, forceMultiplier, damping, mass,
 // PHYSICS SIMULATION DISPATCHER
 // Chooses the appropriate physics model based on simulationMode
 // ============================================================================
-function simulatePhysics(targets, simulationMode, forceMultiplier, damping, mass, scale, centerX, centerY) {
+function simulatePhysics(targets, simulationMode, forceMultiplier, damping, mass, scale, centerX, centerY, canvasWidth, canvasHeight) {
     if (simulationMode === 'spring') {
-        return simulatePhysicsSpring(targets, forceMultiplier, damping, mass, scale, centerX, centerY);
+        return simulatePhysicsSpring(targets, forceMultiplier, damping, mass, scale, centerX, centerY, canvasWidth, canvasHeight);
     } else {
         // Default to electromagnetic model
-        return simulatePhysicsElectromagnetic(targets, forceMultiplier, damping, mass, scale, centerX, centerY);
+        return simulatePhysicsElectromagnetic(targets, forceMultiplier, damping, mass, scale, centerX, centerY, canvasWidth, canvasHeight);
     }
 }
 
 // ============================================================================
 // RENDERING - Phosphor Model (Current/Default)
+// NOW RESOLUTION-INDEPENDENT: Rendering primitives scale with canvas size
 // ============================================================================
-function renderTracePhosphor(ctx, points, speeds, velocityDimming, basePower, deltaTime) {
-    // Configure canvas for drawing
-    ctx.lineWidth = 1.5;
+function renderTracePhosphor(ctx, points, speeds, velocityDimming, basePower, deltaTime, canvasWidth, canvasHeight) {
+    // Calculate scale factor for resolution-independent rendering
+    const canvasScale = Math.min(canvasWidth, canvasHeight);
+    const LINE_WIDTH_RATIO = 0.00375; // 0.375% of canvas (1.5px on 400px canvas)
+    const minSubsegmentLength = MIN_SUBSEGMENT_LENGTH_RATIO * canvasScale;
+
+    // Configure canvas for drawing with scaled line width
+    ctx.lineWidth = LINE_WIDTH_RATIO * canvasScale;
     ctx.lineCap = 'butt'; // Use 'butt' to prevent overlapping caps at connection points
     ctx.lineJoin = 'round';
 
@@ -459,7 +519,7 @@ function renderTracePhosphor(ctx, points, speeds, velocityDimming, basePower, de
 
             // Estimate curve length to determine number of sub-segments
             const curveLength = estimateBezierLength(prevMidX, prevMidY, points[i].x, points[i].y, nextMidX, nextMidY);
-            const numSubSegments = Math.max(1, Math.min(MAX_SUBSEGMENTS, Math.floor(curveLength / MIN_SUBSEGMENT_LENGTH)));
+            const numSubSegments = Math.max(1, Math.min(MAX_SUBSEGMENTS, Math.floor(curveLength / minSubsegmentLength)));
 
             // Get opacities for current and next point
             const currentSpeed = speeds[i] || 0;
@@ -578,14 +638,22 @@ function interpolatePoints(points, speeds, targetTimePerPoint, actualTimePerPoin
 
 // ============================================================================
 // RENDERING - Alternative Model (Time-based segmentation)
+// NOW RESOLUTION-INDEPENDENT: All rendering primitives scale with canvas size
 // ============================================================================
-function renderTraceAlternative(ctx, points, speeds, velocityDimming, basePower, deltaTime, sampleRate, debugMode, timeSegment, dotOpacity, dotSizeVariation, sampleDotOpacity) {
+function renderTraceAlternative(ctx, points, speeds, velocityDimming, basePower, deltaTime, sampleRate, debugMode, timeSegment, dotOpacity, dotSizeVariation, sampleDotOpacity, canvasWidth, canvasHeight) {
     // Time-based segmentation approach:
     // - Segment traces based on fixed time intervals
     // - Fast beam movement = points spread out over time segment
     // - Slow beam movement = points closer together over time segment
 
     if (points.length < 2) return;
+
+    // Calculate scale factor for resolution-independent rendering
+    const canvasScale = Math.min(canvasWidth, canvasHeight);
+    const LINE_WIDTH_RATIO = 0.00375;      // 0.375% of canvas (1.5px on 400px)
+    const GREEN_DOT_RATIO = 0.00375;       // 0.375% of canvas (1.5px on 400px)
+    const RED_DOT_RATIO = 0.005;           // 0.5% of canvas (2px on 400px)
+    const BLUE_DOT_BASE_RATIO = 0.0025;    // 0.25% of canvas (1px on 400px)
 
     // Time interval for each segment (in seconds, configurable via debug slider)
     const TIME_SEGMENT = timeSegment / 1000; // Convert from milliseconds to seconds
@@ -653,8 +721,8 @@ function renderTraceAlternative(ctx, points, speeds, velocityDimming, basePower,
     // Recalculate timePerPoint for interpolated points
     const interpolatedTimePerPoint = TIME_SEGMENT;
 
-    // Configure canvas for drawing
-    ctx.lineWidth = 1.5;
+    // Configure canvas for drawing with scaled line width
+    ctx.lineWidth = LINE_WIDTH_RATIO * canvasScale;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
 
@@ -704,24 +772,26 @@ function renderTraceAlternative(ctx, points, speeds, velocityDimming, basePower,
     // Third pass: highlight direction changes with green dots (beam dwell time)
     // Brightness is proportional to angle of direction change (180° = brightest)
     // Use originalPoints since directionChanges is indexed by original points
+    const greenDotSize = GREEN_DOT_RATIO * canvasScale;
     for (const [idx, brightness] of directionChanges) {
         const point = originalPoints[idx];
         const opacity = basePower * brightness;
 
         ctx.fillStyle = `rgba(76, 175, 80, ${opacity})`; // Green color
         ctx.beginPath();
-        ctx.arc(point.x, point.y, 1.5, 0, Math.PI * 2);
+        ctx.arc(point.x, point.y, greenDotSize, 0, Math.PI * 2);
         ctx.fill();
     }
 
     // Debug visualization: show segment endpoints as red dots
     // Red dots show time-based segmentation (constant size)
     if (debugMode && dotOpacity > 0) {
+        const redDotSize = RED_DOT_RATIO * canvasScale;
         ctx.fillStyle = `rgba(255, 0, 0, ${dotOpacity})`;
         for (let i = 0; i < segmentEndpoints.length; i++) {
             const point = segmentEndpoints[i];
             ctx.beginPath();
-            ctx.arc(point.x, point.y, 2, 0, Math.PI * 2);
+            ctx.arc(point.x, point.y, redDotSize, 0, Math.PI * 2);
             ctx.fill();
         }
     }
@@ -730,6 +800,7 @@ function renderTraceAlternative(ctx, points, speeds, velocityDimming, basePower,
     // Use originalPoints to show actual sample rate, not interpolated points
     // Dot size scales with angle of direction change based on dotSizeVariation
     if (debugMode && sampleDotOpacity > 0) {
+        const blueDotBaseSize = BLUE_DOT_BASE_RATIO * canvasScale;
         for (let i = 0; i < originalPoints.length; i++) {
             const point = originalPoints[i];
 
@@ -739,10 +810,9 @@ function renderTraceAlternative(ctx, points, speeds, velocityDimming, basePower,
 
             // Calculate dot size based on angle and dotSizeVariation
             // dotSizeVariation: 1 = all same size, 10 = 180° dots are 10x larger
-            // Base size is 1px, scales up to 1 * dotSizeVariation for 180° changes
-            const baseSize = 1;
+            // Scales proportionally with canvas size
             const sizeMultiplier = 1 + (brightness * (dotSizeVariation - 1));
-            const dotSize = baseSize * sizeMultiplier;
+            const dotSize = blueDotBaseSize * sizeMultiplier;
 
             ctx.fillStyle = `rgba(59, 130, 246, ${sampleDotOpacity})`; // Blue color
             ctx.beginPath();
@@ -756,12 +826,12 @@ function renderTraceAlternative(ctx, points, speeds, velocityDimming, basePower,
 // RENDERING DISPATCHER
 // Chooses the appropriate rendering model based on renderingMode
 // ============================================================================
-function renderTrace(ctx, points, speeds, velocityDimming, basePower, deltaTime, renderingMode, sampleRate, debugMode, timeSegment, dotOpacity, dotSizeVariation, sampleDotOpacity) {
+function renderTrace(ctx, points, speeds, velocityDimming, basePower, deltaTime, renderingMode, sampleRate, debugMode, timeSegment, dotOpacity, dotSizeVariation, sampleDotOpacity, canvasWidth, canvasHeight) {
     if (renderingMode === 'alternative') {
-        return renderTraceAlternative(ctx, points, speeds, velocityDimming, basePower, deltaTime, sampleRate, debugMode, timeSegment, dotOpacity, dotSizeVariation, sampleDotOpacity);
+        return renderTraceAlternative(ctx, points, speeds, velocityDimming, basePower, deltaTime, sampleRate, debugMode, timeSegment, dotOpacity, dotSizeVariation, sampleDotOpacity, canvasWidth, canvasHeight);
     } else {
         // Default to phosphor model
-        return renderTracePhosphor(ctx, points, speeds, velocityDimming, basePower, deltaTime);
+        return renderTracePhosphor(ctx, points, speeds, velocityDimming, basePower, deltaTime, canvasWidth, canvasHeight);
     }
 }
 
@@ -874,13 +944,13 @@ self.onmessage = function(e) {
             }
 
             // STAGE C: Physics Simulation - Apply electron beam physics uniformly
-            const { points, speeds } = simulatePhysics(targets, simulationMode, forceMultiplier, damping, mass, scale, centerX, centerY);
+            const { points, speeds } = simulatePhysics(targets, simulationMode, forceMultiplier, damping, mass, scale, centerX, centerY, canvasWidth, canvasHeight);
 
             // ========================================================================
             // RENDERING - Draw the simulated beam path
             // ========================================================================
 
-            renderTrace(ctx, points, speeds, velocityDimming, basePower, deltaTime, renderingMode, sampleRate, debugMode, timeSegment, dotOpacity, dotSizeVariation, sampleDotOpacity);
+            renderTrace(ctx, points, speeds, velocityDimming, basePower, deltaTime, renderingMode, sampleRate, debugMode, timeSegment, dotOpacity, dotSizeVariation, sampleDotOpacity, canvasWidth, canvasHeight);
         }
 
         // Send ready message back to main thread
