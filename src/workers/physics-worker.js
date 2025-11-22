@@ -60,11 +60,10 @@ function calculatePhosphorExcitation(speed, velocityDimming, basePower, deltaTim
     // speed is in pixels/frame, deltaTime is in seconds
     const velocity = deltaTime > 0 ? speed / deltaTime : 0;
 
-    // Dwell time model:
+    // Dwell time model (recalibrated for realistic scope behavior):
     // The reference velocity is the speed at which dimming becomes noticeable
-    // At typical oscilloscope speeds (100-1000 px/s), we want visible dimming
-    // Below this speed, phosphor is fully excited; above it, dimming occurs
-    const REFERENCE_VELOCITY = 500; // pixels/second where dimming starts
+    // Real scopes show very aggressive dimming - fast movements are almost invisible
+    const REFERENCE_VELOCITY = 200; // pixels/second where dimming starts (lowered from 500)
     const BEAM_SPOT_SIZE = 1.5; // Effective beam spot diameter in pixels
 
     // Calculate energy deposition factor based on velocity
@@ -80,8 +79,12 @@ function calculatePhosphorExcitation(speed, velocityDimming, basePower, deltaTim
         // This models the physical reality: faster beam = less time on each phosphor grain
         energyFactor = (REFERENCE_VELOCITY / velocity);
 
-        // Clamp to reasonable range (don't go below 2% even at extreme speeds)
-        energyFactor = Math.max(0.02, Math.min(1.0, energyFactor));
+        // Apply power curve for more aggressive dimming at high speeds
+        // Square the factor to make fast movements much dimmer
+        energyFactor = energyFactor * energyFactor;
+
+        // Clamp to very low minimum (fast movements almost invisible, like real scopes)
+        energyFactor = Math.max(0.001, Math.min(1.0, energyFactor));
     }
 
     // Apply velocity dimming control (allows artistic adjustment)
@@ -514,7 +517,7 @@ function renderTraceAlternative(ctx, points, speeds, velocityDimming, basePower,
     if (points.length < 2) return;
 
     // Fixed time interval for each segment (in seconds)
-    const TIME_SEGMENT = 0.00025; // 0.25ms per segment (2x more segments than before)
+    const TIME_SEGMENT = 0.0001; // 0.1ms per segment (increased temporal resolution)
 
     // Time per point (assuming points correspond to audio samples)
     // Each point represents one sample from the physics simulation
@@ -525,6 +528,22 @@ function renderTraceAlternative(ctx, points, speeds, velocityDimming, basePower,
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
 
+    // First pass: detect direction changes for highlighting
+    // Direction changes occur at local velocity minima (beam reversal points)
+    const directionChanges = new Set();
+    for (let i = 1; i < points.length - 1; i++) {
+        const prevSpeed = speeds[i - 1] || 0;
+        const currSpeed = speeds[i] || 0;
+        const nextSpeed = speeds[i + 1] || 0;
+
+        // Detect local minimum in speed (direction change/reversal point)
+        // Also detect when speed drops significantly (approaching zero)
+        if (currSpeed < prevSpeed && currSpeed < nextSpeed && currSpeed < 5) {
+            directionChanges.add(i);
+        }
+    }
+
+    // Second pass: render segments
     let segmentStartIdx = 0;
     let accumulatedTime = 0;
 
@@ -559,6 +578,16 @@ function renderTraceAlternative(ctx, points, speeds, velocityDimming, basePower,
             segmentStartIdx = i;
             accumulatedTime = 0;
         }
+    }
+
+    // Third pass: highlight direction changes with bright dots
+    // These represent points where the beam dwells due to direction reversal
+    ctx.fillStyle = `rgba(76, 175, 80, ${basePower})`;
+    for (const idx of directionChanges) {
+        const point = points[idx];
+        ctx.beginPath();
+        ctx.arc(point.x, point.y, 1.5, 0, Math.PI * 2);
+        ctx.fill();
     }
 }
 

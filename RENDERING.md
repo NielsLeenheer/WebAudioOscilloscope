@@ -83,11 +83,13 @@ The function implements a physics-based model of phosphor excitation:
 Energy Deposition = Beam Current × Dwell Time
 ```
 
-**Dwell Time Model:**
-- Reference velocity: 500 pixels/second (where dimming becomes noticeable)
+**Dwell Time Model (Recalibrated):**
+- Reference velocity: **200 pixels/second** (lowered from 500 for earlier dimming)
 - Below reference: Full phosphor excitation
 - Above reference: Reduced excitation (inversely proportional to velocity)
-- Minimum threshold: 2% even at extreme speeds
+- **Squared dimming curve**: `energyFactor = (200/velocity)²` for aggressive dimming
+- Minimum threshold: **0.1%** (down from 2%) - fast movements almost invisible
+- Matches real oscilloscope behavior where fast beam movements are barely visible
 
 **Velocity Dimming Control:**
 
@@ -220,10 +222,10 @@ This models the beam as having a constant "temporal quantum" - each drawn segmen
 
 **Fixed Time Quantum:**
 ```javascript
-const TIME_SEGMENT = 0.00025; // 0.25ms per segment
+const TIME_SEGMENT = 0.0001; // 0.1ms per segment
 ```
 
-Each rendered segment represents 0.25 milliseconds of beam movement.
+Each rendered segment represents 0.1 milliseconds of beam movement (2.5x higher temporal resolution than previous version).
 
 **Time Calculation:**
 ```javascript
@@ -234,13 +236,24 @@ Since each point corresponds to one audio sample from the physics simulation, th
 
 **Segmentation Algorithm:**
 
+**First Pass - Direction Change Detection:**
+1. Scan through all points to detect local velocity minima
+2. Mark points where speed < previous AND speed < next AND speed < 5 px/frame
+3. These are beam reversal points where the beam changes direction
+
+**Second Pass - Segment Rendering:**
 1. Start at first point, initialize time accumulator to 0
 2. Iterate through points, accumulating time (`timePerPoint` per point)
-3. When accumulated time reaches `TIME_SEGMENT` (0.25ms), finalize the segment:
+3. When accumulated time reaches `TIME_SEGMENT` (0.1ms), finalize the segment:
    - Calculate average speed for the segment (total distance / number of points)
    - Calculate opacity using phosphor excitation model (faster = dimmer)
    - Draw straight lines connecting all points in the segment
 4. Reset accumulator and continue from current point
+
+**Third Pass - Direction Change Highlighting:**
+1. Draw bright dots (radius 1.5px) at all detected direction change points
+2. Opacity = `basePower` (full brightness, no dimming)
+3. Simulates beam dwell time at reversal points observed on real scopes
 
 **Opacity Calculation:**
 
@@ -264,9 +277,10 @@ This creates distinct visual "quanta" where each time segment has uniform bright
 The time-based approach produces different visual effects compared to phosphor rendering:
 
 1. **Spatial Variation**
-   - Fast movements create longer segments (more pixels per 0.25ms)
-   - Slow movements create shorter segments (fewer pixels per 0.25ms)
+   - Fast movements create longer segments (more pixels per 0.1ms)
+   - Slow movements create shorter segments (fewer pixels per 0.1ms)
    - Segment length varies with beam velocity
+   - High temporal resolution (0.1ms quanta) captures fine detail
 
 2. **Physics-Based Opacity**
    - Fast segments are **dimmer** (same as phosphor physics)
@@ -280,16 +294,23 @@ The time-based approach produces different visual effects compared to phosphor r
    - `lineCap: 'round'` softens segment endpoints
    - Simpler rendering path, potentially faster
 
+4. **Direction Change Highlighting**
+   - Bright dots appear at beam reversal points
+   - Simulates dwell time when beam changes direction
+   - Matches behavior observed on real oscilloscopes
+   - Detection: local velocity minima (speed < 5 px/frame)
+
 ### Comparison: Phosphor vs Alternative
 
 | Aspect | Phosphor Model | Alternative Model |
 |--------|----------------|-------------------|
-| Segmentation basis | Spatial (curve length) | Temporal (0.25ms quanta) |
+| Segmentation basis | Spatial (curve length) | Temporal (0.1ms quanta) |
 | Segment length | Variable by curve estimation | Variable by beam velocity |
 | Opacity variation | Smooth gradients (ease-in) | Uniform per segment |
 | Opacity/speed curve | Faster = dimmer (physics) | Faster = dimmer (same physics) |
 | Drawing primitive | Quadratic Bézier curves | Straight lines |
 | Sub-segmentation | Adaptive (1-8 sub-segments) | None (one segment = one draw call) |
+| Direction highlights | None | Bright dots at reversals |
 | Visual style | Smooth, organic | Quantized, temporal |
 
 ### Use Cases
