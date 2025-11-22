@@ -517,7 +517,7 @@ function renderTraceAlternative(ctx, points, speeds, velocityDimming, basePower,
     if (points.length < 2) return;
 
     // Fixed time interval for each segment (in seconds)
-    const TIME_SEGMENT = 0.0001; // 0.1ms per segment (increased temporal resolution)
+    const TIME_SEGMENT = 0.00005; // 0.05ms per segment (2x increase in temporal resolution)
 
     // Time per point (assuming points correspond to audio samples)
     // Each point represents one sample from the physics simulation
@@ -639,10 +639,28 @@ function renderTraceAlternative(ctx, points, speeds, velocityDimming, basePower,
 
     // Debug visualization: show segment endpoints as red dots
     if (debugMode) {
+        // Red dots for segment endpoints
         ctx.fillStyle = 'rgba(255, 0, 0, 0.8)';
         for (const point of segmentEndpoints) {
             ctx.beginPath();
             ctx.arc(point.x, point.y, 2, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        // Purple dot for trace start point
+        if (points.length > 0) {
+            ctx.fillStyle = 'rgba(147, 51, 234, 1.0)'; // Purple
+            ctx.beginPath();
+            ctx.arc(points[0].x, points[0].y, 4, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        // Blue dot for trace end point
+        if (points.length > 0) {
+            const endPoint = points[points.length - 1];
+            ctx.fillStyle = 'rgba(59, 130, 246, 1.0)'; // Blue
+            ctx.beginPath();
+            ctx.arc(endPoint.x, endPoint.y, 4, 0, Math.PI * 2);
             ctx.fill();
         }
     }
