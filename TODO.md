@@ -58,3 +58,32 @@ Currently, the SVG generator distributes sample points equally across all path s
 **Implementation:**
 - `src/workers/physics-worker.js` - Added `catmullRomInterpolate()` and `interpolatePoints()` functions
 - Modified `renderTraceAlternative()` to apply interpolation when needed
+
+### Canvas-size and resolution independence
+
+Currently, physics and rendering are dependent on canvas pixel dimensions, causing inconsistent behavior across different display sizes.
+
+**See:** INDEPENDENT-RENDERING.md for complete analysis
+
+**Current problems:**
+- Physics simulation operates in pixel space (canvas-dependent)
+- Reference velocity = 300 px/s (only valid for specific canvas size)
+- Rendering primitives use fixed pixel sizes (1.5px, 2px dots)
+- Same signal produces different physics behavior on different canvas sizes
+
+**Proposed solution:**
+- Virtual coordinate system with normalized [-1, 1] units
+- Two-stage transformation: Signal → Virtual Space → Pixel Space
+- Resolution-independent physics parameters
+- Scalable rendering primitives (percentages of canvas size)
+
+**Implementation:**
+- 5-phase progressive implementation strategy documented in INDEPENDENT-RENDERING.md
+- Phase 1: Add conversion layer (backward compatible)
+- Phases 2-5: Migrate to virtual units with testing and validation
+
+**Benefits:**
+- Portable configuration across display sizes
+- Predictable physics behavior
+- Responsive design support
+- Future-proof for high-DPI displays
