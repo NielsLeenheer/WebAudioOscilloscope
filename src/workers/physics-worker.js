@@ -647,9 +647,9 @@ function renderTraceAlternative(ctx, points, speeds, velocityDimming, basePower,
             // Find the corresponding point index in the points array
             const pointIdx = points.indexOf(point);
 
-            // Check for direction changes in a range around this segment endpoint
+            // Check for direction changes in a small range around this segment endpoint
             // This handles cases where reversals don't align exactly with time segments
-            const searchRadius = Math.ceil(points.length * 0.05); // Search ±5% of points
+            const searchRadius = 3; // Search ±3 points
             let maxBrightness = 0;
 
             for (let offset = -searchRadius; offset <= searchRadius; offset++) {
