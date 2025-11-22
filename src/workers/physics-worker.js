@@ -506,6 +506,77 @@ function renderTracePhosphor(ctx, points, speeds, velocityDimming, basePower, de
 }
 
 // ============================================================================
+// INTERPOLATION - Catmull-Rom Spline
+// Creates smooth curves through points for sub-sample temporal resolution
+// ============================================================================
+function catmullRomInterpolate(p0, p1, p2, p3, t) {
+    // Catmull-Rom spline interpolation between p1 and p2
+    // p0 and p3 are control points for curve shape
+    // t is interpolation parameter (0 to 1)
+    const t2 = t * t;
+    const t3 = t2 * t;
+
+    return {
+        x: 0.5 * (
+            (2 * p1.x) +
+            (-p0.x + p2.x) * t +
+            (2 * p0.x - 5 * p1.x + 4 * p2.x - p3.x) * t2 +
+            (-p0.x + 3 * p1.x - 3 * p2.x + p3.x) * t3
+        ),
+        y: 0.5 * (
+            (2 * p1.y) +
+            (-p0.y + p2.y) * t +
+            (2 * p0.y - 5 * p1.y + 4 * p2.y - p3.y) * t2 +
+            (-p0.y + 3 * p1.y - 3 * p2.y + p3.y) * t3
+        )
+    };
+}
+
+function interpolatePoints(points, speeds, targetTimePerPoint, actualTimePerPoint) {
+    // If target resolution is coarser than actual, no interpolation needed
+    if (targetTimePerPoint >= actualTimePerPoint) {
+        return { points, speeds };
+    }
+
+    // Calculate how many interpolated points we need between each pair
+    const pointsPerSegment = Math.ceil(actualTimePerPoint / targetTimePerPoint);
+
+    const interpolatedPoints = [];
+    const interpolatedSpeeds = [];
+
+    for (let i = 0; i < points.length; i++) {
+        // Get surrounding points for Catmull-Rom spline
+        const p0 = points[Math.max(0, i - 1)];
+        const p1 = points[i];
+        const p2 = points[Math.min(points.length - 1, i + 1)];
+        const p3 = points[Math.min(points.length - 1, i + 2)];
+
+        // Add the actual sample point
+        interpolatedPoints.push(p1);
+        interpolatedSpeeds.push(speeds[i] || 0);
+
+        // Add interpolated points between p1 and p2 (except for last point)
+        if (i < points.length - 1) {
+            for (let j = 1; j < pointsPerSegment; j++) {
+                const t = j / pointsPerSegment;
+                const interpolated = catmullRomInterpolate(p0, p1, p2, p3, t);
+                interpolatedPoints.push(interpolated);
+
+                // Interpolate speed linearly
+                const speed1 = speeds[i] || 0;
+                const speed2 = speeds[i + 1] || 0;
+                interpolatedSpeeds.push(speed1 + (speed2 - speed1) * t);
+            }
+        }
+    }
+
+    return {
+        points: interpolatedPoints,
+        speeds: interpolatedSpeeds
+    };
+}
+
+// ============================================================================
 // RENDERING - Alternative Model (Time-based segmentation)
 // ============================================================================
 function renderTraceAlternative(ctx, points, speeds, velocityDimming, basePower, deltaTime, sampleRate, debugMode, timeSegment, dotOpacity, dotSizeVariation, sampleDotOpacity) {
@@ -522,6 +593,18 @@ function renderTraceAlternative(ctx, points, speeds, velocityDimming, basePower,
     // Time per point (assuming points correspond to audio samples)
     // Each point represents one sample from the physics simulation
     const timePerPoint = 1 / sampleRate;
+
+    // Store original points for blue dot visualization
+    const originalPoints = points;
+
+    // Apply Catmull-Rom interpolation if TIME_SEGMENT is smaller than timePerPoint
+    // This creates smooth curves and allows finer temporal resolution
+    const interpolated = interpolatePoints(points, speeds, TIME_SEGMENT, timePerPoint);
+    points = interpolated.points;
+    speeds = interpolated.speeds;
+
+    // Recalculate timePerPoint for interpolated points
+    const interpolatedTimePerPoint = TIME_SEGMENT;
 
     // Configure canvas for drawing
     ctx.lineWidth = 1.5;
@@ -588,7 +671,7 @@ function renderTraceAlternative(ctx, points, speeds, velocityDimming, basePower,
     const segmentEndpoints = []; // Track segment endpoints for debug visualization
 
     for (let i = 1; i < points.length; i++) {
-        accumulatedTime += timePerPoint;
+        accumulatedTime += interpolatedTimePerPoint;
 
         // When we've accumulated enough time, draw the segment
         if (accumulatedTime >= TIME_SEGMENT || i === points.length - 1) {
@@ -674,11 +757,12 @@ function renderTraceAlternative(ctx, points, speeds, velocityDimming, basePower,
         }
     }
 
-    // Fourth pass: show blue dots at every sample point to visualize temporal resolution
+    // Fourth pass: show blue dots at every ORIGINAL sample point to visualize temporal resolution
+    // Use originalPoints to show actual sample rate, not interpolated points
     if (debugMode && sampleDotOpacity > 0) {
         ctx.fillStyle = `rgba(59, 130, 246, ${sampleDotOpacity})`; // Blue color
-        for (let i = 0; i < points.length; i++) {
-            const point = points[i];
+        for (let i = 0; i < originalPoints.length; i++) {
+            const point = originalPoints[i];
             ctx.beginPath();
             ctx.arc(point.x, point.y, 1, 0, Math.PI * 2);
             ctx.fill();

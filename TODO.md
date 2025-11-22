@@ -38,3 +38,21 @@ Currently, the SVG generator distributes sample points equally across all path s
 **References:**
 - Current code: `Math.floor(numSamples / pathSegments.length)` (line 221)
 - Need to implement: `Math.floor(numSamples * (segmentLength / totalPathLength))`
+
+## Rendering Improvements
+
+### Interpolation between sample points (IN PROGRESS)
+
+Currently limited by sample rate (48kHz = ~0.021ms per point). Temporal resolution cannot go below this.
+
+**Proposed solution:**
+- Implement Catmull-Rom spline interpolation between sample points
+- Generate virtual points for smoother curves
+- Allow TIME_SEGMENT values smaller than sample rate
+- Benefits:
+  - Smoother rendering
+  - Finer temporal resolution for segmentation
+  - More accurate curve representation
+
+**Implementation location:**
+- `src/workers/physics-worker.js` - `renderTraceAlternative()` function
