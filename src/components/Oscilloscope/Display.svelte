@@ -10,7 +10,7 @@
 
     // Physics parameters (adjustable)
     let simulationMode = $state('electromagnetic'); // 'spring' or 'electromagnetic'
-    let renderingMode = $state('phosphor'); // 'phosphor' or 'alternative'
+    let renderingMode = $state('alternative'); // 'phosphor' or 'alternative'
     let debugMode = $state(false); // Debug visualization toggle
     let timeSegment = $state(0.010); // Temporal resolution in milliseconds (debug parameter)
     let dotOpacity = $state(0.5); // Debug dot opacity for segment endpoints (0.0 to 1.0)
@@ -29,7 +29,7 @@
 
     // Common parameters (shared by both modes)
     let persistence = $state(0.100); // Afterglow/fade effect (0=instant fade, 1=long trail)
-    let signalNoise = $state(0.005); // Random noise added to audio signal (0-1)
+    let signalNoise = $state(0.003); // Random noise added to audio signal (0-1)
     let beamPower = $state(0.75); // Beam power (affects opacity: high power = bright, low power = dim)
     let velocityDimming = $state(1.0); // How much fast movements dim (0=no dimming, 1=maximum dimming)
     let focus = $state(0.2); // Focus control (-1.0 to 1.0, 0.0 = perfect focus, abs value = blur amount)
