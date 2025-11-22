@@ -600,55 +600,46 @@ function renderTraceAlternative(ctx, points, speeds, velocityDimming, basePower,
 
     // First pass: detect direction changes on ORIGINAL points (before interpolation)
     // This ensures blue dots are not affected by TIME_SEGMENT setting
-    // Direction changes occur at local velocity minima (beam reversal points)
     // Calculate angle of direction change to determine brightness
     const directionChanges = new Map(); // Map of index -> brightness
     for (let i = 1; i < originalPoints.length - 1; i++) {
-        const prevSpeed = originalSpeeds[i - 1] || 0;
-        const currSpeed = originalSpeeds[i] || 0;
-        const nextSpeed = originalSpeeds[i + 1] || 0;
+        // Calculate angle of direction change between velocity vectors
+        // Incoming velocity vector: from point[i-1] to point[i]
+        const inX = originalPoints[i].x - originalPoints[i - 1].x;
+        const inY = originalPoints[i].y - originalPoints[i - 1].y;
 
-        // Detect local minimum in speed (direction change/reversal point)
-        // Also detect when speed drops significantly (approaching zero)
-        if (currSpeed < prevSpeed && currSpeed < nextSpeed && currSpeed < 5) {
-            // Calculate angle of direction change
-            // Incoming velocity vector: from point[i-1] to point[i]
-            const inX = originalPoints[i].x - originalPoints[i - 1].x;
-            const inY = originalPoints[i].y - originalPoints[i - 1].y;
+        // Outgoing velocity vector: from point[i] to point[i+1]
+        const outX = originalPoints[i + 1].x - originalPoints[i].x;
+        const outY = originalPoints[i + 1].y - originalPoints[i].y;
 
-            // Outgoing velocity vector: from point[i] to point[i+1]
-            const outX = originalPoints[i + 1].x - originalPoints[i].x;
-            const outY = originalPoints[i + 1].y - originalPoints[i].y;
+        // Calculate magnitudes
+        const inMag = Math.sqrt(inX * inX + inY * inY);
+        const outMag = Math.sqrt(outX * outX + outY * outY);
 
-            // Calculate magnitudes
-            const inMag = Math.sqrt(inX * inX + inY * inY);
-            const outMag = Math.sqrt(outX * outX + outY * outY);
+        if (inMag > 0 && outMag > 0) {
+            // Calculate dot product
+            const dotProduct = inX * outX + inY * outY;
 
-            if (inMag > 0 && outMag > 0) {
-                // Calculate dot product
-                const dotProduct = inX * outX + inY * outY;
+            // Calculate cosine of angle
+            const cosAngle = dotProduct / (inMag * outMag);
 
-                // Calculate cosine of angle
-                const cosAngle = dotProduct / (inMag * outMag);
+            // Clamp to valid range for acos
+            const clampedCos = Math.max(-1, Math.min(1, cosAngle));
 
-                // Clamp to valid range for acos
-                const clampedCos = Math.max(-1, Math.min(1, cosAngle));
+            // Calculate angle in radians, then convert to degrees
+            const angleRad = Math.acos(clampedCos);
+            const angleDeg = angleRad * (180 / Math.PI);
 
-                // Calculate angle in radians, then convert to degrees
-                const angleRad = Math.acos(clampedCos);
-                const angleDeg = angleRad * (180 / Math.PI);
+            // Map angle to brightness
+            // 0° = no change, no dot (brightness = 0)
+            // 180° = complete reversal, brightest (brightness = 1)
+            // Use a power curve for more natural falloff
+            const normalizedAngle = angleDeg / 180; // 0 to 1
+            const brightness = Math.pow(normalizedAngle, 1.5); // Power curve emphasizes larger angles
 
-                // Map angle to brightness
-                // 0° = no change, no dot (brightness = 0)
-                // 180° = complete reversal, brightest (brightness = 1)
-                // Use a power curve for more natural falloff
-                const normalizedAngle = angleDeg / 180; // 0 to 1
-                const brightness = Math.pow(normalizedAngle, 1.5); // Power curve emphasizes larger angles
-
-                // Only add if brightness is significant (angle > ~30°)
-                if (brightness > 0.05) {
-                    directionChanges.set(i, brightness);
-                }
+            // Only add if brightness is significant (angle > ~30°)
+            if (brightness > 0.05) {
+                directionChanges.set(i, brightness);
             }
         }
     }
