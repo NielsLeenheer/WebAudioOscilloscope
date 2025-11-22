@@ -701,13 +701,14 @@ function renderTraceAlternative(ctx, points, speeds, velocityDimming, basePower,
         }
     }
 
-    // Third pass: highlight direction changes with bright dots
+    // Third pass: highlight direction changes with green dots (beam dwell time)
     // Brightness is proportional to angle of direction change (180° = brightest)
+    // Use originalPoints since directionChanges is indexed by original points
     for (const [idx, brightness] of directionChanges) {
-        const point = points[idx];
+        const point = originalPoints[idx];
         const opacity = basePower * brightness;
 
-        ctx.fillStyle = `rgba(76, 175, 80, ${opacity})`;
+        ctx.fillStyle = `rgba(76, 175, 80, ${opacity})`; // Green color
         ctx.beginPath();
         ctx.arc(point.x, point.y, 1.5, 0, Math.PI * 2);
         ctx.fill();
