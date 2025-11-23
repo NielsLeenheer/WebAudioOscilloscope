@@ -930,7 +930,16 @@ self.onmessage = function(e) {
 
         // Clear canvas with adjustable fade effect for persistence
         // Background: dark gray with greenish tint (#1a1f1a = rgb(26, 31, 26))
-        ctx.fillStyle = `rgba(26, 31, 26, ${1 - persistence})`;
+        //
+        // Physically realistic persistence model:
+        // Higher beam intensity excites phosphor more, resulting in longer visible trails
+        // Even with the same phosphor decay time constant, a brighter initial glow
+        // takes longer to fade below the visible threshold
+        // basePower range: 0.2 (min) to 3.0 (max) → intensity boost: 0 to 0.3
+        const intensityBoost = ((basePower - 0.2) / 2.8) * 0.3;
+        const effectivePersistence = Math.min(0.99, persistence + intensityBoost);
+
+        ctx.fillStyle = `rgba(26, 31, 26, ${1 - effectivePersistence})`;
         ctx.fillRect(0, 0, canvasWidth, canvasHeight);
 
         // ========================================================================
