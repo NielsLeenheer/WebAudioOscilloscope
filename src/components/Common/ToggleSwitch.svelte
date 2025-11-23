@@ -15,20 +15,39 @@
     }
 </script>
 
-<button
-    class="toggle-switch"
-    class:on={checked}
-    onclick={handleClick}
-    {disabled}
-    type="button"
-    role="switch"
-    aria-checked={checked}
-    aria-label={label}
->
-    <span class="toggle-slider"></span>
-</button>
+<div class="toggle-container">
+    {#if label}
+        <label class="toggle-label">{label}</label>
+    {/if}
+    <button
+        class="toggle-switch"
+        class:on={checked}
+        onclick={handleClick}
+        {disabled}
+        type="button"
+        role="switch"
+        aria-checked={checked}
+        aria-label={label}
+    >
+        <span class="toggle-slider"></span>
+    </button>
+</div>
 
 <style>
+    .toggle-container {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .toggle-label {
+        color: #4CAF50;
+        font-family: system-ui;
+        font-size: 12px;
+        font-weight: 600;
+        user-select: none;
+    }
+
     .toggle-switch {
         position: relative;
         width: 44px;

@@ -168,19 +168,12 @@
             <span class="value">{decay}</span>
         </div>
         <div class="mode-separator"></div>
-        <div class="control-group toggle-group">
-            <label for="debugMode">Debug Mode</label>
-            <ToggleSwitch bind:checked={debugMode} label="Debug Mode" />
-            <div class="value-display">Show segment endpoints (red dots)</div>
-        </div>
+        <ToggleSwitch bind:checked={debugMode} label="Debug?" />
         {#if debugMode}
             <div class="slider-control">
                 <label>Time Segment</label>
                 <input type="range" min="0.001" max="0.050" step="0.001" bind:value={timeSegment} />
                 <span class="value">{timeSegment.toFixed(3)}</span>
-            </div>
-            <div class="value-display" style="grid-column: 1 / 4; margin-top: -8px; margin-bottom: 8px;">
-                Temporal resolution: {timeSegment}ms per segment
             </div>
             <div class="slider-control">
                 <label>Dot Opacity</label>
@@ -192,16 +185,10 @@
                 <input type="range" min="0.0" max="1.0" step="0.01" bind:value={sampleDotOpacity} />
                 <span class="value">{sampleDotOpacity.toFixed(2)}</span>
             </div>
-            <div class="value-display" style="grid-column: 1 / 4; margin-top: -8px; margin-bottom: 8px;">
-                Blue dots at every sample point
-            </div>
             <div class="slider-control">
                 <label>Dot Size Var</label>
                 <input type="range" min="1" max="10" step="0.1" bind:value={dotSizeVariation} />
                 <span class="value">{dotSizeVariation.toFixed(1)}</span>
-            </div>
-            <div class="value-display" style="grid-column: 1 / 4; margin-top: -8px; margin-bottom: 8px;">
-                Blue dot size at 180° angle: {dotSizeVariation.toFixed(1)}x
             </div>
         {/if}
     </div>
@@ -414,27 +401,6 @@
     }
 
     .checkbox-group .value-display {
-        grid-column: 2 / 4;
-        font-size: 11px;
-        color: #999;
-        font-style: italic;
-        margin-top: 0;
-    }
-
-    .toggle-group {
-        grid-template-columns: 104px auto 1fr;
-        margin-top: 8px;
-        align-items: center;
-    }
-
-    .toggle-group label {
-        color: #4CAF50;
-        font-family: system-ui;
-        font-size: 12px;
-        font-weight: 600;
-    }
-
-    .toggle-group .value-display {
         grid-column: 2 / 4;
         font-size: 11px;
         color: #999;
