@@ -5,6 +5,7 @@ let velocityX = 0;
 let velocityY = 0;
 let smoothedBeamX = 0;
 let smoothedBeamY = 0;
+let smoothedBasePower = 0; // Smoothed beam intensity for stable persistence calculation
 let offscreenCanvas = null;
 let ctx = null;
 let devicePixelRatio = 1;
@@ -851,6 +852,9 @@ self.onmessage = function(e) {
         logicalWidth = data.logicalWidth || 600;
         logicalHeight = data.logicalHeight || 600;
 
+        // Initialize smoothed basePower to typical middle value to avoid slow ramp-up
+        smoothedBasePower = 1.2; // Corresponds to beamPower ≈ 0.7
+
         ctx = offscreenCanvas.getContext('2d');
 
         // Scale context for high-DPI displays
@@ -928,6 +932,11 @@ self.onmessage = function(e) {
 
         if (!ctx) return;
 
+        // Smooth the basePower value to prevent flickering during slider adjustments
+        // Use exponential smoothing: slow response prevents unstable persistence during rapid changes
+        const PERSISTENCE_SMOOTHING = 0.95; // Higher = slower response, more stable
+        smoothedBasePower = PERSISTENCE_SMOOTHING * smoothedBasePower + (1 - PERSISTENCE_SMOOTHING) * basePower;
+
         // Clear canvas with adjustable fade effect for persistence
         // Background: dark gray with greenish tint (#1a1f1a = rgb(26, 31, 26))
         //
@@ -936,7 +945,7 @@ self.onmessage = function(e) {
         // Even with the same phosphor decay time constant, a brighter initial glow
         // takes longer to fade below the visible threshold
         // basePower range: 0.2 (min) to 3.0 (max) → intensity boost: 0 to 0.3
-        const intensityBoost = ((basePower - 0.2) / 2.8) * 0.3;
+        const intensityBoost = ((smoothedBasePower - 0.2) / 2.8) * 0.3;
         const effectivePersistence = Math.min(0.99, persistence + intensityBoost);
 
         ctx.fillStyle = `rgba(26, 31, 26, ${1 - effectivePersistence})`;
