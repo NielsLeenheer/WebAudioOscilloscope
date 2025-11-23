@@ -176,7 +176,7 @@
                 <span class="value">{timeSegment.toFixed(3)}</span>
             </div>
             <div class="slider-control">
-                <label class="clickable" onclick={() => dotOpacity = 0.5}>Dot Opacity</label>
+                <label class="clickable" onclick={() => dotOpacity = 0.5}>Interpolation</label>
                 <input type="range" min="0.0" max="1.0" step="0.01" bind:value={dotOpacity} />
                 <span class="value">{dotOpacity.toFixed(2)}</span>
             </div>
@@ -186,7 +186,7 @@
                 <span class="value">{sampleDotOpacity.toFixed(2)}</span>
             </div>
             <div class="slider-control">
-                <label class="clickable" onclick={() => dotSizeVariation = 1.0}>Dot Size Var</label>
+                <label class="clickable" onclick={() => dotSizeVariation = 1.0}>Angle</label>
                 <input type="range" min="1" max="10" step="0.1" bind:value={dotSizeVariation} />
                 <span class="value">{dotSizeVariation.toFixed(1)}</span>
             </div>

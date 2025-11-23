@@ -602,7 +602,7 @@ function catmullRomInterpolate(p0, p1, p2, p3, t) {
 function interpolatePoints(points, speeds, targetTimePerPoint, actualTimePerPoint) {
     // If target resolution is coarser than actual, no interpolation needed
     if (targetTimePerPoint >= actualTimePerPoint) {
-        return { points, speeds };
+        return { points, speeds, isInterpolated: new Array(points.length).fill(false) };
     }
 
     // Calculate how many interpolated points we need between each pair
@@ -610,6 +610,7 @@ function interpolatePoints(points, speeds, targetTimePerPoint, actualTimePerPoin
 
     const interpolatedPoints = [];
     const interpolatedSpeeds = [];
+    const isInterpolated = []; // Track which points are interpolated vs original
 
     for (let i = 0; i < points.length; i++) {
         // Get surrounding points for Catmull-Rom spline
@@ -621,6 +622,7 @@ function interpolatePoints(points, speeds, targetTimePerPoint, actualTimePerPoin
         // Add the actual sample point
         interpolatedPoints.push(p1);
         interpolatedSpeeds.push(speeds[i] || 0);
+        isInterpolated.push(false); // This is an original sample point
 
         // Add interpolated points between p1 and p2 (except for last point)
         if (i < points.length - 1) {
@@ -633,13 +635,15 @@ function interpolatePoints(points, speeds, targetTimePerPoint, actualTimePerPoin
                 const speed1 = speeds[i] || 0;
                 const speed2 = speeds[i + 1] || 0;
                 interpolatedSpeeds.push(speed1 + (speed2 - speed1) * t);
+                isInterpolated.push(true); // This is an interpolated point
             }
         }
     }
 
     return {
         points: interpolatedPoints,
-        speeds: interpolatedSpeeds
+        speeds: interpolatedSpeeds,
+        isInterpolated: isInterpolated
     };
 }
 
@@ -724,6 +728,7 @@ function renderTraceAlternative(ctx, points, speeds, velocityDimming, basePower,
     const interpolated = interpolatePoints(points, speeds, TIME_SEGMENT, timePerPoint);
     points = interpolated.points;
     speeds = interpolated.speeds;
+    const isInterpolated = interpolated.isInterpolated;
 
     // Recalculate timePerPoint for interpolated points
     const interpolatedTimePerPoint = TIME_SEGMENT;
@@ -790,16 +795,19 @@ function renderTraceAlternative(ctx, points, speeds, velocityDimming, basePower,
         ctx.fill();
     }
 
-    // Debug visualization: show segment endpoints as red dots
-    // Red dots show time-based segmentation (constant size)
+    // Debug visualization: show interpolated points as red dots
+    // Red dots only appear on interpolated points, not original sample points
     if (debugMode && dotOpacity > 0) {
         const redDotSize = RED_DOT_RATIO * canvasScale;
         ctx.fillStyle = `rgba(255, 0, 0, ${dotOpacity})`;
-        for (let i = 0; i < segmentEndpoints.length; i++) {
-            const point = segmentEndpoints[i];
-            ctx.beginPath();
-            ctx.arc(point.x, point.y, redDotSize, 0, Math.PI * 2);
-            ctx.fill();
+        for (let i = 0; i < points.length; i++) {
+            // Only show red dots for interpolated points (not original sample points)
+            if (isInterpolated[i]) {
+                const point = points[i];
+                ctx.beginPath();
+                ctx.arc(point.x, point.y, redDotSize, 0, Math.PI * 2);
+                ctx.fill();
+            }
         }
     }
 
