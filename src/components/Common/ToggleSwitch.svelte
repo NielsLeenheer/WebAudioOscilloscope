@@ -16,9 +16,6 @@
 </script>
 
 <div class="toggle-container">
-    {#if label}
-        <label class="toggle-label">{label}</label>
-    {/if}
     <button
         class="toggle-switch"
         class:on={checked}
@@ -31,6 +28,9 @@
     >
         <span class="toggle-slider"></span>
     </button>
+    {#if label}
+        <label class="toggle-label">{label}</label>
+    {/if}
 </div>
 
 <style>
@@ -76,6 +76,11 @@
     .toggle-switch:disabled {
         opacity: 0.5;
         cursor: not-allowed;
+        background: #3a3a3a;
+    }
+
+    .toggle-switch:disabled .toggle-slider {
+        background: #666;
     }
 
     .toggle-slider {
@@ -86,7 +91,7 @@
         height: 20px;
         background: white;
         border-radius: 50%;
-        transition: transform 0.3s;
+        transition: transform 0.3s, background 0.3s;
         box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
         display: block;
     }
