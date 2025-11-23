@@ -1,4 +1,6 @@
 <script>
+    import ToggleSwitch from '../Common/ToggleSwitch.svelte';
+
     let {
         simulationMode = $bindable(),
         renderingMode = $bindable(),
@@ -150,23 +152,6 @@
             </div>
         {/if}
         <div class="mode-separator"></div>
-        <div class="mode-toggle-inline">
-            <label>Rendering</label>
-            <div class="toggle-buttons">
-                <button
-                    class:active={renderingMode === 'phosphor'}
-                    onclick={() => renderingMode = 'phosphor'}
-                >
-                    Phosphor
-                </button>
-                <button
-                    class:active={renderingMode === 'alternative'}
-                    onclick={() => renderingMode = 'alternative'}
-                >
-                    Alternative
-                </button>
-            </div>
-        </div>
         <div class="slider-control">
             <label>Persistence</label>
             <input type="range" min="0.0" max="0.95" step="0.005" bind:value={persistence} />
@@ -183,14 +168,9 @@
             <span class="value">{decay}</span>
         </div>
         <div class="mode-separator"></div>
-        <div class="control-group checkbox-group">
+        <div class="control-group toggle-group">
             <label for="debugMode">Debug Mode</label>
-            <input
-                type="checkbox"
-                id="debugMode"
-                bind:checked={debugMode}
-            >
-            <span></span>
+            <ToggleSwitch bind:checked={debugMode} label="Debug Mode" />
             <div class="value-display">Show segment endpoints (red dots)</div>
         </div>
         {#if debugMode}
@@ -245,7 +225,7 @@
         backdrop-filter: blur(10px);
         transform: none;
         box-shadow: 0px 0px 4px #1c5e20;
-        z-index: 20;
+        z-index: 1100; /* Above ViewSelector (z-index: 1000) */
     }
 
     .physics-dialog::backdrop {
@@ -434,6 +414,27 @@
     }
 
     .checkbox-group .value-display {
+        grid-column: 2 / 4;
+        font-size: 11px;
+        color: #999;
+        font-style: italic;
+        margin-top: 0;
+    }
+
+    .toggle-group {
+        grid-template-columns: 104px auto 1fr;
+        margin-top: 8px;
+        align-items: center;
+    }
+
+    .toggle-group label {
+        color: #4CAF50;
+        font-family: system-ui;
+        font-size: 12px;
+        font-weight: 600;
+    }
+
+    .toggle-group .value-display {
         grid-column: 2 / 4;
         font-size: 11px;
         color: #999;
