@@ -52,7 +52,7 @@
         position: relative;
         width: 44px;
         height: 24px;
-        background: #ccc;
+        background: #3a3a3a;
         border: none;
         border-radius: 12px;
         cursor: pointer;
@@ -62,7 +62,7 @@
     }
 
     .toggle-switch:hover:not(:disabled) {
-        background: #b3b3b3;
+        background: #4a4a4a;
     }
 
     .toggle-switch.on {
