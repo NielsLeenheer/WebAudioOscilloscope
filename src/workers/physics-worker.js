@@ -657,7 +657,7 @@ function renderTraceAlternative(ctx, points, speeds, velocityDimming, basePower,
     // Calculate scale factor for resolution-independent rendering
     const canvasScale = Math.min(canvasWidth, canvasHeight);
     const LINE_WIDTH_RATIO = 0.00375;      // 0.375% of canvas (1.5px on 400px)
-    const GREEN_DOT_RATIO = 0.00375;       // 0.375% of canvas (1.5px on 400px)
+    const GREEN_DOT_RATIO = 0.001875;      // 0.1875% of canvas (0.75px radius = 1.5px diameter on 400px, matches line width)
     const RED_DOT_RATIO = 0.005;           // 0.5% of canvas (2px on 400px)
     const BLUE_DOT_BASE_RATIO = 0.0025;    // 0.25% of canvas (1px on 400px)
 
