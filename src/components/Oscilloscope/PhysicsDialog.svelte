@@ -1,4 +1,6 @@
 <script>
+    import ToggleSwitch from '../Common/ToggleSwitch.svelte';
+
     let {
         simulationMode = $bindable(),
         renderingMode = $bindable(),
@@ -112,116 +114,81 @@
     -->
     <div class="sliders">
         <div class="slider-control">
-            <label>Noise</label>
+            <label class="clickable" onclick={() => signalNoise = 0.003}>Noise</label>
             <input type="range" min="0" max="0.2" step="0.001" bind:value={signalNoise} />
             <span class="value">{signalNoise.toFixed(3)}</span>
         </div>
         {#if simulationMode === 'spring'}
             <div class="slider-control">
-                <label>Force</label>
+                <label class="clickable" onclick={() => springForce = 0.3}>Force</label>
                 <input type="range" min="0.01" max="5.0" step="0.01" bind:value={springForce} />
                 <span class="value">{springForce.toFixed(2)}</span>
             </div>
             <div class="slider-control">
-                <label>Damping</label>
+                <label class="clickable" onclick={() => springDamping = 0.60}>Damping</label>
                 <input type="range" min="0.1" max="0.99" step="0.01" bind:value={springDamping} />
                 <span class="value">{springDamping.toFixed(2)}</span>
             </div>
             <div class="slider-control">
-                <label>Mass</label>
+                <label class="clickable" onclick={() => springMass = 0.11}>Mass</label>
                 <input type="range" min="0.01" max="5.0" step="0.01" bind:value={springMass} />
                 <span class="value">{springMass.toFixed(2)}</span>
             </div>
         {:else}
             <div class="slider-control">
-                <label>Coil Strength</label>
+                <label class="clickable" onclick={() => coilStrength = 0.60}>Coil Strength</label>
                 <input type="range" min="0.01" max="5.0" step="0.01" bind:value={coilStrength} />
                 <span class="value">{coilStrength.toFixed(2)}</span>
             </div>
             <div class="slider-control">
-                <label>Beam Inertia</label>
+                <label class="clickable" onclick={() => beamInertia = 0.10}>Beam Inertia</label>
                 <input type="range" min="0.01" max="5.0" step="0.01" bind:value={beamInertia} />
                 <span class="value">{beamInertia.toFixed(2)}</span>
             </div>
             <div class="slider-control">
-                <label>Field Damping</label>
+                <label class="clickable" onclick={() => fieldDamping = 0.30}>Field Damping</label>
                 <input type="range" min="0.1" max="0.99" step="0.01" bind:value={fieldDamping} />
                 <span class="value">{fieldDamping.toFixed(2)}</span>
             </div>
         {/if}
         <div class="mode-separator"></div>
-        <div class="mode-toggle-inline">
-            <label>Rendering</label>
-            <div class="toggle-buttons">
-                <button
-                    class:active={renderingMode === 'phosphor'}
-                    onclick={() => renderingMode = 'phosphor'}
-                >
-                    Phosphor
-                </button>
-                <button
-                    class:active={renderingMode === 'alternative'}
-                    onclick={() => renderingMode = 'alternative'}
-                >
-                    Alternative
-                </button>
-            </div>
-        </div>
         <div class="slider-control">
-            <label>Persistence</label>
+            <label class="clickable" onclick={() => persistence = 0.100}>Persistence</label>
             <input type="range" min="0.0" max="0.95" step="0.005" bind:value={persistence} />
             <span class="value">{persistence.toFixed(3)}</span>
         </div>
         <div class="slider-control">
-            <label>Dimming</label>
+            <label class="clickable" onclick={() => velocityDimming = 1.0}>Dimming</label>
             <input type="range" min="0" max="1" step="0.01" bind:value={velocityDimming} />
             <span class="value">{velocityDimming.toFixed(2)}</span>
         </div>
         <div class="slider-control">
-            <label>Decay</label>
+            <label class="clickable" onclick={() => decay = 512}>Decay</label>
             <input type="range" min="128" max="16384" step="128" bind:value={decay} />
             <span class="value">{decay}</span>
         </div>
         <div class="mode-separator"></div>
-        <div class="control-group checkbox-group">
-            <label for="debugMode">Debug Mode</label>
-            <input
-                type="checkbox"
-                id="debugMode"
-                bind:checked={debugMode}
-            >
-            <span></span>
-            <div class="value-display">Show segment endpoints (red dots)</div>
-        </div>
+        <ToggleSwitch bind:checked={debugMode} label="Debug?" />
         {#if debugMode}
             <div class="slider-control">
-                <label>Time Segment</label>
+                <label class="clickable" onclick={() => timeSegment = 0.010}>Time Segment</label>
                 <input type="range" min="0.001" max="0.050" step="0.001" bind:value={timeSegment} />
                 <span class="value">{timeSegment.toFixed(3)}</span>
             </div>
-            <div class="value-display" style="grid-column: 1 / 4; margin-top: -8px; margin-bottom: 8px;">
-                Temporal resolution: {timeSegment}ms per segment
-            </div>
             <div class="slider-control">
-                <label>Dot Opacity</label>
+                <label class="clickable" onclick={() => dotOpacity = 0.5}>Interpolation</label>
                 <input type="range" min="0.0" max="1.0" step="0.01" bind:value={dotOpacity} />
                 <span class="value">{dotOpacity.toFixed(2)}</span>
             </div>
             <div class="slider-control">
-                <label>Sample Dots</label>
+                <label class="clickable" onclick={() => sampleDotOpacity = 0.0}>Sample Dots</label>
                 <input type="range" min="0.0" max="1.0" step="0.01" bind:value={sampleDotOpacity} />
                 <span class="value">{sampleDotOpacity.toFixed(2)}</span>
             </div>
-            <div class="value-display" style="grid-column: 1 / 4; margin-top: -8px; margin-bottom: 8px;">
-                Blue dots at every sample point
-            </div>
             <div class="slider-control">
-                <label>Dot Size Var</label>
+                <label class="clickable" onclick={() => dotSizeVariation = 1.0}>Angle</label>
                 <input type="range" min="1" max="10" step="0.1" bind:value={dotSizeVariation} />
                 <span class="value">{dotSizeVariation.toFixed(1)}</span>
-            </div>
-            <div class="value-display" style="grid-column: 1 / 4; margin-top: -8px; margin-bottom: 8px;">
-                Blue dot size at 180° angle: {dotSizeVariation.toFixed(1)}x
             </div>
         {/if}
     </div>
@@ -245,7 +212,7 @@
         backdrop-filter: blur(10px);
         transform: none;
         box-shadow: 0px 0px 4px #1c5e20;
-        z-index: 20;
+        z-index: 1100; /* Above ViewSelector (z-index: 1000) */
     }
 
     .physics-dialog::backdrop {
@@ -374,6 +341,16 @@
         font-size: 12px;
         font-weight: 600;
         white-space: nowrap;
+    }
+
+    .slider-control label.clickable {
+        cursor: pointer;
+        transition: color 0.2s;
+    }
+
+    .slider-control label.clickable:hover {
+        color: #5db761;
+        text-decoration: underline;
     }
 
     .slider-control .value {

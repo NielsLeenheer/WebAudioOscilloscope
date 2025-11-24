@@ -47,7 +47,18 @@
     let workerBusy = false;
     let lastFrameTime = 0;
 
+    // High-DPI display support
+    const devicePixelRatio = typeof window !== 'undefined' ? (window.devicePixelRatio || 1) : 1;
+    const LOGICAL_WIDTH = 600;   // Visual size in CSS pixels
+    const LOGICAL_HEIGHT = 600;  // Visual size in CSS pixels
+    const PHYSICAL_WIDTH = LOGICAL_WIDTH * devicePixelRatio;   // Backing store resolution
+    const PHYSICAL_HEIGHT = LOGICAL_HEIGHT * devicePixelRatio; // Backing store resolution
+
     onMount(() => {
+        // Set canvas backing store to physical pixels for high-DPI displays
+        canvas.width = PHYSICAL_WIDTH;
+        canvas.height = PHYSICAL_HEIGHT;
+
         // Initialize Web Worker with OffscreenCanvas
         worker = new Worker(new URL('../../workers/physics-worker.js', import.meta.url), { type: 'module' });
 
@@ -62,7 +73,12 @@
         const offscreen = canvas.transferControlToOffscreen();
         worker.postMessage({
             type: 'init',
-            data: { canvas: offscreen }
+            data: {
+                canvas: offscreen,
+                devicePixelRatio: devicePixelRatio,
+                logicalWidth: LOGICAL_WIDTH,
+                logicalHeight: LOGICAL_HEIGHT
+            }
         }, [offscreen]);
 
         if (isPowered) {
@@ -273,8 +289,6 @@
 
 <canvas
     bind:this={canvas}
-    width="600"
-    height="600"
     class="scope-canvas"
     style="filter: blur({Math.abs(focus) * 3}px);"
 ></canvas>
@@ -285,6 +299,10 @@
         top: -100px;
         left: -100px;
         display: block;
+        /* Visual size in CSS pixels (same on all displays) */
+        width: 600px;
+        height: 600px;
+        /* Backing store resolution set programmatically based on devicePixelRatio */
         background: #1a1f1a;
         border-radius: 8px;
     }
