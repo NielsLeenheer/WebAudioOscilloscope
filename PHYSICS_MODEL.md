@@ -33,7 +33,7 @@ forceY = (targetY - currentBeamY) × coilStrength
 ```
 
 **Parameters:**
-- `coilStrength` (default: 0.32) - Strength of the electromagnetic field
+- `coilStrength` (default: 0.60) - Strength of the electromagnetic field
 - Higher values = stronger deflection force = more responsive beam
 - Lower values = weaker deflection = slower, more sluggish response
 
@@ -47,7 +47,7 @@ accelerationY = forceY / beamInertia
 ```
 
 **Parameters:**
-- `beamInertia` (default: 0.06) - Effective mass of the electron beam
+- `beamInertia` (default: 0.10) - Effective mass of the electron beam
 - Higher values = more inertia = slower response, more overshoot
 - Lower values = less inertia = snappier response, less overshoot
 
@@ -72,7 +72,7 @@ velocityY × fieldDamping
 ```
 
 **Parameters:**
-- `fieldDamping` (default: 0.44) - Energy loss per frame (0-1 scale)
+- `fieldDamping` (default: 0.30) - Energy loss per frame (0-1 scale)
 - Higher values (closer to 1.0) = less damping = more oscillation
 - Lower values (closer to 0.0) = more damping = faster settling
 
@@ -123,11 +123,11 @@ Real oscilloscope phosphor (P31 standard):
 #### 1. Calculate Frame-Rate Independent Velocity
 
 ```javascript
-velocity = speed / deltaTime  // pixels per second
+velocity = speed / deltaTime  // virtual units per second
 ```
 
 Where:
-- `speed` = distance moved between points (pixels)
+- `speed` = distance moved between points (in virtual units)
 - `deltaTime` = time between frames (seconds)
 
 This ensures consistent physics regardless of frame rate (60fps, 120fps, etc.).
@@ -135,29 +135,32 @@ This ensures consistent physics regardless of frame rate (60fps, 120fps, etc.).
 #### 2. Calculate Energy Deposition Factor
 
 ```javascript
-REFERENCE_VELOCITY = 500  // pixels/second
-BEAM_SPOT_SIZE = 1.5      // pixels
+VIRTUAL_REFERENCE_VELOCITY = 0.5  // Virtual units/second
+VIRTUAL_BEAM_SPOT_SIZE = 0.003    // 0.3% of canvas
 
-if (velocity < BEAM_SPOT_SIZE) {
+if (velocity < VIRTUAL_BEAM_SPOT_SIZE) {
     // Stationary or very slow: maximum excitation
     energyFactor = 1.0
 } else {
     // Energy inversely proportional to velocity
-    energyFactor = REFERENCE_VELOCITY / velocity
+    energyFactor = (VIRTUAL_REFERENCE_VELOCITY / velocity)
 
-    // Clamp to 2-100% range
-    energyFactor = max(0.02, min(1.0, energyFactor))
+    // Apply power curve for progressive dimming
+    energyFactor = Math.pow(energyFactor, 1.5)
+
+    // Clamp to 1-100% range
+    energyFactor = max(0.01, min(1.0, energyFactor))
 }
 ```
 
 **Key Points:**
-- Below ~2 px/s: Full brightness (beam dwelling)
-- At 500 px/s: Normal brightness (reference)
-- Above 500 px/s: Progressive dimming
-- Never dimmer than 2% (even at extreme speeds)
+- Below 0.003 virtual units/s: Full brightness (beam dwelling)
+- At 0.5 virtual units/s: Normal brightness (reference)
+- Above 0.5 virtual units/s: Progressive dimming
+- Never dimmer than 1% (even at extreme speeds)
 
 **Why This Works:**
-- Practical speeds for oscilloscope (100-10,000 px/s)
+- Resolution-independent (virtual coordinate system)
 - Visible dimming effect on fast-moving traces
 - Realistic representation of energy transfer physics
 
@@ -215,10 +218,10 @@ These parameters control the visual appearance and behavior of the phosphor disp
 Controls how long the phosphor glow persists after the beam passes:
 - Higher = longer afterglow (classic scope look)
 - Lower = sharper, more defined trace
-- Range: 0.0 (instant decay) to 1.0 (very slow decay)
+- Range: 0.0 (instant decay) to 0.95 (very slow decay)
 
 ### Signal Noise
-**Default:** 0.005
+**Default:** 0.003
 
 Adds realistic electronic noise to the beam position:
 - Simulates real-world signal noise and beam instability
@@ -236,10 +239,10 @@ Controls beam spot size and sharpness:
 ### Decay
 **Default:** 512
 
-Alpha channel decay rate for fading traces:
-- Lower = faster fade to black
-- Higher = longer visible trails
-- Works with persistence for overall trace behavior
+Maximum points to render (controls phosphor decay/overdraw):
+- Lower = less overdraw in XY mode
+- Higher = smoother traces in XY mode
+- Only affects XY mode (prevents buffer overload)
 
 ## Frame Rate Independence
 
@@ -274,7 +277,7 @@ deltaTime = (currentFrameTime - lastFrameTime) / 1000  // seconds
 ### For More Realistic CRT Look
 - Increase `persistence` (longer afterglow)
 - Adjust `velocityDimming` to 1.0 (full physics)
-- Add `signalNoise` around 0.005-0.01
+- Add `signalNoise` around 0.003-0.01
 - Adjust `focus` for desired beam sharpness
 
 ### For Arcade/Retro Look
@@ -287,13 +290,12 @@ deltaTime = (currentFrameTime - lastFrameTime) / 1000  // seconds
 ### Code Location
 
 - **Physics Worker:** `/src/workers/physics-worker.js`
-  - `simulatePhysicsElectromagnetic()` (lines 276-353)
-  - `calculatePhosphorExcitation()` (lines 50-119)
-  - `renderTrace()` (lines 371+)
+  - `simulatePhysics()` - Electromagnetic deflection model
+  - `calculatePhosphorExcitation()` - Phosphor brightness calculation
+  - `renderTrace()` - Time-based rendering
 
 - **Display Component:** `/src/components/Oscilloscope/Display.svelte`
   - Parameter definitions and defaults
-  - Mode selection (`simulationMode`)
 
 - **Visualizer:** `/src/components/Oscilloscope/Visualiser.svelte`
   - Frame timing (`deltaTime` calculation)
@@ -301,7 +303,15 @@ deltaTime = (currentFrameTime - lastFrameTime) / 1000  // seconds
 
 - **Physics Dialog:** `/src/components/Oscilloscope/PhysicsDialog.svelte`
   - UI for parameter adjustment
-  - Mode toggle (currently hidden)
+
+### Virtual Coordinate System
+
+All physics calculations operate in resolution-independent **virtual coordinates**:
+
+- Virtual space: [-1, 1] normalized coordinates
+- 1.0 = full canvas radius
+- Automatically scales to any canvas size
+- Physics parameters remain consistent across different resolutions
 
 ### Web Worker Architecture
 
