@@ -2,16 +2,11 @@
     import ToggleSwitch from '../Common/ToggleSwitch.svelte';
 
     let {
-        simulationMode = $bindable(),
-        renderingMode = $bindable(),
         debugMode = $bindable(),
         timeSegment = $bindable(),
         dotOpacity = $bindable(),
         dotSizeVariation = $bindable(),
         sampleDotOpacity = $bindable(),
-        springForce = $bindable(),
-        springDamping = $bindable(),
-        springMass = $bindable(),
         coilStrength = $bindable(),
         beamInertia = $bindable(),
         fieldDamping = $bindable(),
@@ -93,64 +88,27 @@
         <h3>Physics Controls</h3>
         <button class="close-button" onclick={close} onmousedown={(e) => e.stopPropagation()}>✕</button>
     </div>
-    <!-- Mode toggle hidden - keeping both models as backup
-    <div class="mode-toggle">
-        <label>Simulation Mode</label>
-        <div class="toggle-buttons">
-            <button
-                class:active={simulationMode === 'spring'}
-                onclick={() => simulationMode = 'spring'}
-            >
-                Spring-Damper
-            </button>
-            <button
-                class:active={simulationMode === 'electromagnetic'}
-                onclick={() => simulationMode = 'electromagnetic'}
-            >
-                Electromagnetic
-            </button>
-        </div>
-    </div>
-    -->
     <div class="sliders">
         <div class="slider-control">
             <label class="clickable" onclick={() => signalNoise = 0.003}>Noise</label>
             <input type="range" min="0" max="0.2" step="0.001" bind:value={signalNoise} />
             <span class="value">{signalNoise.toFixed(3)}</span>
         </div>
-        {#if simulationMode === 'spring'}
-            <div class="slider-control">
-                <label class="clickable" onclick={() => springForce = 0.3}>Force</label>
-                <input type="range" min="0.01" max="5.0" step="0.01" bind:value={springForce} />
-                <span class="value">{springForce.toFixed(2)}</span>
-            </div>
-            <div class="slider-control">
-                <label class="clickable" onclick={() => springDamping = 0.60}>Damping</label>
-                <input type="range" min="0.1" max="0.99" step="0.01" bind:value={springDamping} />
-                <span class="value">{springDamping.toFixed(2)}</span>
-            </div>
-            <div class="slider-control">
-                <label class="clickable" onclick={() => springMass = 0.11}>Mass</label>
-                <input type="range" min="0.01" max="5.0" step="0.01" bind:value={springMass} />
-                <span class="value">{springMass.toFixed(2)}</span>
-            </div>
-        {:else}
-            <div class="slider-control">
-                <label class="clickable" onclick={() => coilStrength = 0.60}>Coil Strength</label>
-                <input type="range" min="0.01" max="5.0" step="0.01" bind:value={coilStrength} />
-                <span class="value">{coilStrength.toFixed(2)}</span>
-            </div>
-            <div class="slider-control">
-                <label class="clickable" onclick={() => beamInertia = 0.10}>Beam Inertia</label>
-                <input type="range" min="0.01" max="5.0" step="0.01" bind:value={beamInertia} />
-                <span class="value">{beamInertia.toFixed(2)}</span>
-            </div>
-            <div class="slider-control">
-                <label class="clickable" onclick={() => fieldDamping = 0.30}>Field Damping</label>
-                <input type="range" min="0.1" max="0.99" step="0.01" bind:value={fieldDamping} />
-                <span class="value">{fieldDamping.toFixed(2)}</span>
-            </div>
-        {/if}
+        <div class="slider-control">
+            <label class="clickable" onclick={() => coilStrength = 0.60}>Coil Strength</label>
+            <input type="range" min="0.01" max="5.0" step="0.01" bind:value={coilStrength} />
+            <span class="value">{coilStrength.toFixed(2)}</span>
+        </div>
+        <div class="slider-control">
+            <label class="clickable" onclick={() => beamInertia = 0.10}>Beam Inertia</label>
+            <input type="range" min="0.01" max="5.0" step="0.01" bind:value={beamInertia} />
+            <span class="value">{beamInertia.toFixed(2)}</span>
+        </div>
+        <div class="slider-control">
+            <label class="clickable" onclick={() => fieldDamping = 0.30}>Field Damping</label>
+            <input type="range" min="0.1" max="0.99" step="0.01" bind:value={fieldDamping} />
+            <span class="value">{fieldDamping.toFixed(2)}</span>
+        </div>
         <div class="mode-separator"></div>
         <div class="slider-control">
             <label class="clickable" onclick={() => persistence = 0.100}>Persistence</label>
@@ -256,50 +214,6 @@
         color: #4CAF50;
     }
 
-    .mode-toggle {
-        padding: 15px;
-        border-bottom: 1px solid #333;
-    }
-
-    .mode-toggle label {
-        display: block;
-        color: #4CAF50;
-        font-family: system-ui;
-        font-size: 12px;
-        font-weight: 600;
-        margin-bottom: 10px;
-    }
-
-    .toggle-buttons {
-        display: flex;
-        gap: 8px;
-    }
-
-    .toggle-buttons button {
-        flex: 1;
-        padding: 8px 12px;
-        background: #1a1a1a;
-        border: 1px solid #333;
-        border-radius: 4px;
-        color: #888;
-        font-family: system-ui;
-        font-size: 11px;
-        font-weight: 600;
-        cursor: pointer;
-        transition: all 0.2s;
-    }
-
-    .toggle-buttons button:hover {
-        border-color: #4CAF50;
-        color: #4CAF50;
-    }
-
-    .toggle-buttons button.active {
-        background: #4CAF50;
-        border-color: #4CAF50;
-        color: #1a1a1a;
-    }
-
     .sliders {
         display: flex;
         flex-direction: column;
@@ -311,20 +225,6 @@
         height: 1px;
         background: #333;
         margin: 10px 0;
-    }
-
-    .mode-toggle-inline {
-        display: flex;
-        flex-direction: column;
-        gap: 8px;
-        margin: 5px 0;
-    }
-
-    .mode-toggle-inline label {
-        color: #4CAF50;
-        font-family: system-ui;
-        font-size: 12px;
-        font-weight: 600;
     }
 
     .slider-control {
