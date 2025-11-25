@@ -10,7 +10,6 @@
         debugMode,
         rendererType = 'canvas2d',
         onRenderersAvailable = () => {},
-        onRendererSwitchFailed = () => {},
         timeSegment,
         dotOpacity,
         dotSizeVariation,
@@ -37,8 +36,6 @@
         micInput = null
     } = $props();
 
-    let currentRendererType = rendererType;
-
     let canvas;
     let animationId = null;
     let leftData = null;
@@ -47,6 +44,9 @@
     let workerBusy = false;
     let lastFrameTime = 0;
 
+    // Key to force canvas recreation when powering on with different renderer
+    let canvasKey = $state(0);
+
     // High-DPI display support
     const devicePixelRatio = typeof window !== 'undefined' ? (window.devicePixelRatio || 1) : 1;
     const LOGICAL_WIDTH = 600;   // Visual size in CSS pixels
@@ -54,7 +54,13 @@
     const PHYSICAL_WIDTH = LOGICAL_WIDTH * devicePixelRatio;   // Backing store resolution
     const PHYSICAL_HEIGHT = LOGICAL_HEIGHT * devicePixelRatio; // Backing store resolution
 
-    onMount(() => {
+    onDestroy(() => {
+        destroyWorker();
+    });
+
+    function initWorker() {
+        if (!canvas) return;
+
         // Set canvas backing store to physical pixels for high-DPI displays
         canvas.width = PHYSICAL_WIDTH;
         canvas.height = PHYSICAL_HEIGHT;
@@ -68,15 +74,7 @@
                 workerBusy = false;
             } else if (e.data.type === 'initialized') {
                 // Worker initialized with renderer info
-                currentRendererType = e.data.data.rendererType;
                 onRenderersAvailable(e.data.data.availableRenderers);
-            } else if (e.data.type === 'rendererSwitched') {
-                // Renderer switch completed
-                currentRendererType = e.data.data.rendererType;
-                workerBusy = false;
-                if (e.data.data.requiresReload) {
-                    onRendererSwitchFailed(e.data.data.rendererType);
-                }
             }
         };
 
@@ -92,19 +90,15 @@
                 rendererType: rendererType
             }
         }, [offscreen]);
+    }
 
-        if (isPowered) {
-            startVisualization();
-        }
-    });
-
-    onDestroy(() => {
+    function destroyWorker() {
         stopVisualization();
         if (worker) {
             worker.terminate();
             worker = null;
         }
-    });
+    }
 
     function startVisualization() {
         // Initialize data buffers
@@ -272,41 +266,34 @@
         }
     }
 
-    // React to isPowered changes
+    // React to isPowered changes - recreate worker on power on
     $effect(() => {
         if (isPowered) {
-            // Start visualization when powered on
-            startVisualization();
+            // Increment key to force canvas recreation
+            canvasKey++;
         } else {
-            // Stop and reset when powered off
-            stopVisualization();
-            reset();
+            // Stop and destroy worker when powered off
+            destroyWorker();
         }
     });
 
-    // React to power changes - clear screen when powered off
+    // Initialize worker after canvas is created (via key change)
     $effect(() => {
-        if (!isPowered) {
-            clear();
-        }
-    });
-
-    // React to renderer type changes
-    $effect(() => {
-        if (worker && rendererType !== currentRendererType) {
-            worker.postMessage({
-                type: 'switchRenderer',
-                data: { rendererType }
-            });
+        // This runs after canvasKey changes and canvas is recreated
+        if (isPowered && canvas && !worker) {
+            initWorker();
+            startVisualization();
         }
     });
 </script>
 
+{#key canvasKey}
 <canvas
     bind:this={canvas}
     class="scope-canvas"
     style="filter: blur({Math.abs(focus) * 3}px);"
 ></canvas>
+{/key}
 
 <style>
     .scope-canvas {

@@ -5,8 +5,7 @@
         debugMode = $bindable(),
         rendererType = $bindable(),
         availableRenderers = [],
-        pendingRendererType = null,
-        onReloadRequested = () => {},
+        isPowered = false,
         timeSegment = $bindable(),
         dotOpacity = $bindable(),
         dotSizeVariation = $bindable(),
@@ -132,24 +131,19 @@
         <div class="mode-separator"></div>
         <ToggleSwitch bind:checked={debugMode} label="Debug?" />
         {#if debugMode}
-            <div class="renderer-control">
+            <div class="renderer-control" class:disabled={isPowered}>
                 <label>Renderer</label>
-                <select bind:value={rendererType} class="renderer-select">
+                <select bind:value={rendererType} class="renderer-select" disabled={isPowered}>
                     {#each availableRenderers as renderer}
                         <option value={renderer.type} disabled={!renderer.available}>
                             {renderer.name}{renderer.available ? '' : ' (unavailable)'}
                         </option>
                     {/each}
                 </select>
+                {#if isPowered}
+                    <span class="disabled-hint">Power off to change</span>
+                {/if}
             </div>
-            {#if pendingRendererType}
-                <div class="reload-notice">
-                    <span>Switching to {pendingRendererType === 'webgpu' ? 'WebGPU' : 'Canvas 2D'} requires reload</span>
-                    <button class="reload-button" onclick={() => onReloadRequested(pendingRendererType)}>
-                        Reload Now
-                    </button>
-                </div>
-            {/if}
             <div class="slider-control">
                 <label class="clickable" onclick={() => timeSegment = 0.010}>Time Segment</label>
                 <input type="range" min="0.001" max="0.050" step="0.001" bind:value={timeSegment} />
@@ -358,39 +352,24 @@
         color: #666;
     }
 
-    .reload-notice {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        padding: 8px 10px;
-        background: rgba(255, 152, 0, 0.15);
-        border: 1px solid rgba(255, 152, 0, 0.3);
-        border-radius: 4px;
-        margin-bottom: 5px;
+    .renderer-control.disabled label {
+        color: #666;
     }
 
-    .reload-notice span {
-        flex: 1;
-        color: #ff9800;
+    .renderer-select:disabled {
+        background: #222;
+        color: #666;
+        cursor: not-allowed;
+        border-color: #333;
+    }
+
+    .disabled-hint {
+        grid-column: 2;
+        color: #666;
         font-family: system-ui;
-        font-size: 11px;
-    }
-
-    .reload-button {
-        padding: 4px 10px;
-        background: #ff9800;
-        border: none;
-        border-radius: 3px;
-        color: #000;
-        font-family: system-ui;
-        font-size: 11px;
-        font-weight: 600;
-        cursor: pointer;
-        white-space: nowrap;
-    }
-
-    .reload-button:hover {
-        background: #ffb74d;
+        font-size: 10px;
+        font-style: italic;
+        margin-top: 2px;
     }
 
     .checkbox-group {
