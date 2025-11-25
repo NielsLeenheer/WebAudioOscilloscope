@@ -7,16 +7,11 @@
         isPowered,
         mode,
         // Physics parameters
-        simulationMode,
-        renderingMode,
         debugMode,
         timeSegment,
         dotOpacity,
         dotSizeVariation,
         sampleDotOpacity,
-        springForce,
-        springDamping,
-        springMass,
         coilStrength,
         beamInertia,
         fieldDamping,
@@ -200,11 +195,6 @@
 
         const basePower = 0.2 + (beamPower * 1.4); // Allow up to 3.0 max brightness
 
-        // Select the appropriate physics parameters based on simulation mode
-        const forceMultiplier = simulationMode === 'spring' ? springForce : coilStrength;
-        const mass = simulationMode === 'spring' ? springMass : beamInertia;
-        const damping = simulationMode === 'spring' ? springDamping : fieldDamping;
-
         if (worker) {
             workerBusy = true;
             worker.postMessage({
@@ -216,16 +206,14 @@
                     centerY,
                     scale,
                     visibleScale,
-                    simulationMode,
-                    renderingMode,
                     debugMode,
                     timeSegment,
                     dotOpacity,
                     dotSizeVariation,
                     sampleDotOpacity,
-                    forceMultiplier,
-                    damping,
-                    mass,
+                    forceMultiplier: coilStrength,
+                    damping: fieldDamping,
+                    mass: beamInertia,
                     signalNoise,
                     basePower,
                     persistence,
