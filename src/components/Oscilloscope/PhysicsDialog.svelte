@@ -95,17 +95,17 @@
             <span class="value">{signalNoise.toFixed(3)}</span>
         </div>
         <div class="slider-control">
-            <label class="clickable" onclick={() => coilStrength = 0.60}>Coil Strength</label>
+            <label class="clickable" onclick={() => coilStrength = 0.60}>Drive Gain</label>
             <input type="range" min="0.01" max="5.0" step="0.01" bind:value={coilStrength} />
             <span class="value">{coilStrength.toFixed(2)}</span>
         </div>
         <div class="slider-control">
-            <label class="clickable" onclick={() => beamInertia = 0.10}>Beam Inertia</label>
+            <label class="clickable" onclick={() => beamInertia = 0.10}>Coil Inductance</label>
             <input type="range" min="0.01" max="5.0" step="0.01" bind:value={beamInertia} />
             <span class="value">{beamInertia.toFixed(2)}</span>
         </div>
         <div class="slider-control">
-            <label class="clickable" onclick={() => fieldDamping = 0.30}>Field Damping</label>
+            <label class="clickable" onclick={() => fieldDamping = 0.30}>System Damping</label>
             <input type="range" min="0.1" max="0.99" step="0.01" bind:value={fieldDamping} />
             <span class="value">{fieldDamping.toFixed(2)}</span>
         </div>
