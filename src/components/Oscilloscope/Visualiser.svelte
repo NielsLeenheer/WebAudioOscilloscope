@@ -272,7 +272,7 @@
         }
     }
 
-    // React to isPowered changes - recreate canvas and worker on power on
+    // React to isPowered changes - recreate canvas and worker on power on/off
     $effect(() => {
         // Only react to transitions to avoid infinite loops
         if (isPowered !== previousIsPowered) {
@@ -293,6 +293,9 @@
             } else {
                 // Stop and destroy worker when powered off
                 destroyWorker();
+                // Increment key to destroy old canvas and create fresh one
+                // This ensures the old context is completely released
+                canvasKey++;
             }
         }
     });

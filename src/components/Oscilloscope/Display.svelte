@@ -8,10 +8,17 @@
 
     let visualiser;
 
+    // Check WebGPU support in main thread for initial renderer options
+    const webgpuSupported = typeof navigator !== 'undefined' && 'gpu' in navigator;
+
     // Physics parameters (adjustable)
     let debugMode = $state(false); // Debug visualization toggle
     let rendererType = $state('canvas2d'); // Renderer type: 'canvas2d' or 'webgpu'
-    let availableRenderers = $state([]); // Available renderer options from worker
+    // Initialize with default renderers (updated by worker when available)
+    let availableRenderers = $state([
+        { type: 'canvas2d', name: 'Canvas 2D', available: true },
+        { type: 'webgpu', name: 'WebGPU (Experimental)', available: webgpuSupported }
+    ]);
 
     let timeSegment = $state(0.010); // Temporal resolution in milliseconds (debug parameter)
     let dotOpacity = $state(0.0); // Debug dot opacity for red dots/segment endpoints (0.0 to 1.0)
