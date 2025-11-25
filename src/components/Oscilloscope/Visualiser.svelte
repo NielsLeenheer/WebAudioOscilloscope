@@ -1,5 +1,5 @@
 <script>
-    import { onMount, onDestroy } from 'svelte';
+    import { onMount, onDestroy, tick } from 'svelte';
 
     let {
         generatorInput,
@@ -269,29 +269,25 @@
         }
     }
 
-    // React to isPowered changes - recreate worker on power on
+    // React to isPowered changes - recreate canvas and worker on power on
     $effect(() => {
         // Only react to transitions to avoid infinite loops
         if (isPowered !== previousIsPowered) {
+            previousIsPowered = isPowered;
+
             if (isPowered) {
-                // Increment key to force canvas recreation
+                // Increment key to force canvas recreation, then init after DOM updates
                 canvasKey++;
+                tick().then(() => {
+                    if (canvas && !worker) {
+                        initWorker();
+                        startVisualization();
+                    }
+                });
             } else {
                 // Stop and destroy worker when powered off
                 destroyWorker();
             }
-            previousIsPowered = isPowered;
-        }
-    });
-
-    // Initialize worker after canvas is created (via key change)
-    $effect(() => {
-        // Track canvasKey to re-run after canvas recreation
-        canvasKey;
-
-        if (isPowered && canvas && !worker) {
-            initWorker();
-            startVisualization();
         }
     });
 </script>
