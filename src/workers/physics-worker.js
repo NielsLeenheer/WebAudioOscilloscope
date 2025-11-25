@@ -1,4 +1,6 @@
 // Physics simulation and rendering worker with OffscreenCanvas
+import { RendererManager, RendererType } from './renderers/renderer-manager.js';
+
 let beamX = 0;
 let beamY = 0;
 let velocityX = 0;
@@ -8,10 +10,11 @@ let smoothedBeamY = 0;
 let smoothedBasePower = 0; // Smoothed beam intensity for stable persistence calculation
 let fps = 0; // Smoothed FPS counter for debug mode
 let offscreenCanvas = null;
-let ctx = null;
+let rendererManager = null;
 let devicePixelRatio = 1;
 let logicalWidth = 600;
 let logicalHeight = 600;
+let currentRendererType = RendererType.CANVAS_2D;
 
 // ============================================================================
 // VIRTUAL COORDINATE SYSTEM
@@ -610,7 +613,7 @@ function renderTrace(ctx, points, speeds, velocityDimming, basePower, deltaTime,
     }
 }
 
-self.onmessage = function(e) {
+self.onmessage = async function(e) {
     const { type, data } = e.data;
 
     if (type === 'init') {
@@ -619,16 +622,49 @@ self.onmessage = function(e) {
         devicePixelRatio = data.devicePixelRatio || 1;
         logicalWidth = data.logicalWidth || 600;
         logicalHeight = data.logicalHeight || 600;
+        currentRendererType = data.rendererType || RendererType.CANVAS_2D;
 
         // Initialize smoothed basePower to typical middle value to avoid slow ramp-up
         smoothedBasePower = 1.2; // Corresponds to beamPower ≈ 0.7
 
-        ctx = offscreenCanvas.getContext('2d');
+        // Initialize renderer manager
+        rendererManager = new RendererManager();
+        await rendererManager.init(
+            offscreenCanvas,
+            devicePixelRatio,
+            logicalWidth,
+            logicalHeight,
+            currentRendererType
+        );
 
-        // Scale context for high-DPI displays
-        // This makes all drawing operations automatically scale to the higher resolution
-        ctx.scale(devicePixelRatio, devicePixelRatio);
+        // Send back info about available renderers
+        self.postMessage({
+            type: 'initialized',
+            data: {
+                rendererType: rendererManager.getCurrentType(),
+                availableRenderers: rendererManager.getAvailableRenderers()
+            }
+        });
 
+        return;
+    }
+
+    if (type === 'switchRenderer') {
+        // Switch to a different renderer
+        const newType = data.rendererType;
+        if (rendererManager && newType !== currentRendererType) {
+            const success = await rendererManager.switchRenderer(newType);
+            if (success) {
+                currentRendererType = rendererManager.getCurrentType();
+            }
+            self.postMessage({
+                type: 'rendererSwitched',
+                data: {
+                    rendererType: currentRendererType,
+                    success
+                }
+            });
+        }
         return;
     }
 
@@ -644,10 +680,8 @@ self.onmessage = function(e) {
 
     if (type === 'clear') {
         // Clear the canvas completely (power off)
-        // Use logical dimensions since context is scaled by devicePixelRatio
-        if (!ctx || !offscreenCanvas) return;
-        ctx.fillStyle = 'rgb(26, 31, 26)';
-        ctx.fillRect(0, 0, logicalWidth, logicalHeight);
+        if (!rendererManager || !rendererManager.isReady()) return;
+        rendererManager.clear();
 
         // Reset beam position
         beamX = 0;
@@ -696,7 +730,7 @@ self.onmessage = function(e) {
             deltaTime
         } = data;
 
-        if (!ctx) return;
+        if (!rendererManager || !rendererManager.isReady()) return;
 
         // Calculate and smooth FPS for debug mode display
         const currentFps = deltaTime > 0 ? 1 / deltaTime : 0;
@@ -708,18 +742,13 @@ self.onmessage = function(e) {
         smoothedBasePower = PERSISTENCE_SMOOTHING * smoothedBasePower + (1 - PERSISTENCE_SMOOTHING) * basePower;
 
         // Clear canvas with adjustable fade effect for persistence
-        // Background: dark gray with greenish tint (#1a1f1a = rgb(26, 31, 26))
-        //
         // Physically realistic persistence model:
         // Higher beam intensity excites phosphor more, resulting in longer visible trails
-        // Even with the same phosphor decay time constant, a brighter initial glow
-        // takes longer to fade below the visible threshold
         // basePower range: 0.2 (min) to 3.0 (max) → intensity boost: 0 to 0.3
         const intensityBoost = ((smoothedBasePower - 0.2) / 2.8) * 0.3;
         const effectivePersistence = Math.min(0.99, persistence + intensityBoost);
 
-        ctx.fillStyle = `rgba(26, 31, 26, ${1 - effectivePersistence})`;
-        ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+        rendererManager.clearWithPersistence(effectivePersistence, canvasWidth, canvasHeight);
 
         // ========================================================================
         // THREE-STAGE RENDERING PIPELINE
@@ -754,35 +783,28 @@ self.onmessage = function(e) {
             // RENDERING - Draw the simulated beam path
             // ========================================================================
 
-            renderTrace(ctx, points, speeds, velocityDimming, basePower, deltaTime, sampleRate, debugMode, timeSegment, dotOpacity, dotSizeVariation, sampleDotOpacity, canvasWidth, canvasHeight);
+            rendererManager.renderTrace({
+                points,
+                speeds,
+                velocityDimming,
+                basePower,
+                deltaTime,
+                sampleRate,
+                debugMode,
+                timeSegment,
+                dotOpacity,
+                dotSizeVariation,
+                sampleDotOpacity,
+                canvasWidth,
+                canvasHeight,
+                calculatePhosphorExcitation,
+                interpolatePoints
+            });
         }
 
         // Draw FPS counter in debug mode
         if (debugMode) {
-            const fpsText = `${Math.round(fps)} FPS`;
-
-            // Set font for measuring text
-            ctx.font = 'bold 14px "Courier New", monospace';
-            const textMetrics = ctx.measureText(fpsText);
-            const textWidth = textMetrics.width;
-
-            // Position within visible area (canvas is 600x600 but visible area is 400x400 centered)
-            // Visible area starts at (100, 100) and ends at (500, 500) in canvas coordinates
-            const padding = 8;
-            const boxX = 110; // 10px from left edge of visible area
-            const boxY = 480 - padding - 14; // 20px from bottom of visible area
-            const boxWidth = textWidth + padding * 2;
-            const boxHeight = 14 + padding;
-
-            // Draw background with rounded corners (rgba(26, 26, 26, 0.7))
-            ctx.fillStyle = 'rgba(26, 26, 26, 0.7)';
-            ctx.beginPath();
-            ctx.roundRect(boxX, boxY, boxWidth, boxHeight, 4);
-            ctx.fill();
-
-            // Draw text (#4CAF50 green)
-            ctx.fillStyle = '#4CAF50';
-            ctx.fillText(fpsText, boxX + padding, boxY + padding + 11); // 11px baseline offset
+            rendererManager.drawFPS(fps);
         }
 
         // Send ready message back to main thread

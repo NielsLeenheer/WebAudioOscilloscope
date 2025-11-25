@@ -10,6 +10,8 @@
 
     // Physics parameters (adjustable)
     let debugMode = $state(false); // Debug visualization toggle
+    let rendererType = $state('canvas2d'); // Renderer type: 'canvas2d' or 'webgpu'
+    let availableRenderers = $state([]); // Available renderer options from worker
     let timeSegment = $state(0.010); // Temporal resolution in milliseconds (debug parameter)
     let dotOpacity = $state(0.0); // Debug dot opacity for red dots/segment endpoints (0.0 to 1.0)
     let dotSizeVariation = $state(1.0); // Debug dot size variation based on angle (1 = all same, 10 = 10x variation)
@@ -44,6 +46,8 @@
 <div class="display-panel">
     <Physics
         bind:debugMode
+        bind:rendererType
+        {availableRenderers}
         bind:timeSegment
         bind:dotOpacity
         bind:dotSizeVariation
@@ -65,6 +69,8 @@
                 {isPowered}
                 {mode}
                 {debugMode}
+                {rendererType}
+                onRenderersAvailable={(renderers) => availableRenderers = renderers}
                 {timeSegment}
                 {dotOpacity}
                 {dotSizeVariation}

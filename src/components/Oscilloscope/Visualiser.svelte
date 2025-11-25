@@ -8,6 +8,8 @@
         mode,
         // Physics parameters
         debugMode,
+        rendererType = 'canvas2d',
+        onRenderersAvailable = () => {},
         timeSegment,
         dotOpacity,
         dotSizeVariation,
@@ -33,6 +35,8 @@
         // Microphone input helper (optional)
         micInput = null
     } = $props();
+
+    let currentRendererType = rendererType;
 
     let canvas;
     let animationId = null;
@@ -61,6 +65,14 @@
         worker.onmessage = (e) => {
             if (e.data.type === 'ready') {
                 workerBusy = false;
+            } else if (e.data.type === 'initialized') {
+                // Worker initialized with renderer info
+                currentRendererType = e.data.data.rendererType;
+                onRenderersAvailable(e.data.data.availableRenderers);
+            } else if (e.data.type === 'rendererSwitched') {
+                // Renderer switch completed
+                currentRendererType = e.data.data.rendererType;
+                workerBusy = false;
             }
         };
 
@@ -72,7 +84,8 @@
                 canvas: offscreen,
                 devicePixelRatio: devicePixelRatio,
                 logicalWidth: LOGICAL_WIDTH,
-                logicalHeight: LOGICAL_HEIGHT
+                logicalHeight: LOGICAL_HEIGHT,
+                rendererType: rendererType
             }
         }, [offscreen]);
 
@@ -271,6 +284,16 @@
     $effect(() => {
         if (!isPowered) {
             clear();
+        }
+    });
+
+    // React to renderer type changes
+    $effect(() => {
+        if (worker && rendererType !== currentRendererType) {
+            worker.postMessage({
+                type: 'switchRenderer',
+                data: { rendererType }
+            });
         }
     });
 </script>
