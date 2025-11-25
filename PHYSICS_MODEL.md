@@ -16,10 +16,12 @@ In a real CRT oscilloscope:
 - An electron gun emits a focused beam of electrons
 - Horizontal and vertical deflection coils create magnetic fields
 - These fields deflect the electron beam to trace the waveform
-- The beam has inertia and overshoots targets due to its velocity
-- Residual gas in the tube causes damping
+- **Deflection coils have inductance** - they resist changes in current, causing overshoot and ringing
+- The electromagnetic system has resistance, creating damping
 - Without deflection, the beam naturally aims at the screen center
 - Phosphor on the screen glows when struck by electrons
+
+**Key Physics:** The overshoot behavior in CRT deflection comes primarily from the **inductance of the deflection coils**, not from electron beam mass (electrons are far too light). When the coil current tries to change, the inductance creates a delay characterized by the L/R time constant, causing the magnetic field to lag behind the desired position.
 
 ### Step-by-Step Simulation
 
@@ -47,24 +49,27 @@ accelerationY = forceY / beamInertia
 ```
 
 **Parameters:**
-- `beamInertia` (default: 0.10) - Effective mass of the electron beam
-- Higher values = more inertia = slower response, more overshoot
-- Lower values = less inertia = snappier response, less overshoot
+- `beamInertia` (default: 0.10) - Models the electromagnetic system's resistance to change
+- **What it represents:** The inductance of the deflection coils (L) and drive circuit characteristics
+- Higher values = more inertia = slower response, more overshoot (higher L/R time constant)
+- Lower values = less inertia = snappier response, less overshoot (lower L/R time constant)
+
+**Note:** Despite the parameter name, this doesn't model literal electron beam mass (which is negligible). Instead, it models how the deflection coils resist changes in current due to inductance.
 
 #### 3. Update Velocity
 
-The beam velocity changes according to the acceleration:
+The deflection system's "velocity" changes according to the acceleration:
 
 ```javascript
 velocityX += accelerationX
 velocityY += accelerationY
 ```
 
-This accumulation of velocity is what causes **overshoot behavior** - the beam continues moving past the target due to its momentum.
+This accumulation of velocity creates **overshoot behavior**. In the model, this mimics how real deflection coils behave: the coil current can't change instantaneously due to inductance, so it "overshoots" the target position before settling back.
 
 #### 4. Apply Field Damping
 
-Damping represents interaction with residual gas in the CRT:
+Damping represents the resistance in the electromagnetic deflection system:
 
 ```javascript
 velocityX × fieldDamping
@@ -73,8 +78,11 @@ velocityY × fieldDamping
 
 **Parameters:**
 - `fieldDamping` (default: 0.30) - Energy loss per frame (0-1 scale)
-- Higher values (closer to 1.0) = less damping = more oscillation
-- Lower values (closer to 0.0) = more damping = faster settling
+- **What it represents:** Electrical resistance (R) in the deflection coil circuit and drive amplifier
+- Higher values (closer to 1.0) = less damping = more oscillation and ringing
+- Lower values (closer to 0.0) = more damping = faster settling, less overshoot
+
+**Note:** In real CRTs, damping comes primarily from the electrical resistance in the coil windings and drive circuitry, not from residual gas in the tube.
 
 #### 5. Update Beam Position
 
@@ -99,11 +107,18 @@ The 0.6 smoothing factor provides good responsiveness while preventing jitter, a
 ### Behavior Characteristics
 
 **Why This Model is Accurate:**
-- Simulates actual electromagnetic deflection physics
-- Beam inertia causes natural overshoot (visible in fast transients)
-- Self-correcting behavior as deflection force opposes velocity
+- Simulates actual electromagnetic deflection system behavior
+- Coil inductance causes natural overshoot and ringing (visible in fast transients)
+- Self-correcting behavior as deflection force opposes the inductive lag
 - Without deflection input, beam naturally settles to center
-- Responds to parameter changes like a real CRT
+- Responds to parameter changes like a real CRT deflection system
+
+**Implementation Note:** The model uses a "mass-spring-damper" analogy where:
+- `beamInertia` represents coil inductance (L)
+- `fieldDamping` represents circuit resistance (R)
+- `coilStrength` represents the drive amplifier gain
+
+This creates the same second-order response characteristic (overshoot, ringing, settling) as real electromagnetic deflection systems, even though the underlying math uses mechanical physics analogies rather than electrical circuit equations.
 
 ## Phosphor Excitation Model
 
@@ -265,14 +280,14 @@ deltaTime = (currentFrameTime - lastFrameTime) / 1000  // seconds
 ## Parameter Tuning Guide
 
 ### For More Overshoot
-- Increase `beamInertia` (more mass = more overshoot)
-- Increase `coilStrength` (stronger force = faster acceleration = more overshoot)
-- Increase `fieldDamping` closer to 1.0 (less energy loss)
+- Increase `beamInertia` (higher inductance = more overshoot and ringing)
+- Increase `coilStrength` (stronger drive = faster slew rate = more overshoot)
+- Increase `fieldDamping` closer to 1.0 (less resistance = underdamped system)
 
 ### For Faster Response
-- Decrease `beamInertia` (less mass = quicker response)
-- Increase `coilStrength` (stronger deflection)
-- Decrease `fieldDamping` (more damping = faster settling)
+- Decrease `beamInertia` (lower inductance = quicker response)
+- Increase `coilStrength` (stronger deflection drive)
+- Decrease `fieldDamping` (more resistance = critically damped or overdamped)
 
 ### For More Realistic CRT Look
 - Increase `persistence` (longer afterglow)
