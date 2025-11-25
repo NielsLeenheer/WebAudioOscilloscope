@@ -286,7 +286,9 @@
 
     // Initialize worker after canvas is created (via key change)
     $effect(() => {
-        // This runs after canvasKey changes and canvas is recreated
+        // Track canvasKey to re-run after canvas recreation
+        canvasKey;
+
         if (isPowered && canvas && !worker) {
             initWorker();
             startVisualization();
