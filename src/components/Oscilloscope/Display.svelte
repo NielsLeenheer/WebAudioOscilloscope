@@ -11,7 +11,29 @@
     // Physics parameters (adjustable)
     let debugMode = $state(false); // Debug visualization toggle
     let rendererType = $state('canvas2d'); // Renderer type: 'canvas2d' or 'webgpu'
+    let pendingRendererType = $state(null); // Renderer type that requires reload to apply
     let availableRenderers = $state([]); // Available renderer options from worker
+
+    function handleRendererSwitchFailed(requestedType) {
+        // Switch failed, need reload - show pending state in UI
+        pendingRendererType = requestedType;
+    }
+
+    function reloadWithRenderer(newType) {
+        // Store the desired renderer in sessionStorage and reload
+        sessionStorage.setItem('pendingRendererType', newType);
+        location.reload();
+    }
+
+    // On mount, check if we have a pending renderer type from reload
+    import { onMount } from 'svelte';
+    onMount(() => {
+        const pending = sessionStorage.getItem('pendingRendererType');
+        if (pending) {
+            sessionStorage.removeItem('pendingRendererType');
+            rendererType = pending;
+        }
+    });
     let timeSegment = $state(0.010); // Temporal resolution in milliseconds (debug parameter)
     let dotOpacity = $state(0.0); // Debug dot opacity for red dots/segment endpoints (0.0 to 1.0)
     let dotSizeVariation = $state(1.0); // Debug dot size variation based on angle (1 = all same, 10 = 10x variation)
@@ -48,6 +70,8 @@
         bind:debugMode
         bind:rendererType
         {availableRenderers}
+        {pendingRendererType}
+        onReloadRequested={reloadWithRenderer}
         bind:timeSegment
         bind:dotOpacity
         bind:dotSizeVariation
@@ -71,6 +95,7 @@
                 {debugMode}
                 {rendererType}
                 onRenderersAvailable={(renderers) => availableRenderers = renderers}
+                onRendererSwitchFailed={handleRendererSwitchFailed}
                 {timeSegment}
                 {dotOpacity}
                 {dotSizeVariation}

@@ -16,6 +16,7 @@ export class RendererManager {
         this.logicalWidth = 600;
         this.logicalHeight = 600;
         this.webgpuSupported = null; // Cache WebGPU support check
+        this.contextBound = false; // Once true, can't switch renderer types
     }
 
     /**
@@ -42,12 +43,19 @@ export class RendererManager {
     /**
      * Switch to a different renderer
      * @param {string} rendererType - The renderer type to switch to
-     * @returns {boolean} - True if switch was successful
+     * @returns {{success: boolean, requiresReload: boolean}} - Result of switch attempt
      */
     async switchRenderer(rendererType) {
         // If already using this renderer, do nothing
         if (this.currentType === rendererType && this.currentRenderer?.isReady()) {
-            return true;
+            return { success: true, requiresReload: false };
+        }
+
+        // Once a context is bound, switching to a different type requires reload
+        // Canvas contexts are immutable - you can't switch from 2d to webgpu or vice versa
+        if (this.contextBound && this.currentType !== rendererType) {
+            console.warn(`Cannot switch from ${this.currentType} to ${rendererType} at runtime. Page reload required.`);
+            return { success: false, requiresReload: true };
         }
 
         // Validate renderer type
@@ -107,12 +115,13 @@ export class RendererManager {
         if (success) {
             this.currentRenderer = newRenderer;
             this.currentType = rendererType;
-            console.log(`Switched to ${newRenderer.getName()} renderer`);
-            return true;
+            this.contextBound = true; // Context is now locked
+            console.log(`Initialized ${newRenderer.getName()} renderer`);
+            return { success: true, requiresReload: false };
         }
 
         console.error('Failed to initialize renderer');
-        return false;
+        return { success: false, requiresReload: false };
     }
 
     /**

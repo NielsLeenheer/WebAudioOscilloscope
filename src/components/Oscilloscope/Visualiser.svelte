@@ -10,6 +10,7 @@
         debugMode,
         rendererType = 'canvas2d',
         onRenderersAvailable = () => {},
+        onRendererSwitchFailed = () => {},
         timeSegment,
         dotOpacity,
         dotSizeVariation,
@@ -73,6 +74,9 @@
                 // Renderer switch completed
                 currentRendererType = e.data.data.rendererType;
                 workerBusy = false;
+                if (e.data.data.requiresReload) {
+                    onRendererSwitchFailed(e.data.data.rendererType);
+                }
             }
         };
 

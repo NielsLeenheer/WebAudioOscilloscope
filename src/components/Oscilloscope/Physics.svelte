@@ -9,6 +9,8 @@
         debugMode = $bindable(),
         rendererType = $bindable(),
         availableRenderers = [],
+        pendingRendererType = null,
+        onReloadRequested = () => {},
         timeSegment = $bindable(),
         dotOpacity = $bindable(),
         dotSizeVariation = $bindable(),
@@ -45,6 +47,8 @@
     bind:debugMode
     bind:rendererType
     {availableRenderers}
+    {pendingRendererType}
+    {onReloadRequested}
     bind:timeSegment
     bind:dotOpacity
     bind:dotSizeVariation

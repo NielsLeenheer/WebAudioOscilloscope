@@ -653,15 +653,16 @@ self.onmessage = async function(e) {
         // Switch to a different renderer
         const newType = data.rendererType;
         if (rendererManager && newType !== currentRendererType) {
-            const success = await rendererManager.switchRenderer(newType);
-            if (success) {
+            const result = await rendererManager.switchRenderer(newType);
+            if (result.success) {
                 currentRendererType = rendererManager.getCurrentType();
             }
             self.postMessage({
                 type: 'rendererSwitched',
                 data: {
                     rendererType: currentRendererType,
-                    success
+                    success: result.success,
+                    requiresReload: result.requiresReload
                 }
             });
         }
