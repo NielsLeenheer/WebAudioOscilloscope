@@ -229,7 +229,7 @@
 
     .slider-control {
         display: grid;
-        grid-template-columns: 80px 1fr 50px;
+        grid-template-columns: 100px 1fr 50px;
         gap: 10px;
         align-items: center;
         transition: opacity 0.2s;
