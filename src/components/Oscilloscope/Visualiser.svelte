@@ -47,6 +47,9 @@
     // Key to force canvas recreation when powering on with different renderer
     let canvasKey = $state(0);
 
+    // Track previous power state to detect transitions
+    let previousIsPowered = false;
+
     // High-DPI display support
     const devicePixelRatio = typeof window !== 'undefined' ? (window.devicePixelRatio || 1) : 1;
     const LOGICAL_WIDTH = 600;   // Visual size in CSS pixels
@@ -268,12 +271,16 @@
 
     // React to isPowered changes - recreate worker on power on
     $effect(() => {
-        if (isPowered) {
-            // Increment key to force canvas recreation
-            canvasKey++;
-        } else {
-            // Stop and destroy worker when powered off
-            destroyWorker();
+        // Only react to transitions to avoid infinite loops
+        if (isPowered !== previousIsPowered) {
+            if (isPowered) {
+                // Increment key to force canvas recreation
+                canvasKey++;
+            } else {
+                // Stop and destroy worker when powered off
+                destroyWorker();
+            }
+            previousIsPowered = isPowered;
         }
     });
 
