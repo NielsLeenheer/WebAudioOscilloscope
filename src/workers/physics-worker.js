@@ -766,10 +766,11 @@ self.onmessage = function(e) {
             const textMetrics = ctx.measureText(fpsText);
             const textWidth = textMetrics.width;
 
-            // Position and dimensions (matching original CSS: bottom 10px, left 10px)
+            // Position within visible area (canvas is 600x600 but visible area is 400x400 centered)
+            // Visible area starts at (100, 100) and ends at (500, 500) in canvas coordinates
             const padding = 8;
-            const boxX = 10;
-            const boxY = canvasHeight - 10 - 14 - padding; // 10px from bottom, 14px font height, padding
+            const boxX = 110; // 10px from left edge of visible area
+            const boxY = 480 - padding - 14; // 20px from bottom of visible area
             const boxWidth = textWidth + padding * 2;
             const boxHeight = 14 + padding;
 
