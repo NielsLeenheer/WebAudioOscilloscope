@@ -803,9 +803,9 @@ self.onmessage = async function(e) {
             });
         }
 
-        // Draw FPS counter in debug mode
+        // Draw debug info (renderer type and FPS) in debug mode
         if (debugMode) {
-            rendererManager.drawFPS(fps);
+            rendererManager.drawDebugInfo(fps);
         }
 
         // Send ready message back to main thread

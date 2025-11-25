@@ -205,10 +205,10 @@ export class RendererManager {
     }
 
     /**
-     * Draw FPS counter
+     * Draw debug info (renderer type and FPS)
      */
-    drawFPS(fps) {
-        this.currentRenderer?.drawFPS(fps);
+    drawDebugInfo(fps) {
+        this.currentRenderer?.drawDebugInfo(fps);
     }
 
     /**

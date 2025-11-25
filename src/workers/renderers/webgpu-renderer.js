@@ -622,13 +622,178 @@ export class WebGPURenderer {
     }
 
     /**
-     * Draw FPS counter for debug mode
+     * Draw debug info (renderer type and FPS) for debug mode
+     * Uses a temporary 2D canvas for text rendering, then copies to WebGPU
      * @param {number} fps - Current FPS value
      */
-    drawFPS(fps) {
-        // WebGPU text rendering would require a separate text rendering system
-        // For now, this is a no-op - FPS is not displayed in WebGPU mode
-        // TODO: Implement text rendering for WebGPU
+    drawDebugInfo(fps) {
+        if (!this.device || !this.initialized) return;
+
+        // Create a temporary 2D canvas for text rendering
+        const textCanvas = new OffscreenCanvas(100, 40);
+        const ctx = textCanvas.getContext('2d');
+
+        const rendererText = 'WebGPU';
+        const fpsText = `${Math.round(fps)} FPS`;
+
+        // Clear with transparent background
+        ctx.clearRect(0, 0, 100, 40);
+
+        // Draw semi-transparent background
+        ctx.fillStyle = 'rgba(26, 26, 26, 0.7)';
+        ctx.beginPath();
+        ctx.roundRect(0, 0, 80, 36, 4);
+        ctx.fill();
+
+        // Draw renderer type
+        ctx.font = 'bold 12px "Courier New", monospace';
+        ctx.fillStyle = '#4CAF50';
+        ctx.fillText(rendererText, 6, 14);
+
+        // Draw FPS
+        ctx.fillStyle = '#888888';
+        ctx.fillText(fpsText, 6, 28);
+
+        // Copy the text canvas to WebGPU texture
+        const imageBitmap = textCanvas.transferToImageBitmap();
+
+        // Create texture from the bitmap
+        const textTexture = this.device.createTexture({
+            size: [imageBitmap.width, imageBitmap.height],
+            format: 'rgba8unorm',
+            usage: GPUTextureUsage.TEXTURE_BINDING |
+                   GPUTextureUsage.COPY_DST |
+                   GPUTextureUsage.RENDER_ATTACHMENT,
+        });
+
+        this.device.queue.copyExternalImageToTexture(
+            { source: imageBitmap },
+            { texture: textTexture },
+            [imageBitmap.width, imageBitmap.height]
+        );
+
+        // Now render this texture to the canvas at position (110, 110)
+        // For simplicity, we'll use a blit/copy operation
+        // This requires a separate render pass with a textured quad
+
+        // Create a simple blit pipeline if not exists
+        if (!this.textBlitPipeline) {
+            this.createTextBlitPipeline();
+        }
+
+        if (this.textBlitPipeline) {
+            const commandEncoder = this.device.createCommandEncoder();
+            const textureView = this.context.getCurrentTexture().createView();
+
+            // Create bind group for this text texture
+            const textBindGroup = this.device.createBindGroup({
+                layout: this.textBlitPipeline.getBindGroupLayout(0),
+                entries: [
+                    { binding: 0, resource: this.sampler },
+                    { binding: 1, resource: textTexture.createView() },
+                ],
+            });
+
+            const renderPass = commandEncoder.beginRenderPass({
+                colorAttachments: [{
+                    view: textureView,
+                    loadOp: 'load',
+                    storeOp: 'store',
+                }],
+            });
+
+            renderPass.setPipeline(this.textBlitPipeline);
+            renderPass.setBindGroup(0, textBindGroup);
+            renderPass.draw(4);
+            renderPass.end();
+
+            this.device.queue.submit([commandEncoder.finish()]);
+        }
+
+        // Clean up
+        textTexture.destroy();
+        imageBitmap.close();
+    }
+
+    /**
+     * Create pipeline for blitting text texture to screen
+     */
+    createTextBlitPipeline() {
+        const vertexShader = `
+            struct VertexOutput {
+                @builtin(position) position: vec4<f32>,
+                @location(0) texCoord: vec2<f32>,
+            }
+
+            @vertex
+            fn main(@builtin(vertex_index) vertexIndex: u32) -> VertexOutput {
+                var output: VertexOutput;
+                // Position the quad at top-left of visible area (110, 110) in 600x600 canvas
+                // Visible area starts at 100,100 so 110,110 is 10px inside
+                // Quad size: 80x36 pixels
+                let positions = array<vec2<f32>, 4>(
+                    vec2<f32>(110.0, 110.0),      // top-left
+                    vec2<f32>(190.0, 110.0),      // top-right
+                    vec2<f32>(110.0, 146.0),      // bottom-left
+                    vec2<f32>(190.0, 146.0)       // bottom-right
+                );
+                let texCoords = array<vec2<f32>, 4>(
+                    vec2<f32>(0.0, 0.0),
+                    vec2<f32>(1.0, 0.0),
+                    vec2<f32>(0.0, 1.0),
+                    vec2<f32>(1.0, 1.0)
+                );
+                // Convert pixel coords to clip space (0-600 -> -1 to 1)
+                let clipX = (positions[vertexIndex].x / 300.0) - 1.0;
+                let clipY = 1.0 - (positions[vertexIndex].y / 300.0);
+                output.position = vec4<f32>(clipX, clipY, 0.0, 1.0);
+                output.texCoord = texCoords[vertexIndex];
+                return output;
+            }
+        `;
+
+        const fragmentShader = `
+            @group(0) @binding(0) var texSampler: sampler;
+            @group(0) @binding(1) var tex: texture_2d<f32>;
+
+            @fragment
+            fn main(@location(0) texCoord: vec2<f32>) -> @location(0) vec4<f32> {
+                return textureSample(tex, texSampler, texCoord);
+            }
+        `;
+
+        const vertexModule = this.device.createShaderModule({ code: vertexShader });
+        const fragmentModule = this.device.createShaderModule({ code: fragmentShader });
+
+        this.textBlitPipeline = this.device.createRenderPipeline({
+            layout: 'auto',
+            vertex: {
+                module: vertexModule,
+                entryPoint: 'main',
+            },
+            fragment: {
+                module: fragmentModule,
+                entryPoint: 'main',
+                targets: [{
+                    format: this.format,
+                    blend: {
+                        color: {
+                            srcFactor: 'src-alpha',
+                            dstFactor: 'one-minus-src-alpha',
+                            operation: 'add',
+                        },
+                        alpha: {
+                            srcFactor: 'one',
+                            dstFactor: 'one-minus-src-alpha',
+                            operation: 'add',
+                        },
+                    },
+                }],
+            },
+            primitive: {
+                topology: 'triangle-strip',
+            },
+        });
     }
 
     /**

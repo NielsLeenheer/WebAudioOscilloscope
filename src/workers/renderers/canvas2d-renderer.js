@@ -226,32 +226,42 @@ export class Canvas2DRenderer {
     }
 
     /**
-     * Draw FPS counter for debug mode
+     * Draw debug info (renderer type and FPS) for debug mode
      * @param {number} fps - Current FPS value
      */
-    drawFPS(fps) {
+    drawDebugInfo(fps) {
         if (!this.ctx) return;
 
         const ctx = this.ctx;
+        const rendererText = 'Canvas 2D';
         const fpsText = `${Math.round(fps)} FPS`;
 
-        ctx.font = 'bold 14px "Courier New", monospace';
-        const textMetrics = ctx.measureText(fpsText);
-        const textWidth = textMetrics.width;
+        ctx.font = 'bold 12px "Courier New", monospace';
 
-        const padding = 8;
+        // Measure text widths
+        const rendererMetrics = ctx.measureText(rendererText);
+        const fpsMetrics = ctx.measureText(fpsText);
+
+        const padding = 6;
+        const lineHeight = 14;
         const boxX = 110;
-        const boxY = 480 - padding - 14;
-        const boxWidth = textWidth + padding * 2;
-        const boxHeight = 14 + padding;
+        const boxY = 110; // Top left of visible area
+        const boxWidth = Math.max(rendererMetrics.width, fpsMetrics.width) + padding * 2;
+        const boxHeight = lineHeight * 2 + padding * 2;
 
+        // Draw background
         ctx.fillStyle = 'rgba(26, 26, 26, 0.7)';
         ctx.beginPath();
         ctx.roundRect(boxX, boxY, boxWidth, boxHeight, 4);
         ctx.fill();
 
+        // Draw renderer type
         ctx.fillStyle = '#4CAF50';
-        ctx.fillText(fpsText, boxX + padding, boxY + padding + 11);
+        ctx.fillText(rendererText, boxX + padding, boxY + padding + 10);
+
+        // Draw FPS
+        ctx.fillStyle = '#888';
+        ctx.fillText(fpsText, boxX + padding, boxY + padding + 10 + lineHeight);
     }
 
     /**
