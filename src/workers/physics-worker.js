@@ -436,8 +436,7 @@ function renderTrace(ctx, points, speeds, velocityDimming, basePower, deltaTime,
     const canvasScale = Math.min(canvasWidth, canvasHeight);
     const LINE_WIDTH_RATIO = 0.00375;      // 0.375% of canvas (1.5px on 400px)
     const GREEN_DOT_RATIO = 0.001875;      // 0.1875% of canvas (0.75px radius = 1.5px diameter on 400px, matches line width)
-    const RED_DOT_RATIO = 0.005;           // 0.5% of canvas (2px on 400px)
-    const BLUE_DOT_BASE_RATIO = 0.0025;    // 0.25% of canvas (1px on 400px)
+    const DEBUG_DOT_RATIO = 0.0025;        // 0.25% of canvas (1px on 400px) - same for red and blue debug dots
 
     // Time interval for each segment (in seconds, configurable via debug slider)
     const TIME_SEGMENT = timeSegment / 1000; // Convert from milliseconds to seconds
@@ -571,14 +570,14 @@ function renderTrace(ctx, points, speeds, velocityDimming, basePower, deltaTime,
     // Debug visualization: show interpolated points as red dots
     // Red dots only appear on interpolated points, not original sample points
     if (debugMode && dotOpacity > 0) {
-        const redDotSize = RED_DOT_RATIO * canvasScale;
+        const debugDotSize = DEBUG_DOT_RATIO * canvasScale;
         ctx.fillStyle = `rgba(255, 0, 0, ${dotOpacity})`;
         for (let i = 0; i < points.length; i++) {
             // Only show red dots for interpolated points (not original sample points)
             if (isInterpolated[i]) {
                 const point = points[i];
                 ctx.beginPath();
-                ctx.arc(point.x, point.y, redDotSize, 0, Math.PI * 2);
+                ctx.arc(point.x, point.y, debugDotSize, 0, Math.PI * 2);
                 ctx.fill();
             }
         }
@@ -588,7 +587,7 @@ function renderTrace(ctx, points, speeds, velocityDimming, basePower, deltaTime,
     // Use originalPoints to show actual sample rate, not interpolated points
     // Dot size scales with angle of direction change based on dotSizeVariation
     if (debugMode && sampleDotOpacity > 0) {
-        const blueDotBaseSize = BLUE_DOT_BASE_RATIO * canvasScale;
+        const blueDotBaseSize = DEBUG_DOT_RATIO * canvasScale;
         for (let i = 0; i < originalPoints.length; i++) {
             const point = originalPoints[i];
 

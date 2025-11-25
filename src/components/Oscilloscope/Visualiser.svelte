@@ -41,6 +41,7 @@
     let worker = null;
     let workerBusy = false;
     let lastFrameTime = 0;
+    let fps = $state(0);
 
     // High-DPI display support
     const devicePixelRatio = typeof window !== 'undefined' ? (window.devicePixelRatio || 1) : 1;
@@ -126,6 +127,10 @@
         // Calculate frame delta time (in seconds)
         const deltaTime = lastFrameTime === 0 ? 1/60 : (currentTime - lastFrameTime) / 1000;
         lastFrameTime = currentTime;
+
+        // Update FPS with smoothing
+        const currentFps = deltaTime > 0 ? 1 / deltaTime : 0;
+        fps = fps === 0 ? currentFps : fps * 0.9 + currentFps * 0.1;
 
         // Skip this frame if worker is still busy processing previous frame
         if (workerBusy) {
@@ -281,6 +286,12 @@
     style="filter: blur({Math.abs(focus) * 3}px);"
 ></canvas>
 
+{#if debugMode}
+    <div class="fps-counter">
+        {Math.round(fps)} FPS
+    </div>
+{/if}
+
 <style>
     .scope-canvas {
         position: absolute;
@@ -293,5 +304,20 @@
         /* Backing store resolution set programmatically based on devicePixelRatio */
         background: #1a1f1a;
         border-radius: 8px;
+    }
+
+    .fps-counter {
+        position: absolute;
+        bottom: 10px;
+        left: 10px;
+        color: #4CAF50;
+        font-family: 'Courier New', monospace;
+        font-size: 14px;
+        font-weight: bold;
+        background: rgba(26, 26, 26, 0.7);
+        padding: 4px 8px;
+        border-radius: 4px;
+        pointer-events: none;
+        z-index: 10;
     }
 </style>
