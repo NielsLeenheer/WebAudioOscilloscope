@@ -101,6 +101,9 @@
             worker.terminate();
             worker = null;
         }
+        // Reset state for next power cycle
+        workerBusy = false;
+        lastFrameTime = 0;
     }
 
     function startVisualization() {
@@ -278,11 +281,14 @@
             if (isPowered) {
                 // Increment key to force canvas recreation, then init after DOM updates
                 canvasKey++;
+                // Use tick + requestAnimationFrame to ensure canvas is fully bound
                 tick().then(() => {
-                    if (canvas && !worker) {
-                        initWorker();
-                        startVisualization();
-                    }
+                    requestAnimationFrame(() => {
+                        if (canvas && !worker) {
+                            initWorker();
+                            startVisualization();
+                        }
+                    });
                 });
             } else {
                 // Stop and destroy worker when powered off
