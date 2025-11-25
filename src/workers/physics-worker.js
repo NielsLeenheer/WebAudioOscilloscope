@@ -6,6 +6,7 @@ let velocityY = 0;
 let smoothedBeamX = 0;
 let smoothedBeamY = 0;
 let smoothedBasePower = 0; // Smoothed beam intensity for stable persistence calculation
+let fps = 0; // Smoothed FPS counter for debug mode
 let offscreenCanvas = null;
 let ctx = null;
 let devicePixelRatio = 1;
@@ -697,6 +698,10 @@ self.onmessage = function(e) {
 
         if (!ctx) return;
 
+        // Calculate and smooth FPS for debug mode display
+        const currentFps = deltaTime > 0 ? 1 / deltaTime : 0;
+        fps = fps === 0 ? currentFps : fps * 0.9 + currentFps * 0.1;
+
         // Smooth the basePower value to prevent flickering during slider adjustments
         // Use exponential smoothing: slow response prevents unstable persistence during rapid changes
         const PERSISTENCE_SMOOTHING = 0.95; // Higher = slower response, more stable
@@ -750,6 +755,33 @@ self.onmessage = function(e) {
             // ========================================================================
 
             renderTrace(ctx, points, speeds, velocityDimming, basePower, deltaTime, sampleRate, debugMode, timeSegment, dotOpacity, dotSizeVariation, sampleDotOpacity, canvasWidth, canvasHeight);
+        }
+
+        // Draw FPS counter in debug mode
+        if (debugMode) {
+            const fpsText = `${Math.round(fps)} FPS`;
+
+            // Set font for measuring text
+            ctx.font = 'bold 14px "Courier New", monospace';
+            const textMetrics = ctx.measureText(fpsText);
+            const textWidth = textMetrics.width;
+
+            // Position and dimensions (matching original CSS: bottom 10px, left 10px)
+            const padding = 8;
+            const boxX = 10;
+            const boxY = canvasHeight - 10 - 14 - padding; // 10px from bottom, 14px font height, padding
+            const boxWidth = textWidth + padding * 2;
+            const boxHeight = 14 + padding;
+
+            // Draw background with rounded corners (rgba(26, 26, 26, 0.7))
+            ctx.fillStyle = 'rgba(26, 26, 26, 0.7)';
+            ctx.beginPath();
+            ctx.roundRect(boxX, boxY, boxWidth, boxHeight, 4);
+            ctx.fill();
+
+            // Draw text (#4CAF50 green)
+            ctx.fillStyle = '#4CAF50';
+            ctx.fillText(fpsText, boxX + padding, boxY + padding + 11); // 11px baseline offset
         }
 
         // Send ready message back to main thread
