@@ -436,6 +436,23 @@ export function extractPointsFromElement(element, samples) {
 }
 
 /**
+ * Get the total length of an SVG element
+ * @param {SVGGeometryElement} element - SVG element
+ * @returns {number} Total length of the element
+ */
+function getElementLength(element) {
+    try {
+        if (typeof element.getTotalLength === 'function') {
+            const length = element.getTotalLength();
+            return isFinite(length) && length > 0 ? length : 0;
+        }
+    } catch (error) {
+        // Element may not support getTotalLength
+    }
+    return 0;
+}
+
+/**
  * Parse full SVG markup and extract all paths (static, no animation)
  * @param {string} markup - Full SVG markup string
  * @param {number} samples - Number of samples per element
@@ -478,10 +495,36 @@ export function parseSVGMarkupStatic(markup, samples, optimize = true, doubleDra
         throw new Error('No drawable shapes found in SVG');
     }
 
-    // Extract segments from all elements
+    // Calculate total length across all elements for proportional distribution
+    const elementLengths = Array.from(elements).map(el => getElementLength(el));
+    const totalLength = elementLengths.reduce((sum, len) => sum + len, 0);
+
+    // Extract segments from all elements with proportional sample distribution
     let allSegments = [];
-    elements.forEach((element) => {
-        const elementSegments = extractPointsFromElement(element, Math.floor(samples / elements.length));
+    let samplesUsed = 0;
+
+    elements.forEach((element, index) => {
+        const elementLength = elementLengths[index];
+
+        // Calculate proportional samples based on element length
+        let elementSamples;
+        if (totalLength > 0 && elementLength > 0) {
+            // For the last element, use remaining samples to avoid rounding errors
+            if (index === elements.length - 1) {
+                elementSamples = samples - samplesUsed;
+            } else {
+                elementSamples = Math.floor(samples * (elementLength / totalLength));
+            }
+            // Ensure at least 2 samples per element
+            elementSamples = Math.max(2, elementSamples);
+        } else {
+            // Fallback to equal distribution if length calculation fails
+            elementSamples = Math.floor(samples / elements.length);
+        }
+
+        samplesUsed += elementSamples;
+
+        const elementSegments = extractPointsFromElement(element, elementSamples);
         if (elementSegments.length > 0) {
             allSegments = allSegments.concat(elementSegments);
         }
@@ -536,10 +579,36 @@ export function sampleCurrentFrame(svgElement, elements, samples, optimize = tru
     // Force style recalculation to get current animated state
     svgElement.getBoundingClientRect();
 
-    // Extract segments from all elements at current animation state
+    // Calculate total length across all elements for proportional distribution
+    const elementLengths = Array.from(elements).map(el => getElementLength(el));
+    const totalLength = elementLengths.reduce((sum, len) => sum + len, 0);
+
+    // Extract segments from all elements with proportional sample distribution
     let frameSegments = [];
-    elements.forEach((element) => {
-        const elementSegments = extractPointsFromElement(element, Math.floor(samples / elements.length));
+    let samplesUsed = 0;
+
+    elements.forEach((element, index) => {
+        const elementLength = elementLengths[index];
+
+        // Calculate proportional samples based on element length
+        let elementSamples;
+        if (totalLength > 0 && elementLength > 0) {
+            // For the last element, use remaining samples to avoid rounding errors
+            if (index === elements.length - 1) {
+                elementSamples = samples - samplesUsed;
+            } else {
+                elementSamples = Math.floor(samples * (elementLength / totalLength));
+            }
+            // Ensure at least 2 samples per element
+            elementSamples = Math.max(2, elementSamples);
+        } else {
+            // Fallback to equal distribution if length calculation fails
+            elementSamples = Math.floor(samples / elements.length);
+        }
+
+        samplesUsed += elementSamples;
+
+        const elementSegments = extractPointsFromElement(element, elementSamples);
         if (elementSegments.length > 0) {
             frameSegments = frameSegments.concat(elementSegments);
         }
