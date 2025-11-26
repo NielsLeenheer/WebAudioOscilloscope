@@ -308,6 +308,86 @@ export class WebGPURenderer {
             },
         });
 
+        // Create colored line pipeline for debug dots (red/blue)
+        const coloredLineVertexShader = `
+            struct VertexInput {
+                @location(0) position: vec2<f32>,
+                @location(1) color: vec3<f32>,
+                @location(2) opacity: f32,
+            }
+
+            struct VertexOutput {
+                @builtin(position) position: vec4<f32>,
+                @location(0) color: vec3<f32>,
+                @location(1) opacity: f32,
+            }
+
+            @vertex
+            fn main(input: VertexInput) -> VertexOutput {
+                var output: VertexOutput;
+                // Convert from pixel coordinates to clip space [-1, 1]
+                let clipX = (input.position.x / 300.0) - 1.0;
+                let clipY = 1.0 - (input.position.y / 300.0);
+                output.position = vec4<f32>(clipX, clipY, 0.0, 1.0);
+                output.color = input.color;
+                output.opacity = input.opacity;
+                return output;
+            }
+        `;
+
+        const coloredLineFragmentShader = `
+            struct FragmentInput {
+                @location(0) color: vec3<f32>,
+                @location(1) opacity: f32,
+            }
+
+            @fragment
+            fn main(input: FragmentInput) -> @location(0) vec4<f32> {
+                return vec4<f32>(input.color * input.opacity, input.opacity);
+            }
+        `;
+
+        const coloredLineVertexModule = this.device.createShaderModule({ code: coloredLineVertexShader });
+        const coloredLineFragmentModule = this.device.createShaderModule({ code: coloredLineFragmentShader });
+
+        this.coloredLinePipeline = this.device.createRenderPipeline({
+            layout: 'auto',
+            vertex: {
+                module: coloredLineVertexModule,
+                entryPoint: 'main',
+                buffers: [{
+                    arrayStride: 24, // 2 floats position + 3 floats color + 1 float opacity
+                    attributes: [
+                        { shaderLocation: 0, offset: 0, format: 'float32x2' },
+                        { shaderLocation: 1, offset: 8, format: 'float32x3' },
+                        { shaderLocation: 2, offset: 20, format: 'float32' },
+                    ],
+                }],
+            },
+            fragment: {
+                module: coloredLineFragmentModule,
+                entryPoint: 'main',
+                targets: [{
+                    format: this.format,
+                    blend: {
+                        color: {
+                            srcFactor: 'one',  // Premultiplied alpha
+                            dstFactor: 'one-minus-src-alpha',
+                            operation: 'add',
+                        },
+                        alpha: {
+                            srcFactor: 'one',
+                            dstFactor: 'one-minus-src-alpha',
+                            operation: 'add',
+                        },
+                    },
+                }],
+            },
+            primitive: {
+                topology: 'triangle-strip',
+            },
+        });
+
         // Fullscreen quad shader for persistence/fade effect
         const fadeVertexShader = `
             struct VertexOutput {
@@ -691,40 +771,59 @@ export class WebGPURenderer {
         }
 
         // Build debug dot vertices (red for interpolated, blue for samples)
-        const debugDotVertices = [];
+        // Format: position (2), color (3), opacity (1) = 6 floats per vertex
+        const coloredDotVertices = [];
         const debugDotSize = DEBUG_DOT_RATIO * canvasScale;
 
+        // Helper to add a colored quad
+        const addColoredQuad = (x, y, size, r, g, b, opacity) => {
+            // Add degenerate to start new quad (duplicate first vertex)
+            if (coloredDotVertices.length > 0) {
+                // Duplicate last vertex of previous quad
+                const lastIdx = coloredDotVertices.length - 6;
+                coloredDotVertices.push(
+                    coloredDotVertices[lastIdx], coloredDotVertices[lastIdx + 1],
+                    coloredDotVertices[lastIdx + 2], coloredDotVertices[lastIdx + 3],
+                    coloredDotVertices[lastIdx + 4], coloredDotVertices[lastIdx + 5]
+                );
+                // Duplicate first vertex of this quad
+                coloredDotVertices.push(x - size, y - size, r, g, b, opacity);
+            }
+
+            // Quad vertices for triangle strip
+            coloredDotVertices.push(x - size, y - size, r, g, b, opacity);  // bottom-left
+            coloredDotVertices.push(x + size, y - size, r, g, b, opacity);  // bottom-right
+            coloredDotVertices.push(x - size, y + size, r, g, b, opacity);  // top-left
+            coloredDotVertices.push(x + size, y + size, r, g, b, opacity);  // top-right
+        };
+
         if (debugMode) {
-            // Red dots for interpolated points
+            // Red dots for interpolated points (255, 0, 0)
             if (dotOpacity > 0) {
                 for (let i = 0; i < renderPoints.length; i++) {
                     if (isInterpolated[i]) {
                         const point = renderPoints[i];
-                        const size = debugDotSize;
-                        // Red color encoded in vertices (we'll need a different approach)
-                        // For now, render with same pipeline but different color uniform would be needed
-                        // Skip for simplicity - or render as green with low opacity
+                        addColoredQuad(point.x, point.y, debugDotSize, 1.0, 0.0, 0.0, dotOpacity);
                     }
                 }
             }
 
-            // Blue dots for sample points
+            // Blue dots for sample points (59, 130, 246) / 255
             if (sampleDotOpacity > 0) {
                 for (let i = 0; i < originalPoints.length; i++) {
                     const point = originalPoints[i];
                     const brightness = directionChanges.get(i) || 0;
                     const sizeMultiplier = 1 + (brightness * (dotSizeVariation - 1));
                     const size = debugDotSize * sizeMultiplier;
-
-                    // For now using same shader - color will be green
-                    // Would need separate colored shader for proper red/blue
+                    addColoredQuad(point.x, point.y, size, 0.231, 0.510, 0.965, sampleDotOpacity);
                 }
             }
         }
 
-        // Create GPU buffer for line vertices
+        // Create GPU buffers for vertices
         const lineVertexArray = new Float32Array(lineVertices);
         const dotVertexArray = new Float32Array(dotVertices);
+        const coloredDotVertexArray = new Float32Array(coloredDotVertices);
 
         // Debug: Log vertex count on first frame
         if (!this._vertexDebugLogged && lineVertices.length > 0) {
@@ -733,12 +832,13 @@ export class WebGPURenderer {
                 vertexCount: lineVertices.length / 3,
                 byteSize: lineVertexArray.byteLength,
                 dotCount: dotVertices.length / 3,
+                coloredDotCount: coloredDotVertices.length / 6,
                 sampleVertices: lineVertices.slice(0, 12) // First 4 vertices
             });
             this._vertexDebugLogged = true;
         }
 
-        if (lineVertexArray.byteLength === 0 && dotVertexArray.byteLength === 0) {
+        if (lineVertexArray.byteLength === 0 && dotVertexArray.byteLength === 0 && coloredDotVertexArray.byteLength === 0) {
             console.warn('WebGPU: No vertices to render');
             return;
         }
@@ -759,6 +859,15 @@ export class WebGPURenderer {
                 usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
             });
             this.device.queue.writeBuffer(dotVertexBuffer, 0, dotVertexArray);
+        }
+
+        let coloredDotVertexBuffer = null;
+        if (coloredDotVertexArray.byteLength > 0) {
+            coloredDotVertexBuffer = this.device.createBuffer({
+                size: coloredDotVertexArray.byteLength,
+                usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
+            });
+            this.device.queue.writeBuffer(coloredDotVertexBuffer, 0, coloredDotVertexArray);
         }
 
         // Update fade uniform
@@ -823,6 +932,13 @@ export class WebGPURenderer {
             renderPass.draw(dotVertices.length / 3);
         }
 
+        // Draw colored debug dots (red/blue)
+        if (coloredDotVertexBuffer && coloredDotVertices.length > 0) {
+            renderPass.setPipeline(this.coloredLinePipeline);
+            renderPass.setVertexBuffer(0, coloredDotVertexBuffer);
+            renderPass.draw(coloredDotVertices.length / 6);  // 6 floats per vertex
+        }
+
         renderPass.end();
 
         // Third pass: copy render target to persistence texture for next frame
@@ -850,6 +966,7 @@ export class WebGPURenderer {
         // Clean up temporary buffers
         if (lineVertexBuffer) lineVertexBuffer.destroy();
         if (dotVertexBuffer) dotVertexBuffer.destroy();
+        if (coloredDotVertexBuffer) coloredDotVertexBuffer.destroy();
 
         } catch (error) {
             console.error('WebGPU renderTrace error:', error);
