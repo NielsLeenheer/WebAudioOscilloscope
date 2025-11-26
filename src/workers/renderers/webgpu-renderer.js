@@ -622,7 +622,7 @@ export class WebGPURenderer {
             }
         `;
 
-        // Bloom composite shader - adds bloom to original with high intensity for prominent glow
+        // Bloom composite shader - DEBUG: show only the bloom texture to verify blur is working
         const bloomCompositeShader = `
             @group(0) @binding(0) var texSampler: sampler;
             @group(0) @binding(1) var originalTex: texture_2d<f32>;
@@ -634,10 +634,9 @@ export class WebGPURenderer {
 
             @fragment
             fn main(input: FragmentInput) -> @location(0) vec4<f32> {
-                let original = textureSample(originalTex, texSampler, input.texCoord);
                 let bloom = textureSample(bloomTex, texSampler, input.texCoord);
-                // Add bloom with high intensity for prominent glow halo around thin trace
-                return vec4<f32>(original.rgb + bloom.rgb * 3.0, original.a);
+                // DEBUG: Show only the bloom texture content to verify blur spread
+                return vec4<f32>(bloom.rgb, 1.0);
             }
         `;
 
