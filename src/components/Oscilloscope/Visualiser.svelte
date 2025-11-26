@@ -9,6 +9,7 @@
         // Physics parameters
         debugMode,
         rendererType = 'canvas2d',
+        bloomEnabled = false,
         onRenderersAvailable = () => {},
         timeSegment,
         dotOpacity,
@@ -226,6 +227,7 @@
                     scale,
                     visibleScale,
                     debugMode,
+                    bloomEnabled,
                     timeSegment,
                     dotOpacity,
                     dotSizeVariation,

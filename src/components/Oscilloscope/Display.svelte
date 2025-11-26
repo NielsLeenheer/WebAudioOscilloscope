@@ -24,6 +24,7 @@
     let dotOpacity = $state(0.0); // Debug dot opacity for red dots/segment endpoints (0.0 to 1.0)
     let dotSizeVariation = $state(1.0); // Debug dot size variation based on angle (1 = all same, 10 = 10x variation)
     let sampleDotOpacity = $state(0.5); // Debug dot opacity for blue dots/sample points (0.0 to 1.0)
+    let bloomEnabled = $state(false); // Experimental WebGPU bloom/glow effect
 
     // Electromagnetic model parameters
     let coilStrength = $state(0.60);
@@ -57,6 +58,7 @@
         bind:rendererType
         {availableRenderers}
         {isPowered}
+        bind:bloomEnabled
         bind:timeSegment
         bind:dotOpacity
         bind:dotSizeVariation
@@ -79,6 +81,7 @@
                 {mode}
                 {debugMode}
                 {rendererType}
+                {bloomEnabled}
                 onRenderersAvailable={(renderers) => availableRenderers = renderers}
                 {timeSegment}
                 {dotOpacity}

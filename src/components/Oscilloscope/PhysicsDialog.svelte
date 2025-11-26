@@ -6,6 +6,7 @@
         rendererType = $bindable(),
         availableRenderers = [],
         isPowered = false,
+        bloomEnabled = $bindable(),
         timeSegment = $bindable(),
         dotOpacity = $bindable(),
         dotSizeVariation = $bindable(),
@@ -164,6 +165,10 @@
                 <input type="range" min="1" max="10" step="0.1" bind:value={dotSizeVariation} />
                 <span class="value">{dotSizeVariation.toFixed(1)}</span>
             </div>
+            {#if rendererType === 'webgpu'}
+                <div class="mode-separator"></div>
+                <ToggleSwitch bind:checked={bloomEnabled} label="Bloom (experimental)" />
+            {/if}
         {/if}
     </div>
 </dialog>

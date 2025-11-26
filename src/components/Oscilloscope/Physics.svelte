@@ -10,6 +10,7 @@
         rendererType = $bindable(),
         availableRenderers = [],
         isPowered = false,
+        bloomEnabled = $bindable(),
         timeSegment = $bindable(),
         dotOpacity = $bindable(),
         dotSizeVariation = $bindable(),
@@ -47,6 +48,7 @@
     bind:rendererType
     {availableRenderers}
     {isPowered}
+    bind:bloomEnabled
     bind:timeSegment
     bind:dotOpacity
     bind:dotSizeVariation

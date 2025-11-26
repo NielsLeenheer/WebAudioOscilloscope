@@ -26,6 +26,17 @@ export class WebGPURenderer {
         this.sampler = null;
         this.bindGroupLayout = null;
         this.persistenceBindGroup = null;
+
+        // Bloom effect textures and pipelines
+        this.bloomTexture = null;
+        this.bloomTextureView = null;
+        this.bloomBlurTexture = null;
+        this.bloomBlurTextureView = null;
+        this.bloomExtractPipeline = null;
+        this.bloomBlurHPipeline = null;
+        this.bloomBlurVPipeline = null;
+        this.bloomCompositePipeline = null;
+        this.bloomBindGroupLayout = null;
     }
 
     /**
@@ -96,6 +107,28 @@ export class WebGPURenderer {
                        GPUTextureUsage.RENDER_ATTACHMENT,
             });
             this.renderTargetTextureView = this.renderTargetTexture.createView();
+
+            // Create bloom textures (half resolution for performance)
+            const bloomWidth = Math.floor(physicalWidth / 2);
+            const bloomHeight = Math.floor(physicalHeight / 2);
+            this.bloomWidth = bloomWidth;
+            this.bloomHeight = bloomHeight;
+
+            this.bloomTexture = this.device.createTexture({
+                size: [bloomWidth, bloomHeight],
+                format: this.format,
+                usage: GPUTextureUsage.TEXTURE_BINDING |
+                       GPUTextureUsage.RENDER_ATTACHMENT,
+            });
+            this.bloomTextureView = this.bloomTexture.createView();
+
+            this.bloomBlurTexture = this.device.createTexture({
+                size: [bloomWidth, bloomHeight],
+                format: this.format,
+                usage: GPUTextureUsage.TEXTURE_BINDING |
+                       GPUTextureUsage.RENDER_ATTACHMENT,
+            });
+            this.bloomBlurTextureView = this.bloomBlurTexture.createView();
 
             // Create sampler for texture sampling
             this.sampler = this.device.createSampler({
@@ -514,6 +547,165 @@ export class WebGPURenderer {
             size: 4,
             usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
         });
+
+        // ============================================
+        // BLOOM EFFECT PIPELINES
+        // ============================================
+
+        // Bloom extract shader - extracts bright parts and downsamples
+        const bloomExtractShader = `
+            @group(0) @binding(0) var texSampler: sampler;
+            @group(0) @binding(1) var tex: texture_2d<f32>;
+
+            struct FragmentInput {
+                @location(0) texCoord: vec2<f32>,
+            }
+
+            @fragment
+            fn main(input: FragmentInput) -> @location(0) vec4<f32> {
+                let color = textureSample(tex, texSampler, input.texCoord);
+                // Extract bright parts - threshold at 0.3 brightness
+                let brightness = dot(color.rgb, vec3<f32>(0.2126, 0.7152, 0.0722));
+                let threshold = 0.3;
+                let contribution = max(brightness - threshold, 0.0) / max(brightness, 0.001);
+                return vec4<f32>(color.rgb * contribution * 1.5, color.a);
+            }
+        `;
+
+        // Horizontal blur shader
+        const bloomBlurHShader = `
+            @group(0) @binding(0) var texSampler: sampler;
+            @group(0) @binding(1) var tex: texture_2d<f32>;
+            @group(0) @binding(2) var<uniform> texelSize: vec2<f32>;
+
+            struct FragmentInput {
+                @location(0) texCoord: vec2<f32>,
+            }
+
+            @fragment
+            fn main(input: FragmentInput) -> @location(0) vec4<f32> {
+                // 9-tap Gaussian blur weights
+                let weights = array<f32, 5>(0.227027, 0.1945946, 0.1216216, 0.054054, 0.016216);
+                var result = textureSample(tex, texSampler, input.texCoord) * weights[0];
+
+                for (var i = 1; i < 5; i++) {
+                    let offset = vec2<f32>(texelSize.x * f32(i), 0.0);
+                    result += textureSample(tex, texSampler, input.texCoord + offset) * weights[i];
+                    result += textureSample(tex, texSampler, input.texCoord - offset) * weights[i];
+                }
+                return result;
+            }
+        `;
+
+        // Vertical blur shader
+        const bloomBlurVShader = `
+            @group(0) @binding(0) var texSampler: sampler;
+            @group(0) @binding(1) var tex: texture_2d<f32>;
+            @group(0) @binding(2) var<uniform> texelSize: vec2<f32>;
+
+            struct FragmentInput {
+                @location(0) texCoord: vec2<f32>,
+            }
+
+            @fragment
+            fn main(input: FragmentInput) -> @location(0) vec4<f32> {
+                // 9-tap Gaussian blur weights
+                let weights = array<f32, 5>(0.227027, 0.1945946, 0.1216216, 0.054054, 0.016216);
+                var result = textureSample(tex, texSampler, input.texCoord) * weights[0];
+
+                for (var i = 1; i < 5; i++) {
+                    let offset = vec2<f32>(0.0, texelSize.y * f32(i));
+                    result += textureSample(tex, texSampler, input.texCoord + offset) * weights[i];
+                    result += textureSample(tex, texSampler, input.texCoord - offset) * weights[i];
+                }
+                return result;
+            }
+        `;
+
+        // Bloom composite shader - adds bloom to original
+        const bloomCompositeShader = `
+            @group(0) @binding(0) var texSampler: sampler;
+            @group(0) @binding(1) var originalTex: texture_2d<f32>;
+            @group(0) @binding(2) var bloomTex: texture_2d<f32>;
+
+            struct FragmentInput {
+                @location(0) texCoord: vec2<f32>,
+            }
+
+            @fragment
+            fn main(input: FragmentInput) -> @location(0) vec4<f32> {
+                let original = textureSample(originalTex, texSampler, input.texCoord);
+                let bloom = textureSample(bloomTex, texSampler, input.texCoord);
+                // Add bloom with intensity
+                return vec4<f32>(original.rgb + bloom.rgb * 0.8, original.a);
+            }
+        `;
+
+        const bloomExtractModule = this.device.createShaderModule({ code: bloomExtractShader });
+        const bloomBlurHModule = this.device.createShaderModule({ code: bloomBlurHShader });
+        const bloomBlurVModule = this.device.createShaderModule({ code: bloomBlurVShader });
+        const bloomCompositeModule = this.device.createShaderModule({ code: bloomCompositeShader });
+
+        // Bloom bind group layout (sampler + texture)
+        this.bloomBindGroupLayout = this.device.createBindGroupLayout({
+            entries: [
+                { binding: 0, visibility: GPUShaderStage.FRAGMENT, sampler: {} },
+                { binding: 1, visibility: GPUShaderStage.FRAGMENT, texture: {} },
+            ],
+        });
+
+        // Bloom blur bind group layout (sampler + texture + texelSize uniform)
+        this.bloomBlurBindGroupLayout = this.device.createBindGroupLayout({
+            entries: [
+                { binding: 0, visibility: GPUShaderStage.FRAGMENT, sampler: {} },
+                { binding: 1, visibility: GPUShaderStage.FRAGMENT, texture: {} },
+                { binding: 2, visibility: GPUShaderStage.FRAGMENT, buffer: { type: 'uniform' } },
+            ],
+        });
+
+        // Bloom composite bind group layout (sampler + 2 textures)
+        this.bloomCompositeBindGroupLayout = this.device.createBindGroupLayout({
+            entries: [
+                { binding: 0, visibility: GPUShaderStage.FRAGMENT, sampler: {} },
+                { binding: 1, visibility: GPUShaderStage.FRAGMENT, texture: {} },
+                { binding: 2, visibility: GPUShaderStage.FRAGMENT, texture: {} },
+            ],
+        });
+
+        // Create bloom pipelines
+        this.bloomExtractPipeline = this.device.createRenderPipeline({
+            layout: this.device.createPipelineLayout({ bindGroupLayouts: [this.bloomBindGroupLayout] }),
+            vertex: { module: fadeVertexModule, entryPoint: 'main' },
+            fragment: { module: bloomExtractModule, entryPoint: 'main', targets: [{ format: this.format }] },
+            primitive: { topology: 'triangle-strip' },
+        });
+
+        this.bloomBlurHPipeline = this.device.createRenderPipeline({
+            layout: this.device.createPipelineLayout({ bindGroupLayouts: [this.bloomBlurBindGroupLayout] }),
+            vertex: { module: fadeVertexModule, entryPoint: 'main' },
+            fragment: { module: bloomBlurHModule, entryPoint: 'main', targets: [{ format: this.format }] },
+            primitive: { topology: 'triangle-strip' },
+        });
+
+        this.bloomBlurVPipeline = this.device.createRenderPipeline({
+            layout: this.device.createPipelineLayout({ bindGroupLayouts: [this.bloomBlurBindGroupLayout] }),
+            vertex: { module: fadeVertexModule, entryPoint: 'main' },
+            fragment: { module: bloomBlurVModule, entryPoint: 'main', targets: [{ format: this.format }] },
+            primitive: { topology: 'triangle-strip' },
+        });
+
+        this.bloomCompositePipeline = this.device.createRenderPipeline({
+            layout: this.device.createPipelineLayout({ bindGroupLayouts: [this.bloomCompositeBindGroupLayout] }),
+            vertex: { module: fadeVertexModule, entryPoint: 'main' },
+            fragment: { module: bloomCompositeModule, entryPoint: 'main', targets: [{ format: this.format }] },
+            primitive: { topology: 'triangle-strip' },
+        });
+
+        // Create uniform buffer for bloom texel size
+        this.bloomTexelSizeBuffer = this.device.createBuffer({
+            size: 8, // vec2<f32>
+            usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+        });
     }
 
     /**
@@ -607,6 +799,7 @@ export class WebGPURenderer {
             deltaTime,
             sampleRate,
             debugMode,
+            bloomEnabled,
             timeSegment,
             dotOpacity,
             dotSizeVariation,
@@ -948,18 +1141,112 @@ export class WebGPURenderer {
             [this.logicalWidth * this.devicePixelRatio, this.logicalHeight * this.devicePixelRatio]
         );
 
-        // Fourth pass: blit render target to swap chain for display
-        const blitPass = commandEncoder.beginRenderPass({
-            colorAttachments: [{
-                view: swapChainView,
-                loadOp: 'clear',
-                storeOp: 'store',
-            }],
-        });
-        blitPass.setPipeline(this.blitPipeline);
-        blitPass.setBindGroup(0, renderTargetBindGroup);
-        blitPass.draw(4);
-        blitPass.end();
+        // Apply bloom effect if enabled
+        if (bloomEnabled && this.bloomExtractPipeline) {
+            // Update texel size uniform for blur passes
+            const texelSize = new Float32Array([1.0 / this.bloomWidth, 1.0 / this.bloomHeight]);
+            this.device.queue.writeBuffer(this.bloomTexelSizeBuffer, 0, texelSize);
+
+            // Bloom pass 1: Extract bright parts from render target to bloom texture
+            const bloomExtractBindGroup = this.device.createBindGroup({
+                layout: this.bloomBindGroupLayout,
+                entries: [
+                    { binding: 0, resource: this.sampler },
+                    { binding: 1, resource: this.renderTargetTextureView },
+                ],
+            });
+
+            const extractPass = commandEncoder.beginRenderPass({
+                colorAttachments: [{
+                    view: this.bloomTextureView,
+                    loadOp: 'clear',
+                    storeOp: 'store',
+                }],
+            });
+            extractPass.setPipeline(this.bloomExtractPipeline);
+            extractPass.setBindGroup(0, bloomExtractBindGroup);
+            extractPass.draw(4);
+            extractPass.end();
+
+            // Bloom pass 2: Horizontal blur (bloom -> bloomBlur)
+            const blurHBindGroup = this.device.createBindGroup({
+                layout: this.bloomBlurBindGroupLayout,
+                entries: [
+                    { binding: 0, resource: this.sampler },
+                    { binding: 1, resource: this.bloomTextureView },
+                    { binding: 2, resource: { buffer: this.bloomTexelSizeBuffer } },
+                ],
+            });
+
+            const blurHPass = commandEncoder.beginRenderPass({
+                colorAttachments: [{
+                    view: this.bloomBlurTextureView,
+                    loadOp: 'clear',
+                    storeOp: 'store',
+                }],
+            });
+            blurHPass.setPipeline(this.bloomBlurHPipeline);
+            blurHPass.setBindGroup(0, blurHBindGroup);
+            blurHPass.draw(4);
+            blurHPass.end();
+
+            // Bloom pass 3: Vertical blur (bloomBlur -> bloom)
+            const blurVBindGroup = this.device.createBindGroup({
+                layout: this.bloomBlurBindGroupLayout,
+                entries: [
+                    { binding: 0, resource: this.sampler },
+                    { binding: 1, resource: this.bloomBlurTextureView },
+                    { binding: 2, resource: { buffer: this.bloomTexelSizeBuffer } },
+                ],
+            });
+
+            const blurVPass = commandEncoder.beginRenderPass({
+                colorAttachments: [{
+                    view: this.bloomTextureView,
+                    loadOp: 'clear',
+                    storeOp: 'store',
+                }],
+            });
+            blurVPass.setPipeline(this.bloomBlurVPipeline);
+            blurVPass.setBindGroup(0, blurVBindGroup);
+            blurVPass.draw(4);
+            blurVPass.end();
+
+            // Bloom pass 4: Composite (render target + bloom -> swap chain)
+            const compositeBindGroup = this.device.createBindGroup({
+                layout: this.bloomCompositeBindGroupLayout,
+                entries: [
+                    { binding: 0, resource: this.sampler },
+                    { binding: 1, resource: this.renderTargetTextureView },
+                    { binding: 2, resource: this.bloomTextureView },
+                ],
+            });
+
+            const compositePass = commandEncoder.beginRenderPass({
+                colorAttachments: [{
+                    view: swapChainView,
+                    loadOp: 'clear',
+                    storeOp: 'store',
+                }],
+            });
+            compositePass.setPipeline(this.bloomCompositePipeline);
+            compositePass.setBindGroup(0, compositeBindGroup);
+            compositePass.draw(4);
+            compositePass.end();
+        } else {
+            // No bloom - simple blit render target to swap chain for display
+            const blitPass = commandEncoder.beginRenderPass({
+                colorAttachments: [{
+                    view: swapChainView,
+                    loadOp: 'clear',
+                    storeOp: 'store',
+                }],
+            });
+            blitPass.setPipeline(this.blitPipeline);
+            blitPass.setBindGroup(0, renderTargetBindGroup);
+            blitPass.draw(4);
+            blitPass.end();
+        }
 
         this.device.queue.submit([commandEncoder.finish()]);
 
@@ -1100,9 +1387,21 @@ export class WebGPURenderer {
             this.renderTargetTexture.destroy();
             this.renderTargetTexture = null;
         }
+        if (this.bloomTexture) {
+            this.bloomTexture.destroy();
+            this.bloomTexture = null;
+        }
+        if (this.bloomBlurTexture) {
+            this.bloomBlurTexture.destroy();
+            this.bloomBlurTexture = null;
+        }
         if (this.fadeUniformBuffer) {
             this.fadeUniformBuffer.destroy();
             this.fadeUniformBuffer = null;
+        }
+        if (this.bloomTexelSizeBuffer) {
+            this.bloomTexelSizeBuffer.destroy();
+            this.bloomTexelSizeBuffer = null;
         }
         this.device = null;
         this.context = null;
