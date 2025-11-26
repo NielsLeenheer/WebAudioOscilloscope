@@ -564,15 +564,15 @@ export class WebGPURenderer {
             @fragment
             fn main(input: FragmentInput) -> @location(0) vec4<f32> {
                 let color = textureSample(tex, texSampler, input.texCoord);
-                // Extract bright parts - threshold at 0.3 brightness
+                // Extract bright parts - low threshold to catch more of the phosphor glow
                 let brightness = dot(color.rgb, vec3<f32>(0.2126, 0.7152, 0.0722));
-                let threshold = 0.3;
+                let threshold = 0.1;
                 let contribution = max(brightness - threshold, 0.0) / max(brightness, 0.001);
-                return vec4<f32>(color.rgb * contribution * 1.5, color.a);
+                return vec4<f32>(color.rgb * contribution * 2.0, color.a);
             }
         `;
 
-        // Horizontal blur shader
+        // Horizontal blur shader - wider blur for visible glow
         const bloomBlurHShader = `
             @group(0) @binding(0) var texSampler: sampler;
             @group(0) @binding(1) var tex: texture_2d<f32>;
@@ -584,12 +584,12 @@ export class WebGPURenderer {
 
             @fragment
             fn main(input: FragmentInput) -> @location(0) vec4<f32> {
-                // 9-tap Gaussian blur weights
+                // 9-tap Gaussian blur weights with wider spread (3x texel size)
                 let weights = array<f32, 5>(0.227027, 0.1945946, 0.1216216, 0.054054, 0.016216);
                 var result = textureSample(tex, texSampler, input.texCoord) * weights[0];
 
                 for (var i = 1; i < 5; i++) {
-                    let offset = vec2<f32>(texelSize.x * f32(i), 0.0);
+                    let offset = vec2<f32>(texelSize.x * f32(i) * 3.0, 0.0);
                     result += textureSample(tex, texSampler, input.texCoord + offset) * weights[i];
                     result += textureSample(tex, texSampler, input.texCoord - offset) * weights[i];
                 }
@@ -597,7 +597,7 @@ export class WebGPURenderer {
             }
         `;
 
-        // Vertical blur shader
+        // Vertical blur shader - wider blur for visible glow
         const bloomBlurVShader = `
             @group(0) @binding(0) var texSampler: sampler;
             @group(0) @binding(1) var tex: texture_2d<f32>;
@@ -609,12 +609,12 @@ export class WebGPURenderer {
 
             @fragment
             fn main(input: FragmentInput) -> @location(0) vec4<f32> {
-                // 9-tap Gaussian blur weights
+                // 9-tap Gaussian blur weights with wider spread (3x texel size)
                 let weights = array<f32, 5>(0.227027, 0.1945946, 0.1216216, 0.054054, 0.016216);
                 var result = textureSample(tex, texSampler, input.texCoord) * weights[0];
 
                 for (var i = 1; i < 5; i++) {
-                    let offset = vec2<f32>(0.0, texelSize.y * f32(i));
+                    let offset = vec2<f32>(0.0, texelSize.y * f32(i) * 3.0);
                     result += textureSample(tex, texSampler, input.texCoord + offset) * weights[i];
                     result += textureSample(tex, texSampler, input.texCoord - offset) * weights[i];
                 }
@@ -622,7 +622,7 @@ export class WebGPURenderer {
             }
         `;
 
-        // Bloom composite shader - adds bloom to original
+        // Bloom composite shader - adds bloom to original with stronger intensity
         const bloomCompositeShader = `
             @group(0) @binding(0) var texSampler: sampler;
             @group(0) @binding(1) var originalTex: texture_2d<f32>;
@@ -636,8 +636,8 @@ export class WebGPURenderer {
             fn main(input: FragmentInput) -> @location(0) vec4<f32> {
                 let original = textureSample(originalTex, texSampler, input.texCoord);
                 let bloom = textureSample(bloomTex, texSampler, input.texCoord);
-                // Add bloom with intensity
-                return vec4<f32>(original.rgb + bloom.rgb * 0.8, original.a);
+                // Add bloom with stronger intensity for visible glow
+                return vec4<f32>(original.rgb + bloom.rgb * 1.5, original.a);
             }
         `;
 
