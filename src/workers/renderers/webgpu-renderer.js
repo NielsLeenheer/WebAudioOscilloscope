@@ -39,20 +39,30 @@ export class WebGPURenderer {
 
         // Check WebGPU support
         if (!navigator.gpu) {
-            console.error('WebGPU not supported');
+            console.error('WebGPU not supported in this context');
             return false;
         }
 
         try {
+            console.log('WebGPU: Requesting adapter...');
             const adapter = await navigator.gpu.requestAdapter();
             if (!adapter) {
-                console.error('Failed to get GPU adapter');
+                console.error('WebGPU: Failed to get GPU adapter');
                 return false;
             }
 
+            console.log('WebGPU: Requesting device...');
             this.device = await adapter.requestDevice();
+
+            console.log('WebGPU: Getting context...');
             this.context = canvas.getContext('webgpu');
+            if (!this.context) {
+                console.error('WebGPU: Failed to get webgpu context');
+                return false;
+            }
+
             this.format = navigator.gpu.getPreferredCanvasFormat();
+            console.log('WebGPU: Canvas format:', this.format);
 
             this.context.configure({
                 device: this.device,
@@ -80,9 +90,11 @@ export class WebGPURenderer {
             });
 
             // Create shaders and pipelines
+            console.log('WebGPU: Creating pipelines...');
             await this.createPipelines();
 
             this.initialized = true;
+            console.log('WebGPU: Initialization complete');
             return true;
         } catch (error) {
             console.error('WebGPU initialization failed:', error);
@@ -451,7 +463,15 @@ export class WebGPURenderer {
             interpolatePoints
         } = params;
 
-        if (!this.device || !this.initialized || points.length < 2) return;
+        if (!this.device || !this.initialized) {
+            console.log('WebGPU renderTrace: not ready', { device: !!this.device, initialized: this.initialized });
+            return;
+        }
+        if (points.length < 2) {
+            return;
+        }
+
+        try {
 
         const persistence = this.currentPersistence || 0;
 
@@ -619,6 +639,10 @@ export class WebGPURenderer {
 
         // Clean up temporary buffer
         lineVertexBuffer.destroy();
+
+        } catch (error) {
+            console.error('WebGPU renderTrace error:', error);
+        }
     }
 
     /**
@@ -629,90 +653,88 @@ export class WebGPURenderer {
     drawDebugInfo(fps) {
         if (!this.device || !this.initialized) return;
 
-        // Create a temporary 2D canvas for text rendering
-        const textCanvas = new OffscreenCanvas(100, 40);
-        const ctx = textCanvas.getContext('2d');
+        try {
+            // Create a temporary 2D canvas for text rendering
+            const textCanvas = new OffscreenCanvas(100, 40);
+            const ctx = textCanvas.getContext('2d');
 
-        const rendererText = 'WebGPU';
-        const fpsText = `${Math.round(fps)} FPS`;
+            const rendererText = 'WebGPU';
+            const fpsText = `${Math.round(fps)} FPS`;
 
-        // Clear with transparent background
-        ctx.clearRect(0, 0, 100, 40);
+            // Clear with transparent background
+            ctx.clearRect(0, 0, 100, 40);
 
-        // Draw semi-transparent background
-        ctx.fillStyle = 'rgba(26, 26, 26, 0.7)';
-        ctx.beginPath();
-        ctx.roundRect(0, 0, 80, 36, 4);
-        ctx.fill();
+            // Draw semi-transparent background (use fillRect instead of roundRect for compatibility)
+            ctx.fillStyle = 'rgba(26, 26, 26, 0.7)';
+            ctx.fillRect(0, 0, 80, 36);
 
-        // Draw renderer type
-        ctx.font = 'bold 12px "Courier New", monospace';
-        ctx.fillStyle = '#4CAF50';
-        ctx.fillText(rendererText, 6, 14);
+            // Draw renderer type
+            ctx.font = 'bold 12px "Courier New", monospace';
+            ctx.fillStyle = '#4CAF50';
+            ctx.fillText(rendererText, 6, 14);
 
-        // Draw FPS
-        ctx.fillStyle = '#888888';
-        ctx.fillText(fpsText, 6, 28);
+            // Draw FPS
+            ctx.fillStyle = '#888888';
+            ctx.fillText(fpsText, 6, 28);
 
-        // Copy the text canvas to WebGPU texture
-        const imageBitmap = textCanvas.transferToImageBitmap();
+            // Copy the text canvas to WebGPU texture
+            const imageBitmap = textCanvas.transferToImageBitmap();
 
-        // Create texture from the bitmap
-        const textTexture = this.device.createTexture({
-            size: [imageBitmap.width, imageBitmap.height],
-            format: 'rgba8unorm',
-            usage: GPUTextureUsage.TEXTURE_BINDING |
-                   GPUTextureUsage.COPY_DST |
-                   GPUTextureUsage.RENDER_ATTACHMENT,
-        });
-
-        this.device.queue.copyExternalImageToTexture(
-            { source: imageBitmap },
-            { texture: textTexture },
-            [imageBitmap.width, imageBitmap.height]
-        );
-
-        // Now render this texture to the canvas at position (110, 110)
-        // For simplicity, we'll use a blit/copy operation
-        // This requires a separate render pass with a textured quad
-
-        // Create a simple blit pipeline if not exists
-        if (!this.textBlitPipeline) {
-            this.createTextBlitPipeline();
-        }
-
-        if (this.textBlitPipeline) {
-            const commandEncoder = this.device.createCommandEncoder();
-            const textureView = this.context.getCurrentTexture().createView();
-
-            // Create bind group for this text texture
-            const textBindGroup = this.device.createBindGroup({
-                layout: this.textBlitPipeline.getBindGroupLayout(0),
-                entries: [
-                    { binding: 0, resource: this.sampler },
-                    { binding: 1, resource: textTexture.createView() },
-                ],
+            // Create texture from the bitmap - use the canvas format for compatibility
+            const textTexture = this.device.createTexture({
+                size: [imageBitmap.width, imageBitmap.height],
+                format: this.format, // Use same format as canvas
+                usage: GPUTextureUsage.TEXTURE_BINDING |
+                       GPUTextureUsage.COPY_DST |
+                       GPUTextureUsage.RENDER_ATTACHMENT,
             });
 
-            const renderPass = commandEncoder.beginRenderPass({
-                colorAttachments: [{
-                    view: textureView,
-                    loadOp: 'load',
-                    storeOp: 'store',
-                }],
-            });
+            this.device.queue.copyExternalImageToTexture(
+                { source: imageBitmap },
+                { texture: textTexture },
+                [imageBitmap.width, imageBitmap.height]
+            );
 
-            renderPass.setPipeline(this.textBlitPipeline);
-            renderPass.setBindGroup(0, textBindGroup);
-            renderPass.draw(4);
-            renderPass.end();
+            // Create a simple blit pipeline if not exists
+            if (!this.textBlitPipeline) {
+                this.createTextBlitPipeline();
+            }
 
-            this.device.queue.submit([commandEncoder.finish()]);
+            if (this.textBlitPipeline) {
+                const commandEncoder = this.device.createCommandEncoder();
+                const textureView = this.context.getCurrentTexture().createView();
+
+                // Create bind group for this text texture
+                const textBindGroup = this.device.createBindGroup({
+                    layout: this.textBlitPipeline.getBindGroupLayout(0),
+                    entries: [
+                        { binding: 0, resource: this.sampler },
+                        { binding: 1, resource: textTexture.createView() },
+                    ],
+                });
+
+                const renderPass = commandEncoder.beginRenderPass({
+                    colorAttachments: [{
+                        view: textureView,
+                        loadOp: 'load',
+                        storeOp: 'store',
+                    }],
+                });
+
+                renderPass.setPipeline(this.textBlitPipeline);
+                renderPass.setBindGroup(0, textBindGroup);
+                renderPass.draw(4);
+                renderPass.end();
+
+                this.device.queue.submit([commandEncoder.finish()]);
+            }
+
+            // Clean up
+            textTexture.destroy();
+            imageBitmap.close();
+        } catch (error) {
+            console.error('WebGPU drawDebugInfo error:', error);
         }
-
-        // Clean up
-        textTexture.destroy();
-        imageBitmap.close();
     }
 
     /**
