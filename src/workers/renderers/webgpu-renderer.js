@@ -472,6 +472,18 @@ export class WebGPURenderer {
         }
 
         try {
+            // Debug: Log first frame info
+            if (!this._debugLogged) {
+                console.log('WebGPU renderTrace: first frame', {
+                    points: points.length,
+                    canvasWidth,
+                    canvasHeight,
+                    devicePixelRatio: this.devicePixelRatio,
+                    firstPoint: points[0],
+                    lastPoint: points[points.length - 1]
+                });
+                this._debugLogged = true;
+            }
 
         const persistence = this.currentPersistence || 0;
 
@@ -574,6 +586,23 @@ export class WebGPURenderer {
 
         // Create GPU buffer for line vertices
         const lineVertexArray = new Float32Array(lineVertices);
+
+        // Debug: Log vertex count on first frame
+        if (!this._vertexDebugLogged && lineVertices.length > 0) {
+            console.log('WebGPU vertices:', {
+                floatCount: lineVertices.length,
+                vertexCount: lineVertices.length / 3,
+                byteSize: lineVertexArray.byteLength,
+                sampleVertices: lineVertices.slice(0, 12) // First 4 vertices
+            });
+            this._vertexDebugLogged = true;
+        }
+
+        if (lineVertexArray.byteLength === 0) {
+            console.warn('WebGPU: No vertices to render');
+            return;
+        }
+
         const lineVertexBuffer = this.device.createBuffer({
             size: lineVertexArray.byteLength,
             usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
@@ -646,176 +675,110 @@ export class WebGPURenderer {
     }
 
     /**
-     * Draw debug info (renderer type and FPS) for debug mode
-     * Uses a temporary 2D canvas for text rendering, then copies to WebGPU
+     * Draw debug info (FPS) for debug mode using stick figure numbers
+     * Uses line rendering for simplicity
      * @param {number} fps - Current FPS value
      */
     drawDebugInfo(fps) {
         if (!this.device || !this.initialized) return;
 
+        // For WebGPU, we'll draw FPS using simple line segments
+        // This is simpler than text rendering and matches Canvas2D approach
+        const fpsValue = Math.round(fps);
+        const digits = String(fpsValue).split('');
+
+        // Position in top-left of visible area
+        const startX = 112;
+        const startY = 112;
+        const digitWidth = 8;
+        const digitHeight = 12;
+        const spacing = 2;
+        const lineWidth = 1.5;
+
+        // Build line vertices for all digits
+        const lineVertices = [];
+
+        // 7-segment style digit definitions
+        const segments = {
+            0: [[0,0,1,0], [0,0,0,0.5], [1,0,1,0.5], [0,0.5,0,1], [1,0.5,1,1], [0,1,1,1]],
+            1: [[1,0,1,0.5], [1,0.5,1,1]],
+            2: [[0,0,1,0], [1,0,1,0.5], [0,0.5,1,0.5], [0,0.5,0,1], [0,1,1,1]],
+            3: [[0,0,1,0], [1,0,1,0.5], [0,0.5,1,0.5], [1,0.5,1,1], [0,1,1,1]],
+            4: [[0,0,0,0.5], [1,0,1,0.5], [0,0.5,1,0.5], [1,0.5,1,1]],
+            5: [[0,0,1,0], [0,0,0,0.5], [0,0.5,1,0.5], [1,0.5,1,1], [0,1,1,1]],
+            6: [[0,0,1,0], [0,0,0,0.5], [0,0.5,1,0.5], [0,0.5,0,1], [1,0.5,1,1], [0,1,1,1]],
+            7: [[0,0,1,0], [1,0,1,0.5], [1,0.5,1,1]],
+            8: [[0,0,1,0], [0,0,0,0.5], [1,0,1,0.5], [0,0.5,1,0.5], [0,0.5,0,1], [1,0.5,1,1], [0,1,1,1]],
+            9: [[0,0,1,0], [0,0,0,0.5], [1,0,1,0.5], [0,0.5,1,0.5], [1,0.5,1,1], [0,1,1,1]],
+        };
+
+        let offsetX = startX;
+        const opacity = 0.6;
+
+        for (const digitChar of digits) {
+            const digit = parseInt(digitChar);
+            const segs = segments[digit] || [];
+
+            for (const seg of segs) {
+                const x1 = offsetX + seg[0] * digitWidth;
+                const y1 = startY + seg[1] * digitHeight;
+                const x2 = offsetX + seg[2] * digitWidth;
+                const y2 = startY + seg[3] * digitHeight;
+
+                // Create thick line as two triangles
+                const dx = x2 - x1;
+                const dy = y2 - y1;
+                const len = Math.sqrt(dx * dx + dy * dy);
+                if (len > 0) {
+                    const px = (-dy / len) * lineWidth * 0.5;
+                    const py = (dx / len) * lineWidth * 0.5;
+
+                    // Triangle strip: 4 vertices
+                    lineVertices.push(x1 + px, y1 + py, opacity);
+                    lineVertices.push(x1 - px, y1 - py, opacity);
+                    lineVertices.push(x2 + px, y2 + py, opacity);
+                    lineVertices.push(x2 - px, y2 - py, opacity);
+
+                    // Degenerate triangles to separate segments
+                    lineVertices.push(x2 - px, y2 - py, 0);
+                    lineVertices.push(x2 - px, y2 - py, 0);
+                }
+            }
+
+            offsetX += digitWidth + spacing;
+        }
+
+        if (lineVertices.length === 0) return;
+
         try {
-            // Create a temporary 2D canvas for text rendering
-            const textCanvas = new OffscreenCanvas(100, 40);
-            const ctx = textCanvas.getContext('2d');
+            const vertexArray = new Float32Array(lineVertices);
+            const vertexBuffer = this.device.createBuffer({
+                size: vertexArray.byteLength,
+                usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
+            });
+            this.device.queue.writeBuffer(vertexBuffer, 0, vertexArray);
 
-            const rendererText = 'WebGPU';
-            const fpsText = `${Math.round(fps)} FPS`;
+            const commandEncoder = this.device.createCommandEncoder();
+            const textureView = this.context.getCurrentTexture().createView();
 
-            // Clear with transparent background
-            ctx.clearRect(0, 0, 100, 40);
-
-            // Draw semi-transparent background (use fillRect instead of roundRect for compatibility)
-            ctx.fillStyle = 'rgba(26, 26, 26, 0.7)';
-            ctx.fillRect(0, 0, 80, 36);
-
-            // Draw renderer type
-            ctx.font = 'bold 12px "Courier New", monospace';
-            ctx.fillStyle = '#4CAF50';
-            ctx.fillText(rendererText, 6, 14);
-
-            // Draw FPS
-            ctx.fillStyle = '#888888';
-            ctx.fillText(fpsText, 6, 28);
-
-            // Copy the text canvas to WebGPU texture
-            const imageBitmap = textCanvas.transferToImageBitmap();
-
-            // Create texture from the bitmap - use the canvas format for compatibility
-            const textTexture = this.device.createTexture({
-                size: [imageBitmap.width, imageBitmap.height],
-                format: this.format, // Use same format as canvas
-                usage: GPUTextureUsage.TEXTURE_BINDING |
-                       GPUTextureUsage.COPY_DST |
-                       GPUTextureUsage.RENDER_ATTACHMENT,
+            const renderPass = commandEncoder.beginRenderPass({
+                colorAttachments: [{
+                    view: textureView,
+                    loadOp: 'load',
+                    storeOp: 'store',
+                }],
             });
 
-            this.device.queue.copyExternalImageToTexture(
-                { source: imageBitmap },
-                { texture: textTexture },
-                [imageBitmap.width, imageBitmap.height]
-            );
+            renderPass.setPipeline(this.linePipeline);
+            renderPass.setVertexBuffer(0, vertexBuffer);
+            renderPass.draw(lineVertices.length / 3);
+            renderPass.end();
 
-            // Create a simple blit pipeline if not exists
-            if (!this.textBlitPipeline) {
-                this.createTextBlitPipeline();
-            }
-
-            if (this.textBlitPipeline) {
-                const commandEncoder = this.device.createCommandEncoder();
-                const textureView = this.context.getCurrentTexture().createView();
-
-                // Create bind group for this text texture
-                const textBindGroup = this.device.createBindGroup({
-                    layout: this.textBlitPipeline.getBindGroupLayout(0),
-                    entries: [
-                        { binding: 0, resource: this.sampler },
-                        { binding: 1, resource: textTexture.createView() },
-                    ],
-                });
-
-                const renderPass = commandEncoder.beginRenderPass({
-                    colorAttachments: [{
-                        view: textureView,
-                        loadOp: 'load',
-                        storeOp: 'store',
-                    }],
-                });
-
-                renderPass.setPipeline(this.textBlitPipeline);
-                renderPass.setBindGroup(0, textBindGroup);
-                renderPass.draw(4);
-                renderPass.end();
-
-                this.device.queue.submit([commandEncoder.finish()]);
-            }
-
-            // Clean up
-            textTexture.destroy();
-            imageBitmap.close();
+            this.device.queue.submit([commandEncoder.finish()]);
+            vertexBuffer.destroy();
         } catch (error) {
             console.error('WebGPU drawDebugInfo error:', error);
         }
-    }
-
-    /**
-     * Create pipeline for blitting text texture to screen
-     */
-    createTextBlitPipeline() {
-        const vertexShader = `
-            struct VertexOutput {
-                @builtin(position) position: vec4<f32>,
-                @location(0) texCoord: vec2<f32>,
-            }
-
-            @vertex
-            fn main(@builtin(vertex_index) vertexIndex: u32) -> VertexOutput {
-                var output: VertexOutput;
-                // Position the quad at top-left of visible area (110, 110) in 600x600 canvas
-                // Visible area starts at 100,100 so 110,110 is 10px inside
-                // Quad size: 80x36 pixels
-                let positions = array<vec2<f32>, 4>(
-                    vec2<f32>(110.0, 110.0),      // top-left
-                    vec2<f32>(190.0, 110.0),      // top-right
-                    vec2<f32>(110.0, 146.0),      // bottom-left
-                    vec2<f32>(190.0, 146.0)       // bottom-right
-                );
-                let texCoords = array<vec2<f32>, 4>(
-                    vec2<f32>(0.0, 0.0),
-                    vec2<f32>(1.0, 0.0),
-                    vec2<f32>(0.0, 1.0),
-                    vec2<f32>(1.0, 1.0)
-                );
-                // Convert pixel coords to clip space (0-600 -> -1 to 1)
-                let clipX = (positions[vertexIndex].x / 300.0) - 1.0;
-                let clipY = 1.0 - (positions[vertexIndex].y / 300.0);
-                output.position = vec4<f32>(clipX, clipY, 0.0, 1.0);
-                output.texCoord = texCoords[vertexIndex];
-                return output;
-            }
-        `;
-
-        const fragmentShader = `
-            @group(0) @binding(0) var texSampler: sampler;
-            @group(0) @binding(1) var tex: texture_2d<f32>;
-
-            @fragment
-            fn main(@location(0) texCoord: vec2<f32>) -> @location(0) vec4<f32> {
-                return textureSample(tex, texSampler, texCoord);
-            }
-        `;
-
-        const vertexModule = this.device.createShaderModule({ code: vertexShader });
-        const fragmentModule = this.device.createShaderModule({ code: fragmentShader });
-
-        this.textBlitPipeline = this.device.createRenderPipeline({
-            layout: 'auto',
-            vertex: {
-                module: vertexModule,
-                entryPoint: 'main',
-            },
-            fragment: {
-                module: fragmentModule,
-                entryPoint: 'main',
-                targets: [{
-                    format: this.format,
-                    blend: {
-                        color: {
-                            srcFactor: 'src-alpha',
-                            dstFactor: 'one-minus-src-alpha',
-                            operation: 'add',
-                        },
-                        alpha: {
-                            srcFactor: 'one',
-                            dstFactor: 'one-minus-src-alpha',
-                            operation: 'add',
-                        },
-                    },
-                }],
-            },
-            primitive: {
-                topology: 'triangle-strip',
-            },
-        });
     }
 
     /**

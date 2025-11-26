@@ -226,42 +226,83 @@ export class Canvas2DRenderer {
     }
 
     /**
-     * Draw debug info (renderer type and FPS) for debug mode
+     * Draw debug info (FPS) for debug mode using stick figure numbers
      * @param {number} fps - Current FPS value
      */
     drawDebugInfo(fps) {
         if (!this.ctx) return;
 
         const ctx = this.ctx;
-        const rendererText = 'Canvas 2D';
-        const fpsText = `${Math.round(fps)} FPS`;
+        const fpsValue = Math.round(fps);
 
-        ctx.font = 'bold 12px "Courier New", monospace';
+        // Position in top-left of visible area (visible area starts at 100,100)
+        const startX = 112;
+        const startY = 112;
 
-        // Measure text widths
-        const rendererMetrics = ctx.measureText(rendererText);
-        const fpsMetrics = ctx.measureText(fpsText);
+        // Draw FPS using stick figure numbers
+        this.drawStickNumber(ctx, fpsValue, startX, startY, '#4CAF50', 0.6);
+    }
 
-        const padding = 6;
-        const lineHeight = 14;
-        const boxX = 110;
-        const boxY = 110; // Top left of visible area
-        const boxWidth = Math.max(rendererMetrics.width, fpsMetrics.width) + padding * 2;
-        const boxHeight = lineHeight * 2 + padding * 2;
+    /**
+     * Draw a number using stick figure digits
+     * @param {CanvasRenderingContext2D} ctx - Canvas context
+     * @param {number} num - Number to draw
+     * @param {number} x - X position
+     * @param {number} y - Y position
+     * @param {string} color - Color for the digits
+     * @param {number} opacity - Opacity (0-1)
+     */
+    drawStickNumber(ctx, num, x, y, color, opacity) {
+        const digits = String(num).split('');
+        const digitWidth = 8;
+        const digitHeight = 12;
+        const spacing = 2;
 
-        // Draw background
-        ctx.fillStyle = 'rgba(26, 26, 26, 0.7)';
+        ctx.strokeStyle = color;
+        ctx.globalAlpha = opacity;
+        ctx.lineWidth = 1.5;
+        ctx.lineCap = 'round';
+
+        let offsetX = x;
+
+        for (const digit of digits) {
+            this.drawStickDigit(ctx, parseInt(digit), offsetX, y, digitWidth, digitHeight);
+            offsetX += digitWidth + spacing;
+        }
+
+        ctx.globalAlpha = 1;
+    }
+
+    /**
+     * Draw a single digit using line segments (7-segment style)
+     */
+    drawStickDigit(ctx, digit, x, y, w, h) {
+        const midY = y + h / 2;
+        const bottomY = y + h;
+
+        // Segment definitions: [startX, startY, endX, endY] as fractions of width/height
+        // Segments: top, top-left, top-right, middle, bottom-left, bottom-right, bottom
+        const segments = {
+            0: [[0,0,1,0], [0,0,0,0.5], [1,0,1,0.5], [0,0.5,0,1], [1,0.5,1,1], [0,1,1,1]],
+            1: [[1,0,1,0.5], [1,0.5,1,1]],
+            2: [[0,0,1,0], [1,0,1,0.5], [0,0.5,1,0.5], [0,0.5,0,1], [0,1,1,1]],
+            3: [[0,0,1,0], [1,0,1,0.5], [0,0.5,1,0.5], [1,0.5,1,1], [0,1,1,1]],
+            4: [[0,0,0,0.5], [1,0,1,0.5], [0,0.5,1,0.5], [1,0.5,1,1]],
+            5: [[0,0,1,0], [0,0,0,0.5], [0,0.5,1,0.5], [1,0.5,1,1], [0,1,1,1]],
+            6: [[0,0,1,0], [0,0,0,0.5], [0,0.5,1,0.5], [0,0.5,0,1], [1,0.5,1,1], [0,1,1,1]],
+            7: [[0,0,1,0], [1,0,1,0.5], [1,0.5,1,1]],
+            8: [[0,0,1,0], [0,0,0,0.5], [1,0,1,0.5], [0,0.5,1,0.5], [0,0.5,0,1], [1,0.5,1,1], [0,1,1,1]],
+            9: [[0,0,1,0], [0,0,0,0.5], [1,0,1,0.5], [0,0.5,1,0.5], [1,0.5,1,1], [0,1,1,1]],
+        };
+
+        const segs = segments[digit] || [];
+
         ctx.beginPath();
-        ctx.roundRect(boxX, boxY, boxWidth, boxHeight, 4);
-        ctx.fill();
-
-        // Draw renderer type
-        ctx.fillStyle = '#4CAF50';
-        ctx.fillText(rendererText, boxX + padding, boxY + padding + 10);
-
-        // Draw FPS
-        ctx.fillStyle = '#888';
-        ctx.fillText(fpsText, boxX + padding, boxY + padding + 10 + lineHeight);
+        for (const seg of segs) {
+            ctx.moveTo(x + seg[0] * w, y + seg[1] * h);
+            ctx.lineTo(x + seg[2] * w, y + seg[3] * h);
+        }
+        ctx.stroke();
     }
 
     /**
