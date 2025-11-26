@@ -564,15 +564,15 @@ export class WebGPURenderer {
             @fragment
             fn main(input: FragmentInput) -> @location(0) vec4<f32> {
                 let color = textureSample(tex, texSampler, input.texCoord);
-                // Extract bright parts - low threshold to catch more of the phosphor glow
+                // Extract bright parts - very low threshold for prominent glow
                 let brightness = dot(color.rgb, vec3<f32>(0.2126, 0.7152, 0.0722));
-                let threshold = 0.1;
+                let threshold = 0.02;
                 let contribution = max(brightness - threshold, 0.0) / max(brightness, 0.001);
-                return vec4<f32>(color.rgb * contribution * 2.0, color.a);
+                return vec4<f32>(color.rgb * contribution * 4.0, color.a);
             }
         `;
 
-        // Horizontal blur shader - wider blur for visible glow
+        // Horizontal blur shader - wide blur for prominent glow halo
         const bloomBlurHShader = `
             @group(0) @binding(0) var texSampler: sampler;
             @group(0) @binding(1) var tex: texture_2d<f32>;
@@ -584,12 +584,12 @@ export class WebGPURenderer {
 
             @fragment
             fn main(input: FragmentInput) -> @location(0) vec4<f32> {
-                // 9-tap Gaussian blur weights with wider spread (3x texel size)
+                // 9-tap Gaussian blur weights with very wide spread (8x texel size) for prominent glow
                 let weights = array<f32, 5>(0.227027, 0.1945946, 0.1216216, 0.054054, 0.016216);
                 var result = textureSample(tex, texSampler, input.texCoord) * weights[0];
 
                 for (var i = 1; i < 5; i++) {
-                    let offset = vec2<f32>(texelSize.x * f32(i) * 3.0, 0.0);
+                    let offset = vec2<f32>(texelSize.x * f32(i) * 8.0, 0.0);
                     result += textureSample(tex, texSampler, input.texCoord + offset) * weights[i];
                     result += textureSample(tex, texSampler, input.texCoord - offset) * weights[i];
                 }
@@ -597,7 +597,7 @@ export class WebGPURenderer {
             }
         `;
 
-        // Vertical blur shader - wider blur for visible glow
+        // Vertical blur shader - wide blur for prominent glow halo
         const bloomBlurVShader = `
             @group(0) @binding(0) var texSampler: sampler;
             @group(0) @binding(1) var tex: texture_2d<f32>;
@@ -609,12 +609,12 @@ export class WebGPURenderer {
 
             @fragment
             fn main(input: FragmentInput) -> @location(0) vec4<f32> {
-                // 9-tap Gaussian blur weights with wider spread (3x texel size)
+                // 9-tap Gaussian blur weights with very wide spread (8x texel size) for prominent glow
                 let weights = array<f32, 5>(0.227027, 0.1945946, 0.1216216, 0.054054, 0.016216);
                 var result = textureSample(tex, texSampler, input.texCoord) * weights[0];
 
                 for (var i = 1; i < 5; i++) {
-                    let offset = vec2<f32>(0.0, texelSize.y * f32(i) * 3.0);
+                    let offset = vec2<f32>(0.0, texelSize.y * f32(i) * 8.0);
                     result += textureSample(tex, texSampler, input.texCoord + offset) * weights[i];
                     result += textureSample(tex, texSampler, input.texCoord - offset) * weights[i];
                 }
@@ -622,7 +622,7 @@ export class WebGPURenderer {
             }
         `;
 
-        // Bloom composite shader - adds bloom to original with stronger intensity
+        // Bloom composite shader - adds bloom to original with high intensity for prominent glow
         const bloomCompositeShader = `
             @group(0) @binding(0) var texSampler: sampler;
             @group(0) @binding(1) var originalTex: texture_2d<f32>;
@@ -636,8 +636,8 @@ export class WebGPURenderer {
             fn main(input: FragmentInput) -> @location(0) vec4<f32> {
                 let original = textureSample(originalTex, texSampler, input.texCoord);
                 let bloom = textureSample(bloomTex, texSampler, input.texCoord);
-                // Add bloom with stronger intensity for visible glow
-                return vec4<f32>(original.rgb + bloom.rgb * 1.5, original.a);
+                // Add bloom with high intensity for prominent glow halo around thin trace
+                return vec4<f32>(original.rgb + bloom.rgb * 3.0, original.a);
             }
         `;
 
@@ -837,7 +837,7 @@ export class WebGPURenderer {
 
         // Calculate scale factor for resolution-independent rendering
         const canvasScale = Math.min(canvasWidth, canvasHeight);
-        const LINE_WIDTH_RATIO = 0.00375;
+        const LINE_WIDTH_RATIO = 0.002;
         const GREEN_DOT_RATIO = 0.001875;
         const DEBUG_DOT_RATIO = 0.0025;
         const lineWidth = LINE_WIDTH_RATIO * canvasScale;
@@ -1168,8 +1168,8 @@ export class WebGPURenderer {
             extractPass.draw(4);
             extractPass.end();
 
-            // Bloom pass 2: Horizontal blur (bloom -> bloomBlur)
-            const blurHBindGroup = this.device.createBindGroup({
+            // Bloom pass 2: First horizontal blur (bloom -> bloomBlur)
+            const blurHBindGroup1 = this.device.createBindGroup({
                 layout: this.bloomBlurBindGroupLayout,
                 entries: [
                     { binding: 0, resource: this.sampler },
@@ -1178,20 +1178,20 @@ export class WebGPURenderer {
                 ],
             });
 
-            const blurHPass = commandEncoder.beginRenderPass({
+            const blurHPass1 = commandEncoder.beginRenderPass({
                 colorAttachments: [{
                     view: this.bloomBlurTextureView,
                     loadOp: 'clear',
                     storeOp: 'store',
                 }],
             });
-            blurHPass.setPipeline(this.bloomBlurHPipeline);
-            blurHPass.setBindGroup(0, blurHBindGroup);
-            blurHPass.draw(4);
-            blurHPass.end();
+            blurHPass1.setPipeline(this.bloomBlurHPipeline);
+            blurHPass1.setBindGroup(0, blurHBindGroup1);
+            blurHPass1.draw(4);
+            blurHPass1.end();
 
-            // Bloom pass 3: Vertical blur (bloomBlur -> bloom)
-            const blurVBindGroup = this.device.createBindGroup({
+            // Bloom pass 3: First vertical blur (bloomBlur -> bloom)
+            const blurVBindGroup1 = this.device.createBindGroup({
                 layout: this.bloomBlurBindGroupLayout,
                 entries: [
                     { binding: 0, resource: this.sampler },
@@ -1200,19 +1200,63 @@ export class WebGPURenderer {
                 ],
             });
 
-            const blurVPass = commandEncoder.beginRenderPass({
+            const blurVPass1 = commandEncoder.beginRenderPass({
                 colorAttachments: [{
                     view: this.bloomTextureView,
                     loadOp: 'clear',
                     storeOp: 'store',
                 }],
             });
-            blurVPass.setPipeline(this.bloomBlurVPipeline);
-            blurVPass.setBindGroup(0, blurVBindGroup);
-            blurVPass.draw(4);
-            blurVPass.end();
+            blurVPass1.setPipeline(this.bloomBlurVPipeline);
+            blurVPass1.setBindGroup(0, blurVBindGroup1);
+            blurVPass1.draw(4);
+            blurVPass1.end();
 
-            // Bloom pass 4: Composite (render target + bloom -> swap chain)
+            // Bloom pass 4: Second horizontal blur for wider glow (bloom -> bloomBlur)
+            const blurHBindGroup2 = this.device.createBindGroup({
+                layout: this.bloomBlurBindGroupLayout,
+                entries: [
+                    { binding: 0, resource: this.sampler },
+                    { binding: 1, resource: this.bloomTextureView },
+                    { binding: 2, resource: { buffer: this.bloomTexelSizeBuffer } },
+                ],
+            });
+
+            const blurHPass2 = commandEncoder.beginRenderPass({
+                colorAttachments: [{
+                    view: this.bloomBlurTextureView,
+                    loadOp: 'clear',
+                    storeOp: 'store',
+                }],
+            });
+            blurHPass2.setPipeline(this.bloomBlurHPipeline);
+            blurHPass2.setBindGroup(0, blurHBindGroup2);
+            blurHPass2.draw(4);
+            blurHPass2.end();
+
+            // Bloom pass 5: Second vertical blur for wider glow (bloomBlur -> bloom)
+            const blurVBindGroup2 = this.device.createBindGroup({
+                layout: this.bloomBlurBindGroupLayout,
+                entries: [
+                    { binding: 0, resource: this.sampler },
+                    { binding: 1, resource: this.bloomBlurTextureView },
+                    { binding: 2, resource: { buffer: this.bloomTexelSizeBuffer } },
+                ],
+            });
+
+            const blurVPass2 = commandEncoder.beginRenderPass({
+                colorAttachments: [{
+                    view: this.bloomTextureView,
+                    loadOp: 'clear',
+                    storeOp: 'store',
+                }],
+            });
+            blurVPass2.setPipeline(this.bloomBlurVPipeline);
+            blurVPass2.setBindGroup(0, blurVBindGroup2);
+            blurVPass2.draw(4);
+            blurVPass2.end();
+
+            // Bloom pass 6: Composite (render target + bloom -> swap chain)
             const compositeBindGroup = this.device.createBindGroup({
                 layout: this.bloomCompositeBindGroupLayout,
                 entries: [
