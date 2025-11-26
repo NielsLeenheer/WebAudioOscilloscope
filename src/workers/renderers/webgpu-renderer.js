@@ -152,7 +152,7 @@ export class WebGPURenderer {
                 // Green phosphor color (76, 175, 80) / 255
                 let green = vec3<f32>(0.298, 0.686, 0.314);
                 // Boost brightness to compensate for lack of anti-aliasing vs Canvas 2D
-                let boostedOpacity = min(input.opacity * 1.5, 1.0);
+                let boostedOpacity = min(input.opacity * 2.0, 1.0);
                 return vec4<f32>(green * boostedOpacity, boostedOpacity);
             }
         `;
