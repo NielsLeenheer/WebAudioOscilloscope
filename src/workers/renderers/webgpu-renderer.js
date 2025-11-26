@@ -660,23 +660,34 @@ export class WebGPURenderer {
         }
 
         // Build dot vertices for direction changes (green dots)
+        // Using triangle-list style: 6 vertices per quad (2 triangles)
         const dotVertices = [];
         const greenDotSize = GREEN_DOT_RATIO * canvasScale;
 
         for (const [idx, brightness] of directionChanges) {
             const point = originalPoints[idx];
             const opacity = basePower * brightness;
-
-            // Create a small quad for the dot (two triangles as triangle strip)
             const size = greenDotSize;
-            // Triangle strip: 4 vertices forming a quad
-            dotVertices.push(point.x - size, point.y - size, opacity);
-            dotVertices.push(point.x + size, point.y - size, opacity);
-            dotVertices.push(point.x - size, point.y + size, opacity);
-            dotVertices.push(point.x + size, point.y + size, opacity);
-            // Degenerate triangles to separate dots
-            dotVertices.push(point.x + size, point.y + size, 0);
-            dotVertices.push(point.x + size, point.y + size, 0);
+
+            // Two triangles forming a quad (6 vertices for triangle-strip compatibility)
+            // Triangle 1: bottom-left, bottom-right, top-left
+            // Triangle 2: top-left, bottom-right, top-right
+            // For triangle strip: v0, v1, v2, v3 forms quad
+
+            // Add degenerate to start new quad (duplicate first vertex)
+            if (dotVertices.length > 0) {
+                // Duplicate last vertex of previous quad
+                const lastIdx = dotVertices.length - 3;
+                dotVertices.push(dotVertices[lastIdx], dotVertices[lastIdx + 1], dotVertices[lastIdx + 2]);
+                // Duplicate first vertex of this quad
+                dotVertices.push(point.x - size, point.y - size, opacity);
+            }
+
+            // Quad vertices for triangle strip
+            dotVertices.push(point.x - size, point.y - size, opacity);  // bottom-left
+            dotVertices.push(point.x + size, point.y - size, opacity);  // bottom-right
+            dotVertices.push(point.x - size, point.y + size, opacity);  // top-left
+            dotVertices.push(point.x + size, point.y + size, opacity);  // top-right
         }
 
         // Build debug dot vertices (red for interpolated, blue for samples)
