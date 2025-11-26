@@ -78,6 +78,8 @@
             } else if (e.data.type === 'initialized') {
                 // Worker initialized with renderer info
                 onRenderersAvailable(e.data.data.availableRenderers);
+                // Now that the renderer is ready, start visualization
+                startVisualization();
             }
         };
 
@@ -286,7 +288,7 @@
                     requestAnimationFrame(() => {
                         if (canvas && !worker) {
                             initWorker();
-                            startVisualization();
+                            // startVisualization() is called when 'initialized' message is received
                         }
                     });
                 });
