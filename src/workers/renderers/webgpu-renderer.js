@@ -151,7 +151,9 @@ export class WebGPURenderer {
             fn main(input: FragmentInput) -> @location(0) vec4<f32> {
                 // Green phosphor color (76, 175, 80) / 255
                 let green = vec3<f32>(0.298, 0.686, 0.314);
-                return vec4<f32>(green * input.opacity, input.opacity);
+                // Boost brightness to compensate for lack of anti-aliasing vs Canvas 2D
+                let boostedOpacity = min(input.opacity * 1.5, 1.0);
+                return vec4<f32>(green * boostedOpacity, boostedOpacity);
             }
         `;
 
@@ -657,8 +659,61 @@ export class WebGPURenderer {
             }
         }
 
+        // Build dot vertices for direction changes (green dots)
+        const dotVertices = [];
+        const greenDotSize = GREEN_DOT_RATIO * canvasScale;
+
+        for (const [idx, brightness] of directionChanges) {
+            const point = originalPoints[idx];
+            const opacity = basePower * brightness;
+
+            // Create a small quad for the dot (two triangles as triangle strip)
+            const size = greenDotSize;
+            // Triangle strip: 4 vertices forming a quad
+            dotVertices.push(point.x - size, point.y - size, opacity);
+            dotVertices.push(point.x + size, point.y - size, opacity);
+            dotVertices.push(point.x - size, point.y + size, opacity);
+            dotVertices.push(point.x + size, point.y + size, opacity);
+            // Degenerate triangles to separate dots
+            dotVertices.push(point.x + size, point.y + size, 0);
+            dotVertices.push(point.x + size, point.y + size, 0);
+        }
+
+        // Build debug dot vertices (red for interpolated, blue for samples)
+        const debugDotVertices = [];
+        const debugDotSize = DEBUG_DOT_RATIO * canvasScale;
+
+        if (debugMode) {
+            // Red dots for interpolated points
+            if (dotOpacity > 0) {
+                for (let i = 0; i < renderPoints.length; i++) {
+                    if (isInterpolated[i]) {
+                        const point = renderPoints[i];
+                        const size = debugDotSize;
+                        // Red color encoded in vertices (we'll need a different approach)
+                        // For now, render with same pipeline but different color uniform would be needed
+                        // Skip for simplicity - or render as green with low opacity
+                    }
+                }
+            }
+
+            // Blue dots for sample points
+            if (sampleDotOpacity > 0) {
+                for (let i = 0; i < originalPoints.length; i++) {
+                    const point = originalPoints[i];
+                    const brightness = directionChanges.get(i) || 0;
+                    const sizeMultiplier = 1 + (brightness * (dotSizeVariation - 1));
+                    const size = debugDotSize * sizeMultiplier;
+
+                    // For now using same shader - color will be green
+                    // Would need separate colored shader for proper red/blue
+                }
+            }
+        }
+
         // Create GPU buffer for line vertices
         const lineVertexArray = new Float32Array(lineVertices);
+        const dotVertexArray = new Float32Array(dotVertices);
 
         // Debug: Log vertex count on first frame
         if (!this._vertexDebugLogged && lineVertices.length > 0) {
@@ -666,21 +721,34 @@ export class WebGPURenderer {
                 floatCount: lineVertices.length,
                 vertexCount: lineVertices.length / 3,
                 byteSize: lineVertexArray.byteLength,
+                dotCount: dotVertices.length / 3,
                 sampleVertices: lineVertices.slice(0, 12) // First 4 vertices
             });
             this._vertexDebugLogged = true;
         }
 
-        if (lineVertexArray.byteLength === 0) {
+        if (lineVertexArray.byteLength === 0 && dotVertexArray.byteLength === 0) {
             console.warn('WebGPU: No vertices to render');
             return;
         }
 
-        const lineVertexBuffer = this.device.createBuffer({
-            size: lineVertexArray.byteLength,
-            usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
-        });
-        this.device.queue.writeBuffer(lineVertexBuffer, 0, lineVertexArray);
+        let lineVertexBuffer = null;
+        if (lineVertexArray.byteLength > 0) {
+            lineVertexBuffer = this.device.createBuffer({
+                size: lineVertexArray.byteLength,
+                usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
+            });
+            this.device.queue.writeBuffer(lineVertexBuffer, 0, lineVertexArray);
+        }
+
+        let dotVertexBuffer = null;
+        if (dotVertexArray.byteLength > 0) {
+            dotVertexBuffer = this.device.createBuffer({
+                size: dotVertexArray.byteLength,
+                usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
+            });
+            this.device.queue.writeBuffer(dotVertexBuffer, 0, dotVertexArray);
+        }
 
         // Update fade uniform
         this.device.queue.writeBuffer(this.fadeUniformBuffer, 0, new Float32Array([persistence]));
@@ -731,10 +799,17 @@ export class WebGPURenderer {
         });
 
         // Draw lines
-        if (lineVertices.length > 0) {
+        if (lineVertexBuffer && lineVertices.length > 0) {
             renderPass.setPipeline(this.linePipeline);
             renderPass.setVertexBuffer(0, lineVertexBuffer);
             renderPass.draw(lineVertices.length / 3);
+        }
+
+        // Draw direction change dots (green)
+        if (dotVertexBuffer && dotVertices.length > 0) {
+            renderPass.setPipeline(this.linePipeline);
+            renderPass.setVertexBuffer(0, dotVertexBuffer);
+            renderPass.draw(dotVertices.length / 3);
         }
 
         renderPass.end();
@@ -761,8 +836,9 @@ export class WebGPURenderer {
 
         this.device.queue.submit([commandEncoder.finish()]);
 
-        // Clean up temporary buffer
-        lineVertexBuffer.destroy();
+        // Clean up temporary buffers
+        if (lineVertexBuffer) lineVertexBuffer.destroy();
+        if (dotVertexBuffer) dotVertexBuffer.destroy();
 
         } catch (error) {
             console.error('WebGPU renderTrace error:', error);
