@@ -178,7 +178,7 @@ export class WebGPURenderer {
                     format: this.format,
                     blend: {
                         color: {
-                            srcFactor: 'src-alpha',
+                            srcFactor: 'one',  // Premultiplied alpha - color already multiplied
                             dstFactor: 'one-minus-src-alpha',
                             operation: 'add',
                         },
