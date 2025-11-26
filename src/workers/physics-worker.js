@@ -15,6 +15,7 @@ let devicePixelRatio = 1;
 let logicalWidth = 600;
 let logicalHeight = 600;
 let currentRendererType = RendererType.CANVAS_2D;
+let renderSkipLogged = false; // Debug flag for one-time logging
 
 // ============================================================================
 // VIRTUAL COORDINATE SYSTEM
@@ -624,6 +625,9 @@ self.onmessage = async function(e) {
         logicalHeight = data.logicalHeight || 600;
         currentRendererType = data.rendererType || RendererType.CANVAS_2D;
 
+        // Reset debug flags for new session
+        renderSkipLogged = false;
+
         // Initialize smoothed basePower to typical middle value to avoid slow ramp-up
         smoothedBasePower = 1.2; // Corresponds to beamPower ≈ 0.7
 
@@ -731,7 +735,18 @@ self.onmessage = async function(e) {
             deltaTime
         } = data;
 
-        if (!rendererManager || !rendererManager.isReady()) return;
+        if (!rendererManager || !rendererManager.isReady()) {
+            // Debug: Log why we're returning early (once)
+            if (!renderSkipLogged) {
+                console.log('physics-worker: render skipped', {
+                    hasRendererManager: !!rendererManager,
+                    isReady: rendererManager?.isReady?.(),
+                    rendererType: rendererManager?.getCurrentType?.()
+                });
+                renderSkipLogged = true;
+            }
+            return;
+        }
 
         // Calculate and smooth FPS for debug mode display
         const currentFps = deltaTime > 0 ? 1 / deltaTime : 0;
