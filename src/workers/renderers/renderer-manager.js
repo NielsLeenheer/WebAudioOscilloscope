@@ -201,6 +201,14 @@ export class RendererManager {
      * Render the trace
      */
     renderTrace(params) {
+        if (!this._renderTraceLogged) {
+            console.log('RendererManager.renderTrace called:', {
+                hasRenderer: !!this.currentRenderer,
+                rendererType: this.currentType,
+                isReady: this.currentRenderer?.isReady?.()
+            });
+            this._renderTraceLogged = true;
+        }
         this.currentRenderer?.renderTrace(params);
     }
 

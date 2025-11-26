@@ -463,27 +463,28 @@ export class WebGPURenderer {
             interpolatePoints
         } = params;
 
+        // Debug: Log on first call regardless of state
+        if (!this._renderTraceCallLogged) {
+            console.log('WebGPU renderTrace called:', {
+                device: !!this.device,
+                initialized: this.initialized,
+                pointsLength: points?.length,
+                canvasWidth,
+                canvasHeight
+            });
+            this._renderTraceCallLogged = true;
+        }
+
         if (!this.device || !this.initialized) {
             console.log('WebGPU renderTrace: not ready', { device: !!this.device, initialized: this.initialized });
             return;
         }
         if (points.length < 2) {
+            console.log('WebGPU renderTrace: not enough points', points.length);
             return;
         }
 
         try {
-            // Debug: Log first frame info
-            if (!this._debugLogged) {
-                console.log('WebGPU renderTrace: first frame', {
-                    points: points.length,
-                    canvasWidth,
-                    canvasHeight,
-                    devicePixelRatio: this.devicePixelRatio,
-                    firstPoint: points[0],
-                    lastPoint: points[points.length - 1]
-                });
-                this._debugLogged = true;
-            }
 
         const persistence = this.currentPersistence || 0;
 
