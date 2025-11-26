@@ -108,9 +108,9 @@ export class WebGPURenderer {
             });
             this.renderTargetTextureView = this.renderTargetTexture.createView();
 
-            // Create bloom textures (half resolution for performance)
-            const bloomWidth = Math.floor(physicalWidth / 2);
-            const bloomHeight = Math.floor(physicalHeight / 2);
+            // Create bloom textures (full resolution for better quality on thin lines)
+            const bloomWidth = physicalWidth;
+            const bloomHeight = physicalHeight;
             this.bloomWidth = bloomWidth;
             this.bloomHeight = bloomHeight;
 
@@ -150,16 +150,18 @@ export class WebGPURenderer {
     }
 
     async createPipelines() {
-        // Vertex shader for drawing lines as triangle strips
+        // Vertex shader for drawing lines as triangle strips with anti-aliasing
         const lineVertexShader = `
             struct VertexInput {
                 @location(0) position: vec2<f32>,
                 @location(1) opacity: f32,
+                @location(2) edgeDist: f32,  // Distance from line center (-1 to 1)
             }
 
             struct VertexOutput {
                 @builtin(position) position: vec4<f32>,
                 @location(0) opacity: f32,
+                @location(1) edgeDist: f32,
             }
 
             @vertex
@@ -170,23 +172,27 @@ export class WebGPURenderer {
                 let clipY = 1.0 - (input.position.y / 300.0);
                 output.position = vec4<f32>(clipX, clipY, 0.0, 1.0);
                 output.opacity = input.opacity;
+                output.edgeDist = input.edgeDist;
                 return output;
             }
         `;
 
-        // Fragment shader for green phosphor glow
+        // Fragment shader for green phosphor glow with anti-aliased edges
         const lineFragmentShader = `
             struct FragmentInput {
                 @location(0) opacity: f32,
+                @location(1) edgeDist: f32,
             }
 
             @fragment
             fn main(input: FragmentInput) -> @location(0) vec4<f32> {
                 // Green phosphor color (76, 175, 80) / 255
                 let green = vec3<f32>(0.298, 0.686, 0.314);
-                // Boost brightness to compensate for lack of anti-aliasing vs Canvas 2D
-                let boostedOpacity = min(input.opacity * 2.0, 1.0);
-                return vec4<f32>(green * boostedOpacity, boostedOpacity);
+                // Anti-aliasing: smooth edge falloff based on distance from center
+                let dist = abs(input.edgeDist);
+                let edgeAlpha = 1.0 - smoothstep(0.5, 1.0, dist);
+                let finalOpacity = input.opacity * edgeAlpha;
+                return vec4<f32>(green * finalOpacity, finalOpacity);
             }
         `;
 
@@ -199,10 +205,11 @@ export class WebGPURenderer {
                 module: lineVertexModule,
                 entryPoint: 'main',
                 buffers: [{
-                    arrayStride: 12, // 2 floats for position + 1 float for opacity
+                    arrayStride: 16, // 2 floats for position + 1 float for opacity + 1 float for edgeDist
                     attributes: [
                         { shaderLocation: 0, offset: 0, format: 'float32x2' },
                         { shaderLocation: 1, offset: 8, format: 'float32' },
+                        { shaderLocation: 2, offset: 12, format: 'float32' },
                     ],
                 }],
             },
@@ -228,6 +235,97 @@ export class WebGPURenderer {
             primitive: {
                 topology: 'triangle-strip',
                 stripIndexFormat: undefined,
+            },
+        });
+
+        // Create green dot pipeline for circular dots at direction changes
+        const greenDotVertexShader = `
+            struct VertexInput {
+                @location(0) position: vec2<f32>,
+                @location(1) opacity: f32,
+                @location(2) localCoord: vec2<f32>,
+            }
+
+            struct VertexOutput {
+                @builtin(position) position: vec4<f32>,
+                @location(0) opacity: f32,
+                @location(1) localCoord: vec2<f32>,
+            }
+
+            @vertex
+            fn main(input: VertexInput) -> VertexOutput {
+                var output: VertexOutput;
+                let clipX = (input.position.x / 300.0) - 1.0;
+                let clipY = 1.0 - (input.position.y / 300.0);
+                output.position = vec4<f32>(clipX, clipY, 0.0, 1.0);
+                output.opacity = input.opacity;
+                output.localCoord = input.localCoord;
+                return output;
+            }
+        `;
+
+        const greenDotFragmentShader = `
+            struct FragmentInput {
+                @location(0) opacity: f32,
+                @location(1) localCoord: vec2<f32>,
+            }
+
+            @fragment
+            fn main(input: FragmentInput) -> @location(0) vec4<f32> {
+                // Circular mask with soft edge
+                let dist = length(input.localCoord);
+                if (dist > 1.0) {
+                    discard;
+                }
+                // Soft edge falloff for anti-aliasing
+                let edgeAlpha = 1.0 - smoothstep(0.6, 1.0, dist);
+                // Clamp opacity to prevent white-out, keep it green
+                let clampedOpacity = min(input.opacity, 1.0);
+                let finalOpacity = clampedOpacity * edgeAlpha;
+                // Green phosphor color
+                let green = vec3<f32>(0.298, 0.686, 0.314);
+                return vec4<f32>(green * finalOpacity, finalOpacity);
+            }
+        `;
+
+        const greenDotVertexModule = this.device.createShaderModule({ code: greenDotVertexShader });
+        const greenDotFragmentModule = this.device.createShaderModule({ code: greenDotFragmentShader });
+
+        this.greenDotPipeline = this.device.createRenderPipeline({
+            layout: 'auto',
+            vertex: {
+                module: greenDotVertexModule,
+                entryPoint: 'main',
+                buffers: [{
+                    arrayStride: 20, // 2 floats position + 1 float opacity + 2 floats localCoord
+                    attributes: [
+                        { shaderLocation: 0, offset: 0, format: 'float32x2' },
+                        { shaderLocation: 1, offset: 8, format: 'float32' },
+                        { shaderLocation: 2, offset: 12, format: 'float32x2' },
+                    ],
+                }],
+            },
+            fragment: {
+                module: greenDotFragmentModule,
+                entryPoint: 'main',
+                targets: [{
+                    format: this.format,
+                    blend: {
+                        color: {
+                            srcFactor: 'one',
+                            dstFactor: 'one-minus-src-alpha',
+                            operation: 'add',
+                        },
+                        alpha: {
+                            srcFactor: 'one',
+                            dstFactor: 'one-minus-src-alpha',
+                            operation: 'add',
+                        },
+                    },
+                }],
+            },
+            primitive: {
+                topology: 'triangle-strip',
             },
         });
 
@@ -553,9 +651,11 @@ export class WebGPURenderer {
         // ============================================
 
         // Bloom extract shader - extracts bright parts and downsamples
+        // Uses intensity uniform to scale bloom based on beam power
         const bloomExtractShader = `
             @group(0) @binding(0) var texSampler: sampler;
             @group(0) @binding(1) var tex: texture_2d<f32>;
+            @group(0) @binding(2) var<uniform> bloomIntensity: f32;
 
             struct FragmentInput {
                 @location(0) texCoord: vec2<f32>,
@@ -566,13 +666,16 @@ export class WebGPURenderer {
                 let color = textureSample(tex, texSampler, input.texCoord);
                 // Extract bright parts - very low threshold for prominent glow
                 let brightness = dot(color.rgb, vec3<f32>(0.2126, 0.7152, 0.0722));
-                let threshold = 0.02;
+                let threshold = 0.01;
                 let contribution = max(brightness - threshold, 0.0) / max(brightness, 0.001);
-                return vec4<f32>(color.rgb * contribution * 4.0, color.a);
+                // Base intensity multiplier scaled by beam power (bloomIntensity)
+                // When intensity > 1, bloom gets brighter (overdrive effect)
+                let intensityMultiplier = 8.0 * bloomIntensity;
+                return vec4<f32>(color.rgb * contribution * intensityMultiplier, color.a);
             }
         `;
 
-        // Horizontal blur shader - very wide blur for visible glow halo
+        // Horizontal blur shader - tight blur for focused glow
         const bloomBlurHShader = `
             @group(0) @binding(0) var texSampler: sampler;
             @group(0) @binding(1) var tex: texture_2d<f32>;
@@ -584,12 +687,12 @@ export class WebGPURenderer {
 
             @fragment
             fn main(input: FragmentInput) -> @location(0) vec4<f32> {
-                // 13-tap Gaussian blur with very wide spread for visible glow halo
-                let weights = array<f32, 7>(0.159576, 0.147308, 0.115876, 0.077674, 0.044361, 0.021595, 0.008958);
+                // 9-tap Gaussian blur with tight spread for focused glow
+                let weights = array<f32, 5>(0.227027, 0.1945946, 0.1216216, 0.054054, 0.016216);
                 var result = textureSample(tex, texSampler, input.texCoord) * weights[0];
 
-                for (var i = 1; i < 7; i++) {
-                    let offset = vec2<f32>(texelSize.x * f32(i) * 4.0, 0.0);
+                for (var i = 1; i < 5; i++) {
+                    let offset = vec2<f32>(texelSize.x * f32(i) * 0.8, 0.0);
                     result += textureSample(tex, texSampler, input.texCoord + offset) * weights[i];
                     result += textureSample(tex, texSampler, input.texCoord - offset) * weights[i];
                 }
@@ -597,7 +700,7 @@ export class WebGPURenderer {
             }
         `;
 
-        // Vertical blur shader - very wide blur for visible glow halo
+        // Vertical blur shader - tight blur for focused glow
         const bloomBlurVShader = `
             @group(0) @binding(0) var texSampler: sampler;
             @group(0) @binding(1) var tex: texture_2d<f32>;
@@ -609,12 +712,12 @@ export class WebGPURenderer {
 
             @fragment
             fn main(input: FragmentInput) -> @location(0) vec4<f32> {
-                // 13-tap Gaussian blur with very wide spread for visible glow halo
-                let weights = array<f32, 7>(0.159576, 0.147308, 0.115876, 0.077674, 0.044361, 0.021595, 0.008958);
+                // 9-tap Gaussian blur with tight spread for focused glow
+                let weights = array<f32, 5>(0.227027, 0.1945946, 0.1216216, 0.054054, 0.016216);
                 var result = textureSample(tex, texSampler, input.texCoord) * weights[0];
 
-                for (var i = 1; i < 7; i++) {
-                    let offset = vec2<f32>(0.0, texelSize.y * f32(i) * 4.0);
+                for (var i = 1; i < 5; i++) {
+                    let offset = vec2<f32>(0.0, texelSize.y * f32(i) * 0.8);
                     result += textureSample(tex, texSampler, input.texCoord + offset) * weights[i];
                     result += textureSample(tex, texSampler, input.texCoord - offset) * weights[i];
                 }
@@ -622,7 +725,7 @@ export class WebGPURenderer {
             }
         `;
 
-        // Bloom composite shader - DEBUG: show only the bloom texture to verify blur is working
+        // Bloom composite shader - combines original trace with bloom glow
         const bloomCompositeShader = `
             @group(0) @binding(0) var texSampler: sampler;
             @group(0) @binding(1) var originalTex: texture_2d<f32>;
@@ -634,9 +737,14 @@ export class WebGPURenderer {
 
             @fragment
             fn main(input: FragmentInput) -> @location(0) vec4<f32> {
+                let original = textureSample(originalTex, texSampler, input.texCoord);
                 let bloom = textureSample(bloomTex, texSampler, input.texCoord);
-                // DEBUG: Show only the bloom texture content to verify blur spread
-                return vec4<f32>(bloom.rgb, 1.0);
+                // Preserve green phosphor color ratio - prevent white-out
+                // Green phosphor base color (0.298, 0.686, 0.314)
+                let bloomIntensity = max(bloom.r, max(bloom.g, bloom.b));
+                let greenBloom = vec3<f32>(0.298, 0.686, 0.314) * bloomIntensity;
+                // Additive blend: original trace + green-tinted bloom glow
+                return vec4<f32>(original.rgb + greenBloom, max(original.a, bloom.a));
             }
         `;
 
@@ -645,11 +753,12 @@ export class WebGPURenderer {
         const bloomBlurVModule = this.device.createShaderModule({ code: bloomBlurVShader });
         const bloomCompositeModule = this.device.createShaderModule({ code: bloomCompositeShader });
 
-        // Bloom bind group layout (sampler + texture)
+        // Bloom extract bind group layout (sampler + texture + intensity uniform)
         this.bloomBindGroupLayout = this.device.createBindGroupLayout({
             entries: [
                 { binding: 0, visibility: GPUShaderStage.FRAGMENT, sampler: {} },
                 { binding: 1, visibility: GPUShaderStage.FRAGMENT, texture: {} },
+                { binding: 2, visibility: GPUShaderStage.FRAGMENT, buffer: { type: 'uniform' } },
             ],
         });
 
@@ -703,6 +812,12 @@ export class WebGPURenderer {
         // Create uniform buffer for bloom texel size
         this.bloomTexelSizeBuffer = this.device.createBuffer({
             size: 8, // vec2<f32>
+            usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+        });
+
+        // Create uniform buffer for bloom intensity
+        this.bloomIntensityBuffer = this.device.createBuffer({
+            size: 4, // f32
             usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
         });
     }
@@ -799,6 +914,8 @@ export class WebGPURenderer {
             sampleRate,
             debugMode,
             bloomEnabled,
+            antiAliasingEnabled,
+            traceEnabled,
             timeSegment,
             dotOpacity,
             dotSizeVariation,
@@ -836,10 +953,12 @@ export class WebGPURenderer {
 
         // Calculate scale factor for resolution-independent rendering
         const canvasScale = Math.min(canvasWidth, canvasHeight);
-        const LINE_WIDTH_RATIO = 0.002;
-        const GREEN_DOT_RATIO = 0.001875;
+        const LINE_WIDTH_RATIO = 0.0015;
+        const GREEN_DOT_RATIO = 0.0015;  // Same size as line width
         const DEBUG_DOT_RATIO = 0.0025;
-        const lineWidth = LINE_WIDTH_RATIO * canvasScale;
+        // When INTENS > 1 (overdrive), slightly increase line width
+        const intensityWidthScale = basePower > 1 ? 1 + (basePower - 1) * 0.3 : 1;
+        const lineWidth = LINE_WIDTH_RATIO * canvasScale * intensityWidthScale;
 
         const TIME_SEGMENT = timeSegment / 1000;
         const timePerPoint = 1 / sampleRate;
@@ -879,7 +998,12 @@ export class WebGPURenderer {
         const isInterpolated = interpolated.isInterpolated;
 
         // Build vertex data for line rendering (as thick line with triangle strip)
+        // Each vertex: x, y, opacity, edgeDist (4 floats)
         const lineVertices = [];
+
+        // Edge distance values for anti-aliasing (0 = no AA, ±1 = AA enabled)
+        const edgeTop = antiAliasingEnabled ? 1.0 : 0.0;
+        const edgeBottom = antiAliasingEnabled ? -1.0 : 0.0;
 
         let segmentStartIdx = 0;
         let accumulatedTime = 0;
@@ -895,35 +1019,45 @@ export class WebGPURenderer {
                 const avgSpeed = totalDistance / Math.max(1, i - segmentStartIdx);
                 const opacity = calculatePhosphorExcitation(avgSpeed, velocityDimming, basePower, deltaTime);
 
-                // Generate thick line vertices (triangle strip)
+                // Generate thick line vertices (triangle strip) with edge distance for anti-aliasing
                 for (let j = segmentStartIdx; j <= i; j++) {
                     const curr = renderPoints[j];
-                    const next = renderPoints[Math.min(j + 1, renderPoints.length - 1)];
-                    const prev = renderPoints[Math.max(j - 1, 0)];
+                    
+                    // Use a wider neighborhood for direction calculation to reduce noise
+                    // This prevents stepping artifacts from tiny variations between adjacent points
+                    const lookAhead = Math.min(3, renderPoints.length - 1 - j);
+                    const lookBehind = Math.min(3, j);
+                    const next = renderPoints[j + lookAhead];
+                    const prev = renderPoints[j - lookBehind];
 
-                    // Calculate perpendicular direction for line thickness
+                    // Calculate direction from prev to next (smoothed over wider range)
                     let dx = next.x - prev.x;
                     let dy = next.y - prev.y;
                     const len = Math.sqrt(dx * dx + dy * dy);
-                    if (len > 0) {
-                        dx /= len;
-                        dy /= len;
+
+                    // Perpendicular vector (normalized)
+                    let px, py;
+                    if (len > 0.0001) {
+                        // Perpendicular: rotate direction 90 degrees
+                        px = -dy / len * lineWidth * 0.5;
+                        py = dx / len * lineWidth * 0.5;
+                    } else {
+                        // Fallback for stationary points
+                        px = lineWidth * 0.5;
+                        py = 0;
                     }
 
-                    // Perpendicular vector
-                    const px = -dy * lineWidth * 0.5;
-                    const py = dx * lineWidth * 0.5;
-
-                    // Add two vertices (top and bottom of the thick line)
-                    lineVertices.push(curr.x + px, curr.y + py, opacity);
-                    lineVertices.push(curr.x - px, curr.y - py, opacity);
+                    // Add two vertices (top and bottom of the thick line) with edge distance
+                    // edgeDist: +1/-1 for AA enabled, 0 for AA disabled
+                    lineVertices.push(curr.x + px, curr.y + py, opacity, edgeTop);   // top edge
+                    lineVertices.push(curr.x - px, curr.y - py, opacity, edgeBottom);  // bottom edge
                 }
 
                 // Add degenerate triangles to separate segments
                 if (i < renderPoints.length - 1) {
                     const last = renderPoints[i];
-                    lineVertices.push(last.x, last.y, 0);
-                    lineVertices.push(last.x, last.y, 0);
+                    lineVertices.push(last.x, last.y, 0, 0);
+                    lineVertices.push(last.x, last.y, 0, 0);
                 }
 
                 segmentStartIdx = i;
@@ -932,7 +1066,8 @@ export class WebGPURenderer {
         }
 
         // Build dot vertices for direction changes (green dots)
-        // Using triangle-list style: 6 vertices per quad (2 triangles)
+        // Format: position (2), opacity (1), localCoord (2) = 5 floats per vertex
+        // localCoord is used to calculate distance from center for circular shape
         const dotVertices = [];
         const greenDotSize = GREEN_DOT_RATIO * canvasScale;
 
@@ -941,25 +1076,20 @@ export class WebGPURenderer {
             const opacity = basePower * brightness;
             const size = greenDotSize;
 
-            // Two triangles forming a quad (6 vertices for triangle-strip compatibility)
-            // Triangle 1: bottom-left, bottom-right, top-left
-            // Triangle 2: top-left, bottom-right, top-right
-            // For triangle strip: v0, v1, v2, v3 forms quad
-
             // Add degenerate to start new quad (duplicate first vertex)
             if (dotVertices.length > 0) {
                 // Duplicate last vertex of previous quad
-                const lastIdx = dotVertices.length - 3;
-                dotVertices.push(dotVertices[lastIdx], dotVertices[lastIdx + 1], dotVertices[lastIdx + 2]);
+                const lastIdx = dotVertices.length - 5;
+                dotVertices.push(dotVertices[lastIdx], dotVertices[lastIdx + 1], dotVertices[lastIdx + 2], dotVertices[lastIdx + 3], dotVertices[lastIdx + 4]);
                 // Duplicate first vertex of this quad
-                dotVertices.push(point.x - size, point.y - size, opacity);
+                dotVertices.push(point.x - size, point.y - size, opacity, -1.0, -1.0);
             }
 
-            // Quad vertices for triangle strip
-            dotVertices.push(point.x - size, point.y - size, opacity);  // bottom-left
-            dotVertices.push(point.x + size, point.y - size, opacity);  // bottom-right
-            dotVertices.push(point.x - size, point.y + size, opacity);  // top-left
-            dotVertices.push(point.x + size, point.y + size, opacity);  // top-right
+            // Quad vertices for triangle strip with local coords for circular mask
+            dotVertices.push(point.x - size, point.y - size, opacity, -1.0, -1.0);  // bottom-left
+            dotVertices.push(point.x + size, point.y - size, opacity, 1.0, -1.0);   // bottom-right
+            dotVertices.push(point.x - size, point.y + size, opacity, -1.0, 1.0);   // top-left
+            dotVertices.push(point.x + size, point.y + size, opacity, 1.0, 1.0);    // top-right
         }
 
         // Build debug dot vertices (red for interpolated, blue for samples)
@@ -1021,11 +1151,11 @@ export class WebGPURenderer {
         if (!this._vertexDebugLogged && lineVertices.length > 0) {
             console.log('WebGPU vertices:', {
                 floatCount: lineVertices.length,
-                vertexCount: lineVertices.length / 3,
+                vertexCount: lineVertices.length / 4,
                 byteSize: lineVertexArray.byteLength,
-                dotCount: dotVertices.length / 3,
+                dotCount: dotVertices.length / 5,
                 coloredDotCount: coloredDotVertices.length / 6,
-                sampleVertices: lineVertices.slice(0, 12) // First 4 vertices
+                sampleVertices: lineVertices.slice(0, 16) // First 4 vertices
             });
             this._vertexDebugLogged = true;
         }
@@ -1110,18 +1240,18 @@ export class WebGPURenderer {
             }],
         });
 
-        // Draw lines
-        if (lineVertexBuffer && lineVertices.length > 0) {
+        // Draw lines (if trace enabled)
+        if (traceEnabled && lineVertexBuffer && lineVertices.length > 0) {
             renderPass.setPipeline(this.linePipeline);
             renderPass.setVertexBuffer(0, lineVertexBuffer);
-            renderPass.draw(lineVertices.length / 3);
+            renderPass.draw(lineVertices.length / 4);
         }
 
-        // Draw direction change dots (green)
+        // Draw direction change dots (green circular)
         if (dotVertexBuffer && dotVertices.length > 0) {
-            renderPass.setPipeline(this.linePipeline);
+            renderPass.setPipeline(this.greenDotPipeline);
             renderPass.setVertexBuffer(0, dotVertexBuffer);
-            renderPass.draw(dotVertices.length / 3);
+            renderPass.draw(dotVertices.length / 5);  // 5 floats per vertex
         }
 
         // Draw colored debug dots (red/blue)
@@ -1146,12 +1276,18 @@ export class WebGPURenderer {
             const texelSize = new Float32Array([1.0 / this.bloomWidth, 1.0 / this.bloomHeight]);
             this.device.queue.writeBuffer(this.bloomTexelSizeBuffer, 0, texelSize);
 
+            // Update bloom intensity based on beam power (basePower)
+            // When basePower > 1, bloom gets brighter (overdrive effect)
+            const bloomIntensity = Math.max(1.0, basePower);
+            this.device.queue.writeBuffer(this.bloomIntensityBuffer, 0, new Float32Array([bloomIntensity]));
+
             // Bloom pass 1: Extract bright parts from render target to bloom texture
             const bloomExtractBindGroup = this.device.createBindGroup({
                 layout: this.bloomBindGroupLayout,
                 entries: [
                     { binding: 0, resource: this.sampler },
                     { binding: 1, resource: this.renderTargetTextureView },
+                    { binding: 2, resource: { buffer: this.bloomIntensityBuffer } },
                 ],
             });
 
@@ -1211,95 +1347,7 @@ export class WebGPURenderer {
             blurVPass1.draw(4);
             blurVPass1.end();
 
-            // Bloom pass 4: Second horizontal blur for wider glow (bloom -> bloomBlur)
-            const blurHBindGroup2 = this.device.createBindGroup({
-                layout: this.bloomBlurBindGroupLayout,
-                entries: [
-                    { binding: 0, resource: this.sampler },
-                    { binding: 1, resource: this.bloomTextureView },
-                    { binding: 2, resource: { buffer: this.bloomTexelSizeBuffer } },
-                ],
-            });
-
-            const blurHPass2 = commandEncoder.beginRenderPass({
-                colorAttachments: [{
-                    view: this.bloomBlurTextureView,
-                    loadOp: 'clear',
-                    storeOp: 'store',
-                }],
-            });
-            blurHPass2.setPipeline(this.bloomBlurHPipeline);
-            blurHPass2.setBindGroup(0, blurHBindGroup2);
-            blurHPass2.draw(4);
-            blurHPass2.end();
-
-            // Bloom pass 5: Second vertical blur for wider glow (bloomBlur -> bloom)
-            const blurVBindGroup2 = this.device.createBindGroup({
-                layout: this.bloomBlurBindGroupLayout,
-                entries: [
-                    { binding: 0, resource: this.sampler },
-                    { binding: 1, resource: this.bloomBlurTextureView },
-                    { binding: 2, resource: { buffer: this.bloomTexelSizeBuffer } },
-                ],
-            });
-
-            const blurVPass2 = commandEncoder.beginRenderPass({
-                colorAttachments: [{
-                    view: this.bloomTextureView,
-                    loadOp: 'clear',
-                    storeOp: 'store',
-                }],
-            });
-            blurVPass2.setPipeline(this.bloomBlurVPipeline);
-            blurVPass2.setBindGroup(0, blurVBindGroup2);
-            blurVPass2.draw(4);
-            blurVPass2.end();
-
-            // Bloom pass 6: Third horizontal blur for even wider glow (bloom -> bloomBlur)
-            const blurHBindGroup3 = this.device.createBindGroup({
-                layout: this.bloomBlurBindGroupLayout,
-                entries: [
-                    { binding: 0, resource: this.sampler },
-                    { binding: 1, resource: this.bloomTextureView },
-                    { binding: 2, resource: { buffer: this.bloomTexelSizeBuffer } },
-                ],
-            });
-
-            const blurHPass3 = commandEncoder.beginRenderPass({
-                colorAttachments: [{
-                    view: this.bloomBlurTextureView,
-                    loadOp: 'clear',
-                    storeOp: 'store',
-                }],
-            });
-            blurHPass3.setPipeline(this.bloomBlurHPipeline);
-            blurHPass3.setBindGroup(0, blurHBindGroup3);
-            blurHPass3.draw(4);
-            blurHPass3.end();
-
-            // Bloom pass 7: Third vertical blur for even wider glow (bloomBlur -> bloom)
-            const blurVBindGroup3 = this.device.createBindGroup({
-                layout: this.bloomBlurBindGroupLayout,
-                entries: [
-                    { binding: 0, resource: this.sampler },
-                    { binding: 1, resource: this.bloomBlurTextureView },
-                    { binding: 2, resource: { buffer: this.bloomTexelSizeBuffer } },
-                ],
-            });
-
-            const blurVPass3 = commandEncoder.beginRenderPass({
-                colorAttachments: [{
-                    view: this.bloomTextureView,
-                    loadOp: 'clear',
-                    storeOp: 'store',
-                }],
-            });
-            blurVPass3.setPipeline(this.bloomBlurVPipeline);
-            blurVPass3.setBindGroup(0, blurVBindGroup3);
-            blurVPass3.draw(4);
-            blurVPass3.end();
-
-            // Bloom pass 8: Composite (render target + bloom -> swap chain)
+            // Bloom pass 4: Composite (render target + bloom -> swap chain)
             const compositeBindGroup = this.device.createBindGroup({
                 layout: this.bloomCompositeBindGroupLayout,
                 entries: [
@@ -1406,15 +1454,15 @@ export class WebGPURenderer {
                     const px = (-dy / len) * lineWidth * 0.5;
                     const py = (dx / len) * lineWidth * 0.5;
 
-                    // Triangle strip: 4 vertices
-                    lineVertices.push(x1 + px, y1 + py, opacity);
-                    lineVertices.push(x1 - px, y1 - py, opacity);
-                    lineVertices.push(x2 + px, y2 + py, opacity);
-                    lineVertices.push(x2 - px, y2 - py, opacity);
+                    // Triangle strip: 4 vertices with edge distance for anti-aliasing
+                    lineVertices.push(x1 + px, y1 + py, opacity, 1.0);
+                    lineVertices.push(x1 - px, y1 - py, opacity, -1.0);
+                    lineVertices.push(x2 + px, y2 + py, opacity, 1.0);
+                    lineVertices.push(x2 - px, y2 - py, opacity, -1.0);
 
                     // Degenerate triangles to separate segments
-                    lineVertices.push(x2 - px, y2 - py, 0);
-                    lineVertices.push(x2 - px, y2 - py, 0);
+                    lineVertices.push(x2 - px, y2 - py, 0, 0);
+                    lineVertices.push(x2 - px, y2 - py, 0, 0);
                 }
             }
 
@@ -1444,7 +1492,7 @@ export class WebGPURenderer {
 
             renderPass.setPipeline(this.linePipeline);
             renderPass.setVertexBuffer(0, vertexBuffer);
-            renderPass.draw(lineVertices.length / 3);
+            renderPass.draw(lineVertices.length / 4);
             renderPass.end();
 
             this.device.queue.submit([commandEncoder.finish()]);
@@ -1489,6 +1537,10 @@ export class WebGPURenderer {
         if (this.bloomTexelSizeBuffer) {
             this.bloomTexelSizeBuffer.destroy();
             this.bloomTexelSizeBuffer = null;
+        }
+        if (this.bloomIntensityBuffer) {
+            this.bloomIntensityBuffer.destroy();
+            this.bloomIntensityBuffer = null;
         }
         this.device = null;
         this.context = null;

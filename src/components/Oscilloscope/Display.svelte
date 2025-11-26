@@ -13,7 +13,7 @@
 
     // Physics parameters (adjustable)
     let debugMode = $state(false); // Debug visualization toggle
-    let rendererType = $state('canvas2d'); // Renderer type: 'canvas2d' or 'webgpu'
+    let rendererType = $state('webgpu'); // Renderer type: 'canvas2d' or 'webgpu'
     // Initialize with default renderers (updated by worker when available)
     let availableRenderers = $state([
         { type: 'canvas2d', name: 'Canvas 2D', available: true },
@@ -24,7 +24,7 @@
     let dotOpacity = $state(0.0); // Debug dot opacity for red dots/segment endpoints (0.0 to 1.0)
     let dotSizeVariation = $state(1.0); // Debug dot size variation based on angle (1 = all same, 10 = 10x variation)
     let sampleDotOpacity = $state(0.5); // Debug dot opacity for blue dots/sample points (0.0 to 1.0)
-    let bloomEnabled = $state(false); // Experimental WebGPU bloom/glow effect
+    let bloomEnabled = $state(true); // Experimental WebGPU bloom/glow effect
 
     // Electromagnetic model parameters
     let coilStrength = $state(0.60);
@@ -58,7 +58,6 @@
         bind:rendererType
         {availableRenderers}
         {isPowered}
-        bind:bloomEnabled
         bind:timeSegment
         bind:dotOpacity
         bind:dotSizeVariation
