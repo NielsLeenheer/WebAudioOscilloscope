@@ -10,6 +10,34 @@ The rendering system is the final stage in a three-stage pipeline:
 2. **Physics Simulation** - Calculate beam position using electromagnetic model
 3. **Rendering** - Draw the beam path to canvas with phosphor effects
 
+### Renderer Architecture
+
+The rendering system uses a modular architecture with swappable backends:
+
+```
+physics-worker.js
+    └── RendererManager
+            ├── Canvas2DRenderer (default)
+            └── WebGPURenderer (experimental)
+```
+
+**Key Files:**
+- `src/workers/physics-worker.js` - Physics simulation and rendering orchestration
+- `src/workers/renderers/renderer-manager.js` - Manages renderer lifecycle and switching
+- `src/workers/renderers/canvas2d-renderer.js` - Standard Canvas 2D implementation
+- `src/workers/renderers/webgpu-renderer.js` - GPU-accelerated WebGPU implementation
+
+### Renderer Selection
+
+The system supports two rendering backends:
+
+| Renderer | Status | Features |
+|----------|--------|----------|
+| **Canvas 2D** | Stable (Default) | Universal browser support, reliable performance |
+| **WebGPU** | Experimental | GPU-accelerated, bloom/glow effects, anti-aliased lines |
+
+**Switching Renderers:** To change between Canvas 2D and WebGPU, power off the oscilloscope and select a different renderer, then power it back on. The canvas context is recreated on power-on, allowing the new renderer to initialize.
+
 ## Rendering Model
 
 The oscilloscope uses a **time-based segmentation** approach with Catmull-Rom interpolation and direction change highlighting to create realistic CRT phosphor behavior.
@@ -388,10 +416,24 @@ sampleDotOpacity: 0.0         // Blue dots hidden by default
 ### Code Location
 
 - **Physics Worker:** `/src/workers/physics-worker.js`
-  - `renderTrace()` - Main rendering function
+  - Physics simulation and rendering orchestration
   - `catmullRomInterpolate()` - Spline interpolation
   - `interpolatePoints()` - Point generation for sub-sampling
   - `calculatePhosphorExcitation()` - Brightness calculation
+
+- **Renderer Manager:** `/src/workers/renderers/renderer-manager.js`
+  - Manages renderer lifecycle and switching
+  - Handles fallback when WebGPU unavailable
+  - Enforces context binding constraints
+
+- **Canvas 2D Renderer:** `/src/workers/renderers/canvas2d-renderer.js`
+  - `renderTrace()` - Main trace rendering
+  - Standard Canvas 2D drawing operations
+
+- **WebGPU Renderer:** `/src/workers/renderers/webgpu-renderer.js`
+  - `renderTrace()` - GPU-accelerated trace rendering
+  - WGSL shaders for lines, dots, bloom effects
+  - Multi-pass bloom pipeline
 
 - **Display Component:** `/src/components/Oscilloscope/Display.svelte`
   - Rendering parameter definitions and defaults
@@ -401,6 +443,7 @@ sampleDotOpacity: 0.0         // Blue dots hidden by default
 
 - **Physics Dialog:** `/src/components/Oscilloscope/PhysicsDialog.svelte`
   - Debug mode controls and parameter adjustment
+  - Renderer selection UI
 
 ### Web Worker Architecture
 
@@ -409,6 +452,119 @@ The rendering runs in a Web Worker (`physics-worker.js`) to:
 - Maintain 60fps animation smoothness
 - Use OffscreenCanvas for direct GPU rendering
 - Prevent UI blocking during complex rendering
+
+## Canvas 2D Renderer
+
+The default renderer uses the standard Canvas 2D API. It provides reliable cross-browser compatibility and good performance for most use cases.
+
+### Implementation
+
+The Canvas 2D renderer (`canvas2d-renderer.js`) draws traces using:
+- `lineTo()` for segment connections
+- `arc()` for circular dots (direction changes and debug points)
+- CSS `blur()` filter for focus simulation
+
+### Strengths
+- Universal browser support
+- Predictable performance
+- Simple debugging
+
+### Limitations
+- No hardware-accelerated blur/glow
+- Focus effect applied as post-process CSS filter
+- Limited visual effects
+
+## WebGPU Renderer
+
+The experimental WebGPU renderer provides GPU-accelerated rendering with advanced visual effects.
+
+### Features
+
+1. **Anti-Aliased Lines**
+   - Lines rendered as triangle strips with smooth edge falloff
+   - `smoothstep()` function creates soft edges without post-processing
+   - Consistent line quality at all angles
+
+2. **Bloom/Glow Effect**
+   - Multi-pass GPU bloom pipeline:
+     1. **Extract** - Isolate bright pixels above threshold
+     2. **Horizontal Blur** - 9-tap Gaussian blur
+     3. **Vertical Blur** - 9-tap Gaussian blur
+     4. **Composite** - Blend bloom with original image (additive)
+   - Bloom intensity scales with beam power for overdrive effect
+   - Creates realistic phosphor glow around bright traces
+
+3. **GPU Persistence**
+   - Phosphor trail effect computed entirely on GPU
+   - Render target textures preserve previous frames
+   - Fade shader applies persistence decay per frame
+
+4. **Circular Dots with Soft Edges**
+   - Direction change dots rendered as quads with circular mask
+   - Fragment shader discards pixels outside radius
+   - Smooth anti-aliased edges via `smoothstep()`
+
+### Pipeline Architecture
+
+The WebGPU renderer uses multiple render pipelines:
+
+| Pipeline | Purpose |
+|----------|---------|
+| `linePipeline` | Draw anti-aliased trace lines |
+| `greenDotPipeline` | Direction change highlights |
+| `pointPipeline` | Debug visualization dots |
+| `coloredLinePipeline` | Debug colored lines |
+| `fadeAndCopyPipeline` | Apply persistence fade |
+| `blitPipeline` | Copy textures without modification |
+| `bloomExtractPipeline` | Extract bright pixels for bloom |
+| `bloomBlurHPipeline` | Horizontal Gaussian blur |
+| `bloomBlurVPipeline` | Vertical Gaussian blur |
+| `bloomCompositePipeline` | Blend bloom with scene |
+
+### Shader Code (WGSL)
+
+The WebGPU renderer uses WGSL (WebGPU Shading Language) for all shaders. Key techniques:
+
+**Anti-aliased line edges:**
+```wgsl
+let dist = abs(input.edgeDist);
+let edgeAlpha = 1.0 - smoothstep(0.5, 1.0, dist);
+```
+
+**Circular dot mask:**
+```wgsl
+let dist = length(input.localCoord);
+if (dist > 1.0) { discard; }
+let edgeAlpha = 1.0 - smoothstep(0.6, 1.0, dist);
+```
+
+**Bloom extraction:**
+```wgsl
+let brightness = dot(color.rgb, vec3<f32>(0.2126, 0.7152, 0.0722));
+let threshold = 0.01;
+let contribution = max(brightness - threshold, 0.0) / max(brightness, 0.001);
+```
+
+### Browser Support
+
+WebGPU requires:
+- Chrome 113+ (with flags in some versions)
+- Edge 113+
+- Firefox Nightly (behind flag)
+- Safari 17+ (macOS Sonoma)
+
+The renderer manager automatically falls back to Canvas 2D if WebGPU is unavailable.
+
+### Texture Management
+
+The WebGPU renderer maintains several textures:
+
+| Texture | Purpose |
+|---------|---------|
+| `persistenceTexture` | Stores accumulated phosphor trails |
+| `renderTargetTexture` | Current frame render target |
+| `bloomTexture` | Extracted bright pixels |
+| `bloomBlurTexture` | Intermediate blur result |
 
 ## Future Development
 
@@ -420,15 +576,18 @@ The rendering runs in a Web Worker (`physics-worker.js`) to:
 - ✅ Debug visualizations (red/blue dots)
 - ✅ Angle-based brightness for realistic dwell time
 - ✅ Resolution-independent rendering
+- ✅ WebGPU renderer with GPU-accelerated rendering
+- ✅ Bloom/glow effects (WebGPU)
+- ✅ Anti-aliased lines (WebGPU)
+- ✅ Modular renderer architecture with hot-swappable backends
 
 ### Potential Future Enhancements
 
 - Gradient within segments: Interpolate opacity across points within each time segment
 - Temporal patterns: Visual effects based on time-domain characteristics
 - Configurable dot colors and styles
-- HDR bloom effects for bright direction changes
-- Different phosphor types (P7, P11, P15, etc.) with varying persistence
-- Bloom/glow effects for overdriven signals
+- Different phosphor types (P7, P11, P15, etc.) with varying persistence and colors
 - Color variations based on velocity or signal amplitude
 - Scanline effects for enhanced CRT realism
 - Adjustable phosphor saturation curves
+- WebGPU compute shaders for physics simulation
