@@ -914,8 +914,6 @@ export class WebGPURenderer {
             sampleRate,
             debugMode,
             bloomEnabled,
-            antiAliasingEnabled,
-            traceEnabled,
             timeSegment,
             dotOpacity,
             dotSizeVariation,
@@ -1001,9 +999,9 @@ export class WebGPURenderer {
         // Each vertex: x, y, opacity, edgeDist (4 floats)
         const lineVertices = [];
 
-        // Edge distance values for anti-aliasing (0 = no AA, ±1 = AA enabled)
-        const edgeTop = antiAliasingEnabled ? 1.0 : 0.0;
-        const edgeBottom = antiAliasingEnabled ? -1.0 : 0.0;
+        // Edge distance values for anti-aliasing (always enabled)
+        const edgeTop = 1.0;
+        const edgeBottom = -1.0;
 
         let segmentStartIdx = 0;
         let accumulatedTime = 0;
@@ -1241,7 +1239,7 @@ export class WebGPURenderer {
         });
 
         // Draw lines (if trace enabled)
-        if (traceEnabled && lineVertexBuffer && lineVertices.length > 0) {
+        if (lineVertexBuffer && lineVertices.length > 0) {
             renderPass.setPipeline(this.linePipeline);
             renderPass.setVertexBuffer(0, lineVertexBuffer);
             renderPass.draw(lineVertices.length / 4);
