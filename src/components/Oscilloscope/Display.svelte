@@ -8,12 +8,23 @@
 
     let visualiser;
 
+    // Check WebGPU support in main thread for initial renderer options
+    const webgpuSupported = typeof navigator !== 'undefined' && 'gpu' in navigator;
+
     // Physics parameters (adjustable)
     let debugMode = $state(false); // Debug visualization toggle
+    let rendererType = $state('webgpu'); // Renderer type: 'canvas2d' or 'webgpu'
+    // Initialize with default renderers (updated by worker when available)
+    let availableRenderers = $state([
+        { type: 'canvas2d', name: 'Canvas 2D', available: true },
+        { type: 'webgpu', name: 'WebGPU (Experimental)', available: webgpuSupported }
+    ]);
+
     let timeSegment = $state(0.010); // Temporal resolution in milliseconds (debug parameter)
     let dotOpacity = $state(0.0); // Debug dot opacity for red dots/segment endpoints (0.0 to 1.0)
     let dotSizeVariation = $state(1.0); // Debug dot size variation based on angle (1 = all same, 10 = 10x variation)
     let sampleDotOpacity = $state(0.5); // Debug dot opacity for blue dots/sample points (0.0 to 1.0)
+    let bloomEnabled = $state(true); // Experimental WebGPU bloom/glow effect
 
     // Electromagnetic model parameters
     let coilStrength = $state(0.60);
@@ -44,6 +55,9 @@
 <div class="display-panel">
     <Physics
         bind:debugMode
+        bind:rendererType
+        {availableRenderers}
+        {isPowered}
         bind:timeSegment
         bind:dotOpacity
         bind:dotSizeVariation
@@ -65,6 +79,9 @@
                 {isPowered}
                 {mode}
                 {debugMode}
+                {rendererType}
+                {bloomEnabled}
+                onRenderersAvailable={(renderers) => availableRenderers = renderers}
                 {timeSegment}
                 {dotOpacity}
                 {dotSizeVariation}

@@ -7,6 +7,9 @@
         simulationMode = $bindable(),
         renderingMode = $bindable(),
         debugMode = $bindable(),
+        rendererType = $bindable(),
+        availableRenderers = [],
+        isPowered = false,
         timeSegment = $bindable(),
         dotOpacity = $bindable(),
         dotSizeVariation = $bindable(),
@@ -41,6 +44,9 @@
     bind:simulationMode
     bind:renderingMode
     bind:debugMode
+    bind:rendererType
+    {availableRenderers}
+    {isPowered}
     bind:timeSegment
     bind:dotOpacity
     bind:dotSizeVariation

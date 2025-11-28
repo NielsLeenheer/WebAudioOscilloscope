@@ -3,6 +3,9 @@
 
     let {
         debugMode = $bindable(),
+        rendererType = $bindable(),
+        availableRenderers = [],
+        isPowered = false,
         timeSegment = $bindable(),
         dotOpacity = $bindable(),
         dotSizeVariation = $bindable(),
@@ -128,6 +131,19 @@
         <div class="mode-separator"></div>
         <ToggleSwitch bind:checked={debugMode} label="Debug?" />
         {#if debugMode}
+            <div class="renderer-control" class:disabled={isPowered}>
+                <label>Renderer</label>
+                <select bind:value={rendererType} class="renderer-select" disabled={isPowered}>
+                    {#each availableRenderers as renderer}
+                        <option value={renderer.type} disabled={!renderer.available}>
+                            {renderer.name}{renderer.available ? '' : ' (unavailable)'}
+                        </option>
+                    {/each}
+                </select>
+                {#if isPowered}
+                    <span class="disabled-hint">Power off to change</span>
+                {/if}
+            </div>
             <div class="slider-control">
                 <label class="clickable" onclick={() => timeSegment = 0.010}>Time Segment</label>
                 <input type="range" min="0.001" max="0.050" step="0.001" bind:value={timeSegment} />
@@ -287,6 +303,73 @@
         border-radius: 50%;
         cursor: pointer;
         border: none;
+    }
+
+    .renderer-control {
+        display: grid;
+        grid-template-columns: 80px 1fr;
+        gap: 10px;
+        align-items: center;
+        margin-bottom: 5px;
+    }
+
+    .renderer-control label {
+        color: #4CAF50;
+        font-family: system-ui;
+        font-size: 12px;
+        font-weight: 600;
+    }
+
+    .renderer-select {
+        width: 100%;
+        padding: 6px 10px;
+        background: #333;
+        border: 1px solid #444;
+        border-radius: 4px;
+        color: #4CAF50;
+        font-family: system-ui;
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+        outline: none;
+    }
+
+    .renderer-select:hover {
+        border-color: #4CAF50;
+    }
+
+    .renderer-select:focus {
+        border-color: #4CAF50;
+        box-shadow: 0 0 0 1px rgba(76, 175, 80, 0.3);
+    }
+
+    .renderer-select option {
+        background: #222;
+        color: #4CAF50;
+    }
+
+    .renderer-select option:disabled {
+        color: #666;
+    }
+
+    .renderer-control.disabled label {
+        color: #666;
+    }
+
+    .renderer-select:disabled {
+        background: #222;
+        color: #666;
+        cursor: not-allowed;
+        border-color: #333;
+    }
+
+    .disabled-hint {
+        grid-column: 2;
+        color: #666;
+        font-family: system-ui;
+        font-size: 10px;
+        font-style: italic;
+        margin-top: 2px;
     }
 
     .checkbox-group {

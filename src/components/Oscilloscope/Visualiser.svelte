@@ -1,5 +1,5 @@
 <script>
-    import { onMount, onDestroy } from 'svelte';
+    import { onMount, onDestroy, tick } from 'svelte';
 
     let {
         generatorInput,
@@ -8,6 +8,9 @@
         mode,
         // Physics parameters
         debugMode,
+        rendererType = 'canvas2d',
+        bloomEnabled = false,
+        onRenderersAvailable = () => {},
         timeSegment,
         dotOpacity,
         dotSizeVariation,
@@ -42,6 +45,12 @@
     let workerBusy = false;
     let lastFrameTime = 0;
 
+    // Key to force canvas recreation when powering on with different renderer
+    let canvasKey = $state(0);
+
+    // Track previous power state to detect transitions
+    let previousIsPowered = false;
+
     // High-DPI display support
     const devicePixelRatio = typeof window !== 'undefined' ? (window.devicePixelRatio || 1) : 1;
     const LOGICAL_WIDTH = 600;   // Visual size in CSS pixels
@@ -49,7 +58,13 @@
     const PHYSICAL_WIDTH = LOGICAL_WIDTH * devicePixelRatio;   // Backing store resolution
     const PHYSICAL_HEIGHT = LOGICAL_HEIGHT * devicePixelRatio; // Backing store resolution
 
-    onMount(() => {
+    onDestroy(() => {
+        destroyWorker();
+    });
+
+    function initWorker() {
+        if (!canvas) return;
+
         // Set canvas backing store to physical pixels for high-DPI displays
         canvas.width = PHYSICAL_WIDTH;
         canvas.height = PHYSICAL_HEIGHT;
@@ -61,6 +76,11 @@
         worker.onmessage = (e) => {
             if (e.data.type === 'ready') {
                 workerBusy = false;
+            } else if (e.data.type === 'initialized') {
+                // Worker initialized with renderer info
+                onRenderersAvailable(e.data.data.availableRenderers);
+                // Now that the renderer is ready, start visualization
+                startVisualization();
             }
         };
 
@@ -72,22 +92,22 @@
                 canvas: offscreen,
                 devicePixelRatio: devicePixelRatio,
                 logicalWidth: LOGICAL_WIDTH,
-                logicalHeight: LOGICAL_HEIGHT
+                logicalHeight: LOGICAL_HEIGHT,
+                rendererType: rendererType
             }
         }, [offscreen]);
+    }
 
-        if (isPowered) {
-            startVisualization();
-        }
-    });
-
-    onDestroy(() => {
+    function destroyWorker() {
         stopVisualization();
         if (worker) {
             worker.terminate();
             worker = null;
         }
-    });
+        // Reset state for next power cycle
+        workerBusy = false;
+        lastFrameTime = 0;
+    }
 
     function startVisualization() {
         // Initialize data buffers
@@ -207,6 +227,7 @@
                     scale,
                     visibleScale,
                     debugMode,
+                    bloomEnabled,
                     timeSegment,
                     dotOpacity,
                     dotSizeVariation,
@@ -255,31 +276,42 @@
         }
     }
 
-    // React to isPowered changes
+    // React to isPowered changes - recreate canvas and worker on power on/off
     $effect(() => {
-        if (isPowered) {
-            // Start visualization when powered on
-            startVisualization();
-        } else {
-            // Stop and reset when powered off
-            stopVisualization();
-            reset();
-        }
-    });
+        // Only react to transitions to avoid infinite loops
+        if (isPowered !== previousIsPowered) {
+            previousIsPowered = isPowered;
 
-    // React to power changes - clear screen when powered off
-    $effect(() => {
-        if (!isPowered) {
-            clear();
+            if (isPowered) {
+                // Increment key to force canvas recreation, then init after DOM updates
+                canvasKey++;
+                // Use tick + requestAnimationFrame to ensure canvas is fully bound
+                tick().then(() => {
+                    requestAnimationFrame(() => {
+                        if (canvas && !worker) {
+                            initWorker();
+                            // startVisualization() is called when 'initialized' message is received
+                        }
+                    });
+                });
+            } else {
+                // Stop and destroy worker when powered off
+                destroyWorker();
+                // Increment key to destroy old canvas and create fresh one
+                // This ensures the old context is completely released
+                canvasKey++;
+            }
         }
     });
 </script>
 
+{#key canvasKey}
 <canvas
     bind:this={canvas}
     class="scope-canvas"
     style="filter: blur({Math.abs(focus) * 3}px);"
 ></canvas>
+{/key}
 
 <style>
     .scope-canvas {
