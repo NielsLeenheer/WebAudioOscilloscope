@@ -1,7 +1,7 @@
 import { getCharStrokes, getCharWidth, getCharHeight } from './vectorFont.js';
 
 // Default settings
-const DEFAULT_CHAR_SPACING = 0.2; // Space between characters (as fraction of char width)
+const DEFAULT_CHAR_SPACING = 0.2; // Space between characters (normalized units scaled by size)
 const DEFAULT_POINT_DENSITY = 50; // Points per unit length (in normalized coordinates)
 
 /**
@@ -36,7 +36,8 @@ function calculateStrokeLength(stroke, scaleX, scaleY) {
 function generateCharPoints(char, x, y, scale, pointDensity = DEFAULT_POINT_DENSITY) {
     const strokes = getCharStrokes(char);
     const charHeight = getCharHeight();
-    const scaleX = scale;
+    const charWidth = getCharWidth(char);
+    const scaleX = scale * charWidth;
     const scaleY = scale * charHeight;
     const segments = [];
 
@@ -107,9 +108,15 @@ function generateCharPoints(char, x, y, scale, pointDensity = DEFAULT_POINT_DENS
  */
 export function measureText(text, scale = 1, charSpacing = DEFAULT_CHAR_SPACING) {
     if (text.length === 0) return 0;
-    const charWidth = getCharWidth() * scale;
     const spacing = charSpacing * scale;
-    return text.length * charWidth + (text.length - 1) * spacing;
+    let width = 0;
+    for (let i = 0; i < text.length; i++) {
+        width += getCharWidth(text[i]) * scale;
+        if (i < text.length - 1) {
+            width += spacing;
+        }
+    }
+    return width;
 }
 
 /**
@@ -137,10 +144,8 @@ export function generateScrollingText(text, scrollOffset, options = {}) {
         return [];
     }
 
-    const charWidth = getCharWidth() * scale;
     const charHeight = getCharHeight() * scale;
     const spacing = charSpacing * scale;
-    const charTotalWidth = charWidth + spacing;
 
     // Text starts at right edge (1.0) and scrolls left
     // scrollOffset = 0 means first char starts at right edge
@@ -156,30 +161,30 @@ export function generateScrollingText(text, scrollOffset, options = {}) {
     const viewportRight = 1;
 
     // Generate characters
+    let cursorX = startX;
     for (let i = 0; i < text.length; i++) {
-        const charX = startX + i * charTotalWidth;
+        const char = text[i];
+        const charWidth = getCharWidth(char) * scale;
 
         // Skip characters completely outside viewport
-        if (charX + charWidth < viewportLeft || charX > viewportRight) {
-            continue;
-        }
+        if (cursorX + charWidth >= viewportLeft && cursorX <= viewportRight) {
+            const charSegments = generateCharPoints(char, cursorX, baseY, scale, pointDensity);
 
-        const char = text[i];
-        const charSegments = generateCharPoints(char, charX, baseY, scale, pointDensity);
-
-        // Clip segments to viewport
-        for (const segment of charSegments) {
-            const clippedPoints = [];
-            for (const [px, py] of segment) {
-                // Only include points within horizontal viewport bounds
-                if (px >= viewportLeft && px <= viewportRight) {
-                    clippedPoints.push([px, py]);
+            // Clip segments to viewport
+            for (const segment of charSegments) {
+                const clippedPoints = [];
+                for (const [px, py] of segment) {
+                    if (px >= viewportLeft && px <= viewportRight) {
+                        clippedPoints.push([px, py]);
+                    }
+                }
+                if (clippedPoints.length >= 2) {
+                    allSegments.push(clippedPoints);
                 }
             }
-            if (clippedPoints.length >= 2) {
-                allSegments.push(clippedPoints);
-            }
         }
+
+        cursorX += charWidth + spacing;
     }
 
     return allSegments;
@@ -318,9 +323,7 @@ export function generateStaticText(text, options = {}) {
 
     const textWidth = measureText(text, scale, charSpacing);
     const charHeight = getCharHeight() * scale;
-    const charWidth = getCharWidth() * scale;
     const spacing = charSpacing * scale;
-    const charTotalWidth = charWidth + spacing;
 
     // Center the text
     const startX = xOffset - textWidth / 2;
@@ -328,11 +331,12 @@ export function generateStaticText(text, options = {}) {
 
     const allSegments = [];
 
+    let cursorX = startX;
     for (let i = 0; i < text.length; i++) {
-        const charX = startX + i * charTotalWidth;
         const char = text[i];
-        const charSegments = generateCharPoints(char, charX, baseY, scale, pointDensity);
+        const charSegments = generateCharPoints(char, cursorX, baseY, scale, pointDensity);
         allSegments.push(...charSegments);
+        cursorX += getCharWidth(char) * scale + spacing;
     }
 
     return allSegments;
