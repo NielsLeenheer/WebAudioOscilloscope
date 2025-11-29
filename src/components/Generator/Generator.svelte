@@ -4,6 +4,7 @@
     import WaveControls from './tabs/WaveControls.svelte';
     import ShapeControls from './tabs/ShapeControls.svelte';
     import ClockControls from './tabs/ClockControls.svelte';
+    import TextControls from './tabs/TextControls.svelte';
     import DrawControls from './tabs/DrawControls.svelte';
     import SVGControls from './tabs/SVGControls.svelte';
     import Settings from './tabs/Settings.svelte';
@@ -42,6 +43,9 @@
         </div>
         <div class="tab-panel" class:active={activeTab === 'clock'}>
             <ClockControls {audioEngine} isActive={activeTab === 'clock'} />
+        </div>
+        <div class="tab-panel" class:active={activeTab === 'text'}>
+            <TextControls {audioEngine} isActive={activeTab === 'text'} />
         </div>
         <div class="tab-panel" class:active={activeTab === 'draw'}>
             <DrawControls {audioEngine} isActive={activeTab === 'draw'} bind:activeTab bind:svgInput bind:svgSelectedExample />

@@ -4,6 +4,7 @@
     import audioIcon from '../../assets/icons/audio.svg?raw';
     import shapesIcon from '../../assets/icons/shapes.svg?raw';
     import clockIcon from '../../assets/icons/clock.svg?raw';
+    import textIcon from '../../assets/icons/text.svg?raw';
     import drawIcon from '../../assets/icons/draw.svg?raw';
     import pathsIcon from '../../assets/icons/paths.svg?raw';
     import settingsIcon from '../../assets/icons/settings.svg?raw';
@@ -29,6 +30,12 @@
             <input type="radio" name="tab" value="clock" bind:group={activeTab}>
             <Icon data={clockIcon} />
             Clock
+        </label>
+
+        <label>
+            <input type="radio" name="tab" value="text" bind:group={activeTab}>
+            <Icon data={textIcon} />
+            Text
         </label>
 
         <label>
