@@ -236,6 +236,7 @@
                     damping: fieldDamping,
                     mass: beamInertia,
                     signalNoise,
+                    inputSource,
                     basePower,
                     persistence,
                     velocityDimming,

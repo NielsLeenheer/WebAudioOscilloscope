@@ -150,18 +150,21 @@ function findTriggerPoint(data, triggerLevel) {
 
 // ============================================================================
 // STAGE A: SIGNAL PROCESSING
-// Add noise to raw audio data (same for all modes)
+// Add noise to raw audio data (only for generated input, not microphone)
 // ============================================================================
-function processSignals(leftData, rightData, signalNoise) {
+function processSignals(leftData, rightData, signalNoise, inputSource) {
     const processedLeft = [];
     const processedRight = [];
+
+    // Only add noise for generated input - microphone already has natural noise
+    const shouldAddNoise = signalNoise > 0 && inputSource !== 'microphone';
 
     for (let i = 0; i < leftData.length; i++) {
         let left = leftData[i];
         let right = rightData[i];
 
-        // Add noise if enabled
-        if (signalNoise > 0) {
+        // Add noise if enabled and using generated input
+        if (shouldAddNoise) {
             left += (Math.random() - 0.5) * signalNoise;
             right += (Math.random() - 0.5) * signalNoise;
         }
@@ -716,6 +719,7 @@ self.onmessage = async function(e) {
             damping,
             mass,
             signalNoise,
+            inputSource,
             basePower,
             persistence,
             velocityDimming,
@@ -771,8 +775,8 @@ self.onmessage = async function(e) {
         // THREE-STAGE RENDERING PIPELINE
         // ========================================================================
 
-        // STAGE A: Signal Processing - Add noise to raw audio data
-        const { processedLeft, processedRight } = processSignals(leftData, rightData, signalNoise);
+        // STAGE A: Signal Processing - Add noise to raw audio data (only for generated input)
+        const { processedLeft, processedRight } = processSignals(leftData, rightData, signalNoise, inputSource);
 
         // Handle A/B mode: render both channels sequentially
         const modesToRender = mode === 'ab' ? ['a', 'b'] : [mode];
