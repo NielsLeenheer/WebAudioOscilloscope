@@ -16,6 +16,23 @@ export class AudioEngine {
         this.currentRotation = 0;
         this.isPlaying = writable(false);
         this.clockInterval = null;
+
+        // Rendering mode: 'frequency' (fixed frame rate) or 'points' (1:1 point mapping)
+        this.renderMode = 'frequency';
+        this.pointSpacing = 0.02; // For points mode: distance between points in coordinate space (higher = fewer points)
+
+        // Layered buffering for points mode
+        this.pointsRingBuffer = [];     // Accumulated points from incoming frames
+        this.lastFramePoints = [];      // Copy of last frame for repeat on underrun
+        this.maxBufferPoints = 20000;   // Max points to buffer before dropping oldest
+        this.pointsOutputTimer = null;  // Timer for continuous output
+        this.pointsOutputInterval = 20; // ms between output chunks (50 Hz output rate)
+        this.pointsScheduledTime = 0;   // When next chunk should start playing
+        this.pointsActiveSources = [];  // Active buffer sources for cleanup
+
+        // Store last waveform for refresh on settings change
+        this.lastWaveformPoints = null;
+        this.isContinuousGenerator = false;  // True for generators that continuously push frames (e.g., DOOM)
     }
 
     initialize() {
@@ -73,6 +90,9 @@ export class AudioEngine {
             this.rightOscillator = null;
         }
 
+        // Stop points mode output
+        this.stopPointsOutput();
+
         // Clear clock interval if active
         if (this.clockInterval) {
             clearInterval(this.clockInterval);
@@ -98,24 +118,265 @@ export class AudioEngine {
         // Called by Settings tab - updates both default and current
         this.defaultFrequency = parseFloat(value);
         this.baseFrequency = parseFloat(value);
+        this.refreshWaveform();
     }
 
     setFrequency(value) {
         // Called by Waves tab - only updates current playback frequency
         this.baseFrequency = parseFloat(value);
+        this.refreshWaveform();
     }
 
     restoreDefaultFrequency() {
         // Called by other tabs to restore Settings frequency
         this.baseFrequency = this.defaultFrequency;
+        this.refreshWaveform();
     }
 
     setRotation(value) {
         this.currentRotation = parseFloat(value);
+        // Note: rotation doesn't need refresh as it's applied in real-time for points mode
+        // and at buffer creation for frequency mode
+    }
+
+    setRenderMode(mode) {
+        this.renderMode = mode; // 'frequency' or 'points'
+        this.refreshWaveform();
+    }
+
+    setPointSpacing(value) {
+        this.pointSpacing = parseFloat(value);
+        this.refreshWaveform();
+    }
+
+    // Mark generator as continuous (won't store points for refresh)
+    setContinuousGenerator(isContinuous) {
+        this.isContinuousGenerator = isContinuous;
+        if (isContinuous) {
+            this.lastWaveformPoints = null;
+        }
+    }
+
+    // Refresh the waveform with current settings (for single-frame generators)
+    refreshWaveform() {
+        if (this.lastWaveformPoints && get(this.isPlaying) && !this.isContinuousGenerator) {
+            this.createWaveform(this.lastWaveformPoints);
+        }
+    }
+
+    // === Layered buffering for points mode ===
+
+    // Add a frame's worth of points to the ring buffer
+    addPointsToBuffer(points) {
+        // Flatten if segments (array of arrays)
+        let flatPoints;
+        if (points.length > 0 && Array.isArray(points[0]) && Array.isArray(points[0][0])) {
+            flatPoints = points.flat();
+        } else {
+            flatPoints = points;
+        }
+
+        if (flatPoints.length === 0) return;
+
+        // Store as last frame for repeat on underrun
+        this.lastFramePoints = flatPoints.slice();
+
+        // Append to ring buffer
+        this.pointsRingBuffer.push(...flatPoints);
+
+        // Trim if buffer exceeds max (drop oldest points)
+        if (this.pointsRingBuffer.length > this.maxBufferPoints) {
+            const excess = this.pointsRingBuffer.length - this.maxBufferPoints;
+            this.pointsRingBuffer.splice(0, excess);
+        }
+    }
+
+    // Start the continuous output timer for points mode
+    startPointsOutput() {
+        if (this.pointsOutputTimer) return; // Already running
+
+        // Initialize scheduling time
+        this.pointsScheduledTime = this.audioContext.currentTime;
+
+        // Start output loop
+        this.pointsOutputTimer = setInterval(() => {
+            this.outputPointsChunk();
+        }, this.pointsOutputInterval);
+
+        // Output first chunk immediately
+        this.outputPointsChunk();
+    }
+
+    // Stop the continuous output timer
+    stopPointsOutput() {
+        if (this.pointsOutputTimer) {
+            clearInterval(this.pointsOutputTimer);
+            this.pointsOutputTimer = null;
+        }
+
+        // Clean up active sources
+        for (const sources of this.pointsActiveSources) {
+            try {
+                sources.left.stop();
+                sources.right.stop();
+            } catch (e) {
+                // Source may have already stopped
+            }
+        }
+        this.pointsActiveSources = [];
+        this.pointsRingBuffer = [];
+        this.pointsScheduledTime = 0;
+    }
+
+    // Output a fixed-size chunk from the buffer
+    outputPointsChunk() {
+        if (!this.audioContext || !get(this.isPlaying)) return;
+
+        const sampleRate = this.audioContext.sampleRate;
+        const now = this.audioContext.currentTime;
+
+        // Calculate chunk size: points needed for one interval (1:1 mapping)
+        // At 48kHz with 20ms interval = 960 points
+        const chunkDuration = this.pointsOutputInterval / 1000;
+        const pointsNeeded = Math.ceil(sampleRate * chunkDuration);
+
+        // Get points from ring buffer or repeat last frame
+        let pointsToUse;
+        if (this.pointsRingBuffer.length >= pointsNeeded) {
+            // Extract from buffer
+            pointsToUse = this.pointsRingBuffer.splice(0, pointsNeeded);
+        } else if (this.pointsRingBuffer.length > 0) {
+            // Partial buffer - use what we have plus pad from last frame (cycling if needed)
+            pointsToUse = this.pointsRingBuffer.splice(0, this.pointsRingBuffer.length);
+            if (this.lastFramePoints.length > 0) {
+                while (pointsToUse.length < pointsNeeded) {
+                    const remaining = pointsNeeded - pointsToUse.length;
+                    const chunk = this.lastFramePoints.slice(0, Math.min(remaining, this.lastFramePoints.length));
+                    pointsToUse.push(...chunk);
+                }
+            }
+        } else if (this.lastFramePoints.length > 0) {
+            // Buffer empty - repeat last frame (cycling through it)
+            pointsToUse = [];
+            while (pointsToUse.length < pointsNeeded) {
+                const remaining = pointsNeeded - pointsToUse.length;
+                const chunk = this.lastFramePoints.slice(0, Math.min(remaining, this.lastFramePoints.length));
+                pointsToUse.push(...chunk);
+            }
+        } else {
+            // No data at all - skip this chunk (don't output silence/center point)
+            return;
+        }
+
+        // Apply rotation
+        const rad = this.currentRotation * Math.PI / 180;
+        const cos = Math.cos(rad);
+        const sin = Math.sin(rad);
+
+        const rotatedPoints = pointsToUse.map(([x, y]) => [
+            x * cos - y * sin,
+            x * sin + y * cos
+        ]);
+
+        // Create audio buffer (1:1 point to sample mapping)
+        const bufferSize = rotatedPoints.length;
+        const leftBuffer = this.audioContext.createBuffer(1, bufferSize, sampleRate);
+        const rightBuffer = this.audioContext.createBuffer(1, bufferSize, sampleRate);
+
+        const leftData = leftBuffer.getChannelData(0);
+        const rightData = rightBuffer.getChannelData(0);
+
+        // Fill buffer - direct 1:1 mapping (no interpolation between points)
+        for (let i = 0; i < rotatedPoints.length; i++) {
+            leftData[i] = rotatedPoints[i][0];
+            rightData[i] = rotatedPoints[i][1];
+        }
+
+        // Schedule the buffer
+        const leftSource = this.audioContext.createBufferSource();
+        const rightSource = this.audioContext.createBufferSource();
+
+        leftSource.buffer = leftBuffer;
+        rightSource.buffer = rightBuffer;
+
+        leftSource.connect(this.leftGain);
+        rightSource.connect(this.rightGain);
+
+        // If we've fallen behind, catch up
+        if (this.pointsScheduledTime < now) {
+            this.pointsScheduledTime = now;
+        }
+
+        leftSource.start(this.pointsScheduledTime);
+        rightSource.start(this.pointsScheduledTime);
+
+        this.pointsScheduledTime += chunkDuration;
+
+        // Track for cleanup
+        const sourceEntry = { left: leftSource, right: rightSource, endTime: this.pointsScheduledTime };
+        this.pointsActiveSources.push(sourceEntry);
+
+        // Clean up finished sources
+        this.pointsActiveSources = this.pointsActiveSources.filter(s => s.endTime > now - 0.5);
+    }
+
+    // Resample a segment to have points at regular spacing intervals
+    resampleSegment(segment, spacing) {
+        if (segment.length < 2 || spacing <= 0) return segment;
+
+        const resampled = [segment[0]]; // Always include first point
+        let accumulatedDist = 0;
+        let lastOutputPoint = segment[0];
+
+        for (let i = 1; i < segment.length; i++) {
+            const prevInputPoint = segment[i - 1];
+            const point = segment[i];
+            const dx = point[0] - prevInputPoint[0];
+            const dy = point[1] - prevInputPoint[1];
+            const dist = Math.sqrt(dx * dx + dy * dy);
+
+            if (dist === 0) continue;
+
+            // Normalized direction vector for this segment
+            const dirX = dx / dist;
+            const dirY = dy / dist;
+
+            accumulatedDist += dist;
+
+            // Add points at regular spacing intervals
+            while (accumulatedDist >= spacing) {
+                // New point is exactly 'spacing' distance from last output point
+                // in the direction of the current segment
+                const newPoint = [
+                    lastOutputPoint[0] + dirX * spacing,
+                    lastOutputPoint[1] + dirY * spacing
+                ];
+                resampled.push(newPoint);
+                accumulatedDist -= spacing;
+                lastOutputPoint = newPoint;
+            }
+        }
+
+        // Always include last point if it's not too close to the previous one
+        const lastResampled = resampled[resampled.length - 1];
+        const finalPoint = segment[segment.length - 1];
+        const finalDx = finalPoint[0] - lastResampled[0];
+        const finalDy = finalPoint[1] - lastResampled[1];
+        const finalDist = Math.sqrt(finalDx * finalDx + finalDy * finalDy);
+        if (finalDist > spacing * 0.1) {
+            resampled.push(finalPoint);
+        }
+
+        return resampled;
     }
 
     createWaveform(pointsOrSegments, isClockUpdate = false) {
         if (!this.audioContext || !get(this.isPlaying)) return;
+
+        // Store points for refresh (unless this is from a continuous generator)
+        if (!this.isContinuousGenerator) {
+            this.lastWaveformPoints = pointsOrSegments;
+        }
 
         // Clear clock interval if switching to a different shape (but not if this is a clock update)
         if (this.clockInterval && !isClockUpdate) {
@@ -123,16 +384,47 @@ export class AudioEngine {
             this.clockInterval = null;
         }
 
-        // Stop existing oscillators
-        if (this.leftOscillator) this.leftOscillator.stop();
-        if (this.rightOscillator) this.rightOscillator.stop();
-
         // Detect if input is segments (array of arrays) or flat points (array of [x,y])
         const isSegmented = pointsOrSegments.length > 0 &&
                            Array.isArray(pointsOrSegments[0]) &&
                            Array.isArray(pointsOrSegments[0][0]);
 
         const segments = isSegmented ? pointsOrSegments : [pointsOrSegments];
+
+        // Points mode: use layered buffering (rotation is applied in outputPointsChunk)
+        if (this.renderMode === 'points') {
+            // Stop looping oscillators if switching from frequency mode
+            if (this.leftOscillator) {
+                this.leftOscillator.stop();
+                this.leftOscillator = null;
+            }
+            if (this.rightOscillator) {
+                this.rightOscillator.stop();
+                this.rightOscillator = null;
+            }
+
+            // Resample segments to desired point spacing
+            const resampledSegments = segments.map(segment =>
+                this.resampleSegment(segment, this.pointSpacing)
+            );
+
+            // Add to ring buffer (flattens segments internally)
+            this.addPointsToBuffer(resampledSegments);
+
+            // Start continuous output if not already running
+            this.startPointsOutput();
+            return;
+        }
+
+        // For frequency mode: stop points output if it was running
+        this.stopPointsOutput();
+
+        // Store references to old oscillators - we'll stop them right before starting new ones
+        // to minimize the gap (stopping here would create a gap during buffer processing)
+        const oldLeftOscillator = this.leftOscillator;
+        const oldRightOscillator = this.rightOscillator;
+        this.leftOscillator = null;
+        this.rightOscillator = null;
 
         // Apply rotation to all segments
         const rad = this.currentRotation * Math.PI / 180;
@@ -148,6 +440,9 @@ export class AudioEngine {
 
         // Create buffer for custom waveform
         const sampleRate = this.audioContext.sampleRate;
+
+        // Determine buffer size based on frequency
+        const totalPoints = rotatedSegments.reduce((sum, seg) => sum + seg.length, 0);
         const duration = 1 / this.baseFrequency;
         const bufferSize = Math.ceil(sampleRate * duration);
 
@@ -157,13 +452,17 @@ export class AudioEngine {
         const leftData = leftBuffer.getChannelData(0);
         const rightData = rightBuffer.getChannelData(0);
 
-        // Calculate total points across all segments
-        const totalPoints = rotatedSegments.reduce((sum, seg) => sum + seg.length, 0);
-
-        // Allocate buffer space proportionally to each segment
+        // Allocate buffer space proportionally to point count
+        // Use cumulative proportion to avoid rounding error accumulation
         let bufferOffset = 0;
-        rotatedSegments.forEach((segment, segmentIndex) => {
-            const segmentBufferSize = Math.floor(bufferSize * segment.length / totalPoints);
+        let cumulativePoints = 0;
+        rotatedSegments.forEach((segment) => {
+            cumulativePoints += segment.length;
+            // Calculate where this segment should end based on cumulative proportion
+            const targetEndOffset = Math.round(bufferSize * cumulativePoints / totalPoints);
+            const segmentBufferSize = targetEndOffset - bufferOffset;
+
+            if (segmentBufferSize <= 0) return;
 
             // Fill this segment's portion of the buffer with interpolation
             for (let i = 0; i < segmentBufferSize; i++) {
@@ -181,19 +480,10 @@ export class AudioEngine {
                 }
             }
 
-            bufferOffset += segmentBufferSize;
+            bufferOffset = targetEndOffset;
         });
 
-        // Fill any remaining buffer space (due to rounding) by repeating the last segment
-        if (bufferOffset < bufferSize && rotatedSegments.length > 0) {
-            const lastSegment = rotatedSegments[rotatedSegments.length - 1];
-            const lastPoint = lastSegment[lastSegment.length - 1];
-            for (let i = bufferOffset; i < bufferSize; i++) {
-                leftData[i] = lastPoint[0];
-                rightData[i] = lastPoint[1];
-            }
-        }
-
+        // Looping mode for frequency mode
         // Create buffer sources
         this.leftOscillator = this.audioContext.createBufferSource();
         this.rightOscillator = this.audioContext.createBufferSource();
@@ -207,6 +497,10 @@ export class AudioEngine {
         // Connect to gain nodes
         this.leftOscillator.connect(this.leftGain);
         this.rightOscillator.connect(this.rightGain);
+
+        // Stop old oscillators right before starting new ones to minimize gap
+        if (oldLeftOscillator) oldLeftOscillator.stop();
+        if (oldRightOscillator) oldRightOscillator.stop();
 
         // Start playback
         this.leftOscillator.start();

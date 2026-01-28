@@ -7,6 +7,7 @@
     import textIcon from '../../assets/icons/text.svg?raw';
     import drawIcon from '../../assets/icons/draw.svg?raw';
     import pathsIcon from '../../assets/icons/paths.svg?raw';
+    import doomIcon from '../../assets/icons/doom.svg?raw';
     import settingsIcon from '../../assets/icons/settings.svg?raw';
 
     let { activeTab = $bindable(), onSettingsClick } = $props();
@@ -48,6 +49,12 @@
             <input type="radio" name="tab" value="svg" bind:group={activeTab}>
             <Icon data={pathsIcon} />
             SVG
+        </label>
+
+        <label>
+            <input type="radio" name="tab" value="doom" bind:group={activeTab}>
+            <Icon data={doomIcon} />
+            Doom
         </label>
 
         <button class="settings-button" onclick={onSettingsClick} style="anchor-name: --settings-button">
