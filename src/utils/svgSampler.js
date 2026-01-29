@@ -60,7 +60,7 @@ function samplePathSegment(pathData, numSamples) {
 
         const points = [];
         for (let i = 0; i < numSamples; i++) {
-            const distance = (i / numSamples) * length;
+            const distance = numSamples > 1 ? (i / (numSamples - 1)) * length : 0;
             const point = properties.getPointAtLength(distance);
             points.push([point.x, point.y]);
         }

@@ -176,8 +176,8 @@ function outputFrequencyMode(segments, id, preview) {
         if (segmentBufferSize <= 0) continue;
 
         for (let i = 0; i < segmentBufferSize; i++) {
-            const t = i / segmentBufferSize;
-            const pointIndex = t * segment.length;
+            const t = segmentBufferSize > 1 ? i / (segmentBufferSize - 1) : 0;
+            const pointIndex = t * (segment.length - 1);
             const index1 = Math.floor(pointIndex);
             const index2 = Math.min(index1 + 1, segment.length - 1);
             const frac = pointIndex - index1;

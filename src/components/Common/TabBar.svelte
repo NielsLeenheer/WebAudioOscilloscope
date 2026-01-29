@@ -69,7 +69,6 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        min-height: 40px;
     }
 
     .tab-bar.wrap .tab {

@@ -6,7 +6,6 @@
     import ShapeControls from './tabs/ShapeControls.svelte';
     import ClockControls from './tabs/ClockControls.svelte';
     import TextControls from './tabs/TextControls.svelte';
-    import DrawControls from './tabs/DrawControls.svelte';
     import SVGControls from './tabs/SVGControls.svelte';
     import DoomControls from './tabs/DoomControls.svelte';
     import DinoControls from './tabs/DinoControls.svelte';
@@ -45,10 +44,6 @@
     let dinoShowDebug = $state(false);
     let dinoSceneScale = $state(1.25);
     let dinoSimplifySprites = $state(true);
-
-    // SVG input shared between Draw tab and SVG tab
-    let svgInput = $state('');
-    let svgSelectedExample = $state('star');
 
     // Stats (updated from frame processor)
     let statSegments = $state(0);
@@ -127,11 +122,8 @@
         <div class="tab-panel" class:active={activeTab === 'text'}>
             <TextControls {audioEngine} {frameProcessor} isActive={activeTab === 'text'} />
         </div>
-        <div class="tab-panel" class:active={activeTab === 'draw'}>
-            <DrawControls {audioEngine} {frameProcessor} isActive={activeTab === 'draw'} bind:activeTab bind:svgInput bind:svgSelectedExample />
-        </div>
         <div class="tab-panel" class:active={activeTab === 'svg'}>
-            <SVGControls {audioEngine} {frameProcessor} isActive={activeTab === 'svg'} bind:animationFPS={svgAnimationFPS} bind:numSamples={svgSamplePoints} optimizeSegments={true} bind:doubleDraw={svgDoubleDraw} bind:svgInput bind:selectedExample={svgSelectedExample} />
+            <SVGControls {audioEngine} {frameProcessor} isActive={activeTab === 'svg'} bind:animationFPS={svgAnimationFPS} bind:numSamples={svgSamplePoints} optimizeSegments={true} bind:doubleDraw={svgDoubleDraw} />
         </div>
         <div class="tab-panel" class:active={activeTab === 'doom'}>
             <DoomControls {audioEngine} {frameProcessor} isActive={activeTab === 'doom'} bind:maxRenderDistance={doomMaxRenderDistance} bind:depthPreset={doomDepthPreset} bind:edgeSampleInterval={doomEdgeSampleInterval} {doomShowDebug} />

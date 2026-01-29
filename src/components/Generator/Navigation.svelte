@@ -5,7 +5,6 @@
     import shapesIcon from '../../assets/icons/shapes.svg?raw';
     import clockIcon from '../../assets/icons/clock.svg?raw';
     import textIcon from '../../assets/icons/text.svg?raw';
-    import drawIcon from '../../assets/icons/draw.svg?raw';
     import pathsIcon from '../../assets/icons/paths.svg?raw';
     import doomIcon from '../../assets/icons/doom.svg?raw';
     import dinoIcon from '../../assets/icons/dino.svg?raw';
@@ -36,12 +35,6 @@
             <input type="radio" name="tab" value="text" bind:group={activeTab}>
             <Icon data={textIcon} />
             Text
-        </label>
-
-        <label>
-            <input type="radio" name="tab" value="draw" bind:group={activeTab}>
-            <Icon data={drawIcon} />
-            Draw
         </label>
 
         <label>

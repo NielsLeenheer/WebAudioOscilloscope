@@ -41,7 +41,7 @@
     let isWavesTab = $derived(activeTab === 'waves');
 
     // SVG settings only apply to draw and svg tabs
-    let isSvgTab = $derived(activeTab === 'draw' || activeTab === 'svg');
+    let isSvgTab = $derived(activeTab === 'svg');
 
     // Doom settings only apply to doom tab
     let isDoomTab = $derived(activeTab === 'doom');
