@@ -19,6 +19,9 @@ export class AudioEngine {
         // AudioWorklet for points mode (runs on audio thread, stutter-free)
         this.pointsWorkletNode = null;
         this.pointsWorkletReady = false;
+
+        // Generation counter to detect stale async operations after mode switches
+        this._audioGeneration = 0;
     }
 
     initialize() {
@@ -157,6 +160,8 @@ export class AudioEngine {
     createWaveform(points) {
         if (!this.audioContext || !get(this.isPlaying)) return;
 
+        this._audioGeneration++;
+
         // Stop points worklet if it was running
         this.stopPointsWorklet();
 
@@ -222,6 +227,8 @@ export class AudioEngine {
     playProcessedFrequencyFrame(leftData, rightData) {
         if (!this.audioContext || !get(this.isPlaying)) return;
 
+        this._audioGeneration++;
+
         // Stop points worklet if switching from points mode
         this.stopPointsWorklet();
 
@@ -264,6 +271,8 @@ export class AudioEngine {
     async playProcessedPointsFrame(interleavedData) {
         if (!this.audioContext || !get(this.isPlaying)) return;
 
+        const gen = ++this._audioGeneration;
+
         // Stop looping oscillators if switching from frequency mode
         if (this.leftOscillator) {
             this.leftOscillator.stop();
@@ -275,6 +284,9 @@ export class AudioEngine {
         }
 
         await this.startPointsWorklet();
+
+        // Abort if mode switched during await (another play method bumped the generation)
+        if (this._audioGeneration !== gen) return;
 
         if (!this.pointsWorkletNode) return;
 
