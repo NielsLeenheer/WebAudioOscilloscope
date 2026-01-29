@@ -1,13 +1,11 @@
 <script>
-    import { get } from 'svelte/store';
     import Button from '../../Common/Button.svelte';
     import PathEditor from '../../Common/PathEditor.svelte';
     import ImageUpload from '../../Common/ImageUpload.svelte';
     import EraseIcon from '../../../assets/icons/erase.svg?raw';
     import MoveIcon from '../../../assets/icons/move.svg?raw';
 
-    let { audioEngine, isActive = false, activeTab = $bindable('draw'), svgInput = $bindable(''), svgSelectedExample = $bindable('star') } = $props();
-    let isPlaying = audioEngine.isPlaying;
+    let { audioEngine, frameProcessor, isActive = false, activeTab = $bindable('draw'), svgInput = $bindable(''), svgSelectedExample = $bindable('star') } = $props();
 
     let pathEditor;
     let backgroundImage = $state(null);
@@ -16,20 +14,14 @@
 
     // Auto-update scope whenever path changes and playing
     $effect(() => {
-        if ($isPlaying && isActive) {
-            if (currentNormalizedPoints) {
-                updateScope();
-            } else {
-                // Clear output when tab becomes active with no points
-                audioEngine.restoreDefaultFrequency();
-                audioEngine.createWaveform([]);
-            }
+        if (isActive && currentNormalizedPoints) {
+            updateScope();
         }
     });
 
     function handlePathChange(normalizedPoints) {
         currentNormalizedPoints = normalizedPoints;
-        if (get(audioEngine.isPlaying) && normalizedPoints) {
+        if (normalizedPoints) {
             updateScope();
         }
     }
@@ -37,21 +29,17 @@
     function updateScope() {
         if (!currentNormalizedPoints) return;
 
-        // Restore Settings tab default frequency
-        audioEngine.restoreDefaultFrequency();
-
-        // Use the normalized points from PathEditor
-        audioEngine.createWaveform(currentNormalizedPoints);
+        // Normalize points to segments format
+        const segments = Array.isArray(currentNormalizedPoints[0]?.[0])
+            ? currentNormalizedPoints
+            : [currentNormalizedPoints];
+        frameProcessor.processFrame(segments);
     }
 
     function clearCanvas() {
         if (pathEditor) {
             pathEditor.clear();
         }
-
-        // Clear the oscilloscope output
-        audioEngine.restoreDefaultFrequency();
-        audioEngine.createWaveform([]);
     }
 
     function exportSVG() {

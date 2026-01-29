@@ -63,7 +63,6 @@ export async function createDoomRenderer(wadUrl, mapName = 'E1M1') {
     let optimizeOrder = true;
     let deduplicateLines = true;
     let dedupeThreshold = 25;  // Rounding factor for deduplication (25 = 0.040 tolerance)
-    let renderMode = 'frequency';  // 'frequency' or 'points'
 
     // Worker state
     let worker = null;
@@ -87,7 +86,7 @@ export async function createDoomRenderer(wadUrl, mapName = 'E1M1') {
                 // Send initial settings
                 worker.postMessage({
                     type: 'setSettings',
-                    payload: { pointDensity, optimizeOrder, deduplicateLines, dedupeThreshold, renderMode }
+                    payload: { pointDensity, optimizeOrder, deduplicateLines, dedupeThreshold }
                 });
                 // Send initial map data
                 sendMapToWorker();
@@ -284,15 +283,6 @@ export async function createDoomRenderer(wadUrl, mapName = 'E1M1') {
                     worker.postMessage({
                         type: 'setSettings',
                         payload: { dedupeThreshold }
-                    });
-                }
-            }
-            if (options.renderMode !== undefined) {
-                renderMode = options.renderMode;
-                if (worker && workerReady) {
-                    worker.postMessage({
-                        type: 'setSettings',
-                        payload: { renderMode }
                     });
                 }
             }

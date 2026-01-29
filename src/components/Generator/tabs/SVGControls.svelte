@@ -1,5 +1,4 @@
 <script>
-    import { get } from 'svelte/store';
     import { untrack } from 'svelte';
     import { svgExamples } from '../../../utils/svgExamples/index.js';
     import { onMount } from 'svelte';
@@ -12,12 +11,25 @@
         createContinuousSampler
     } from '../../../utils/svgSampler.js';
 
-    let { audioEngine, isActive = false, animationFPS = $bindable(30), numSamples = $bindable(200), optimizeSegments = $bindable(true), doubleDraw = $bindable(true), svgInput = $bindable(''), selectedExample = $bindable('star') } = $props();
-    let isPlaying = audioEngine.isPlaying;
+    let { audioEngine, frameProcessor, isActive = false, animationFPS = $bindable(30), numSamples = $bindable(200), optimizeSegments = $bindable(true), doubleDraw = $bindable(true), svgInput = $bindable(''), selectedExample = $bindable('star') } = $props();
     let validationError = $state('');
     let isValid = $state(true);
     let normalizedPoints = $state([]);
     let optimizationInitialized = $state(false);
+
+    // Listen for processed preview updates (e.g. settings changes that re-process cached frame)
+    $effect(() => {
+        if (isActive) {
+            frameProcessor.onPreviewUpdate = () => {
+                if (frameProcessor.processedPreview) {
+                    normalizedPoints = frameProcessor.processedPreview;
+                }
+            };
+            return () => {
+                frameProcessor.onPreviewUpdate = null;
+            };
+        }
+    });
 
     // Animation sampler
     let sampler = null;
@@ -39,12 +51,13 @@
                 samples,
                 animationFPS,
                 (normalized) => {
-                    normalizedPoints = normalized;
-                    // Update waveform with current frame
-                    audioEngine.restoreDefaultFrequency();
-                    audioEngine.createWaveform(normalized);
+                    // Send segments to frame processor
+                    const segments = Array.isArray(normalized[0]?.[0]) ? normalized : [normalized];
+                    frameProcessor.processFrame(segments);
+                    // Use processed preview when available, raw otherwise
+                    normalizedPoints = frameProcessor.processedPreview ?? normalized;
                 },
-                () => get(audioEngine.isPlaying),
+                () => true,
                 optimizeSegments,
                 doubleDraw
             );
@@ -90,7 +103,7 @@
     }
 
     function applyInput(value) {
-        if (!get(audioEngine.isPlaying) || !isValid || !isActive) return;
+        if (!isValid || !isActive) return;
 
         const data = value.trim();
         if (!data) return;
@@ -106,12 +119,10 @@
         // For path data, stop continuous sampling
         stopContinuousSampling();
 
-        // Restore Settings tab default frequency
-        audioEngine.restoreDefaultFrequency();
-
         try {
             if (normalizedPoints.length > 0) {
-                audioEngine.createWaveform(normalizedPoints);
+                const segments = Array.isArray(normalizedPoints[0]?.[0]) ? normalizedPoints : [normalizedPoints];
+                frameProcessor.processFrame(segments);
             }
         } catch (error) {
             console.error('Error applying SVG:', error);
@@ -143,7 +154,7 @@
 
             validateInput(svgInput);
 
-            if (get(audioEngine.isPlaying) && isValid) {
+            if (isValid) {
                 applyInput(svgInput);
             }
         }
@@ -161,14 +172,14 @@
 
     // Apply SVG when tab becomes active
     $effect(() => {
-        if (isActive && $isPlaying && svgInput && isValid) {
+        if (isActive && svgInput && isValid) {
             applyInput(svgInput);
         }
     });
 
     // Stop continuous sampling when playback stops or tab becomes inactive
     $effect(() => {
-        if (!$isPlaying || !isActive) {
+        if (!isActive) {
             stopContinuousSampling();
         }
     });
@@ -199,7 +210,7 @@
                 validateInput(svgInput);
 
                 // Re-apply if tab is active and playing
-                if (isActive && $isPlaying) {
+                if (isActive) {
                     applyInput(svgInput);
                 }
             }

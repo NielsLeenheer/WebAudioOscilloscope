@@ -6,9 +6,7 @@
         width = 150,
         height = 150,
         strokeColor = 'rgba(60, 60, 60, 0.7)',
-        jumpColor = 'rgba(60, 60, 60, 0.1)',
-        lineWidth = 1.5,
-        jumpThreshold = 0.3  // In normalized coordinates
+        lineWidth = 1.5
     } = $props();
 
     let canvas;
@@ -68,12 +66,17 @@
 
             ctx.stroke();
 
-            // Draw a faint line to the next segment (if any) to show the jump
+            // Draw beam travel line to the next segment (if any)
+            // Opacity varies by distance: short jumps are more visible, long jumps fade out
             if (segmentIndex < segments.length - 1 && segments[segmentIndex + 1].length > 0) {
                 const lastPoint = segment[segment.length - 1];
                 const nextFirstPoint = segments[segmentIndex + 1][0];
+                const dx = nextFirstPoint[0] - lastPoint[0];
+                const dy = nextFirstPoint[1] - lastPoint[1];
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                const opacity = 0.25 / (1 + dist * 3);
 
-                ctx.strokeStyle = jumpColor;
+                ctx.strokeStyle = `rgba(60, 60, 60, ${opacity.toFixed(3)})`;
                 ctx.beginPath();
                 ctx.moveTo(centerX + lastPoint[0] * scale, centerY - lastPoint[1] * scale);
                 ctx.lineTo(centerX + nextFirstPoint[0] * scale, centerY - nextFirstPoint[1] * scale);

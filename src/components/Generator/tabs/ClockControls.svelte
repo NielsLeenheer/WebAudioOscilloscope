@@ -4,37 +4,74 @@
     import Card from '../../Common/Card.svelte';
     import { generateClockPoints } from '../../../utils/shapes.js';
 
-    let { audioEngine, isActive = false } = $props();
-    let isPlaying = audioEngine.isPlaying;
+    let { audioEngine, frameProcessor, isActive = false } = $props();
 
     let showFace = $state(true);
     let showTicks = $state(false);
 
     let clockPoints = $state(generateClockPoints(showFace, showTicks));
-    let updateInterval;
+    let previewInterval;
+    let clockInterval = null;
 
-    // Function to generate clock with current settings
-    function getClockGenerator() {
-        return () => generateClockPoints(showFace, showTicks);
-    }
+    // Listen for processed preview updates (e.g. settings changes that re-process cached frame)
+    $effect(() => {
+        if (isActive) {
+            frameProcessor.onPreviewUpdate = () => {
+                if (frameProcessor.processedPreview) {
+                    clockPoints = frameProcessor.processedPreview;
+                }
+            };
+            return () => {
+                frameProcessor.onPreviewUpdate = null;
+            };
+        }
+    });
 
     // Update clock preview every second
     onMount(() => {
-        updateInterval = setInterval(() => {
-            clockPoints = generateClockPoints(showFace, showTicks);
+        previewInterval = setInterval(() => {
+            const raw = generateClockPoints(showFace, showTicks);
+            // Use processed preview when playing, raw when not
+            clockPoints = frameProcessor.processedPreview ?? raw;
         }, 1000);
     });
 
     onDestroy(() => {
-        if (updateInterval) {
-            clearInterval(updateInterval);
+        if (previewInterval) {
+            clearInterval(previewInterval);
         }
+        stopClockAudio();
     });
 
-    // Update clock when tab becomes active
+    function startClockAudio() {
+        stopClockAudio();
+
+        const sendClock = () => {
+            const points = generateClockPoints(showFace, showTicks);
+            // Clock generates flat points, wrap as single segment
+            const segments = Array.isArray(points[0]?.[0]) ? points : [points];
+            frameProcessor.processFrame(segments);
+        };
+
+        sendClock();
+        clockInterval = setInterval(() => {
+            sendClock();
+        }, 1000);
+    }
+
+    function stopClockAudio() {
+        if (clockInterval) {
+            clearInterval(clockInterval);
+            clockInterval = null;
+        }
+    }
+
+    // Start/stop clock audio when tab becomes active
     $effect(() => {
-        if ($isPlaying && isActive) {
-            audioEngine.startClock(getClockGenerator());
+        if (isActive) {
+            startClockAudio();
+        } else {
+            stopClockAudio();
         }
     });
 
@@ -45,8 +82,8 @@
 
         clockPoints = generateClockPoints(showFace, showTicks);
 
-        if ($isPlaying && isActive) {
-            audioEngine.startClock(getClockGenerator());
+        if (isActive) {
+            startClockAudio();
         }
     });
 </script>

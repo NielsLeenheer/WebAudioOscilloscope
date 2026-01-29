@@ -1,6 +1,5 @@
 <script>
     import { onMount, onDestroy } from 'svelte';
-    import { get } from 'svelte/store';
     import Preview from '../../Common/Preview.svelte';
     import Card from '../../Common/Card.svelte';
     import Button from '../../Common/Button.svelte';
@@ -8,8 +7,7 @@
     import { createDoomRenderer } from '../../../utils/doom/doomGenerator.js';
     import wadUrl from '../../../assets/doom1.wad?url';
 
-    let { audioEngine, isActive = false, renderMode = 'frequency', pointSpacing = 0.02, maxRenderDistance = $bindable(1000), depthPreset = $bindable(3), edgeSampleInterval = $bindable(1), doomShowDebug = false } = $props();
-    let isPlaying = audioEngine.isPlaying;
+    let { audioEngine, frameProcessor, isActive = false, maxRenderDistance = $bindable(1000), depthPreset = $bindable(3), edgeSampleInterval = $bindable(1), doomShowDebug = false } = $props();
 
     // Track state for use in event handlers (plain object - closures can read mutated properties)
     const handlerState = {
@@ -36,60 +34,21 @@
     // Key press state for button visual feedback (reactive)
     let keyPressed = $state({ up: false, down: false, left: false, right: false });
 
+    // Listen for processed preview updates (e.g. settings changes that re-process cached frame)
+    $effect(() => {
+        if (isActive) {
+            frameProcessor.onPreviewUpdate = () => {
+                if (frameProcessor.processedPreview) {
+                    previewPoints = frameProcessor.processedPreview;
+                }
+            };
+            return () => {
+                frameProcessor.onPreviewUpdate = null;
+            };
+        }
+    });
+
     // Debug stats - individual $state variables (no self-reference = no loops)
-    let currentLineCount = $state(0);
-    let currentPointCount = $state(0);
-    let currentPathLength = $state(0);
-    const SAMPLE_RATE = 48000; // Assumed audio sample rate
-
-    // Derived: effective audio/trace FPS based on render mode
-    let audioFps = $derived(() => {
-        if (renderMode === 'frequency') {
-            return audioEngine.baseFrequency || 100;
-        } else if (renderMode === 'points') {
-            // Use effective (resampled) point count for accurate FPS calculation
-            const ptCount = effectivePointCount();
-            if (ptCount <= 0) return 0;
-            return SAMPLE_RATE / ptCount;
-        }
-        return 0;
-    });
-
-    // Helper to calculate geometric path length from points
-    function calculatePathLength(points) {
-        if (!points || points.length === 0) return 0;
-
-        let totalLength = 0;
-        const segments = Array.isArray(points[0]) && Array.isArray(points[0][0])
-            ? points
-            : [points];
-
-        for (const segment of segments) {
-            for (let i = 1; i < segment.length; i++) {
-                const dx = segment[i][0] - segment[i - 1][0];
-                const dy = segment[i][1] - segment[i - 1][1];
-                totalLength += Math.sqrt(dx * dx + dy * dy);
-            }
-        }
-        return totalLength;
-    }
-
-    // Calculate resampled point count (matching AudioEngine's resampleSegment logic)
-    function calculateResampledPointCount(pathLength, spacing) {
-        if (pathLength <= 0 || spacing <= 0) return 0;
-        // Each segment adds approximately pathLength/spacing points, plus start/end points
-        // This matches the behavior of AudioEngine.resampleSegment()
-        return Math.ceil(pathLength / spacing) + 1;
-    }
-
-    // Effective point count for stats - uses resampled count in 'points' mode
-    let effectivePointCount = $derived(() => {
-        if (renderMode === 'points' && currentPathLength > 0) {
-            return calculateResampledPointCount(currentPathLength, pointSpacing);
-        }
-        return currentPointCount;
-    });
-
     // Initialize DOOM on mount
     onMount(async () => {
         try {
@@ -191,9 +150,9 @@
         }
     }
 
-    // Start/stop animation when tab becomes active and audio is playing
+    // Start/stop animation when tab becomes active
     $effect(() => {
-        if ($isPlaying && isActive && doomRenderer) {
+        if (isActive && doomRenderer) {
             startAnimation();
         } else {
             stopAnimation();
@@ -203,18 +162,11 @@
     function startAnimation() {
         if (animationInterval) return;
 
-        // Clear any existing clock interval
-        audioEngine.clearClockInterval();
-        audioEngine.restoreDefaultFrequency();
-
-        // Mark as continuous generator (don't store frames for refresh)
-        audioEngine.setContinuousGenerator(true);
-
         const fps = 30;
         let lastTime = performance.now();
 
         animationInterval = setInterval(() => {
-            if (!get(audioEngine.isPlaying) || !doomRenderer) {
+            if (!doomRenderer) {
                 stopAnimation();
                 return;
             }
@@ -230,16 +182,10 @@
             const points = doomRenderer.getPoints();
 
             if (points.length > 0) {
-                audioEngine.createWaveform(points);
+                frameProcessor.processFrame(points);
 
-                // Update stats
-                currentLineCount = Array.isArray(points[0]) && Array.isArray(points[0][0])
-                    ? points.length
-                    : 1;
-                currentPointCount = Array.isArray(points[0]) && Array.isArray(points[0][0])
-                    ? points.reduce((sum, seg) => sum + seg.length, 0)
-                    : points.length;
-                currentPathLength = calculatePathLength(points);
+                // Share points with preview (use processed output when available)
+                previewPoints = frameProcessor.processedPreview ?? points;
             }
         }, 1000 / fps);
     }
@@ -249,32 +195,17 @@
             clearInterval(animationInterval);
             animationInterval = null;
         }
-        // Reset continuous generator flag when stopping
-        audioEngine.setContinuousGenerator(false);
     }
 
     function startPreviewAnimation() {
         const previewFPS = 30;
-        const previewDelta = 1 / previewFPS;
 
         previewInterval = setInterval(() => {
+            // Animation loop handles updates, points, preview, and stats.
+            // This loop reads the latest processed preview for display.
             if (handlerState.renderer && handlerState.active) {
-                // Only update camera for preview if not playing audio
-                if (!get(audioEngine.isPlaying)) {
-                    handlerState.renderer.update(previewDelta);
-                }
-                const points = handlerState.renderer.getPoints();
-                previewPoints = points;
-
-                // Update stats for preview (only when not streaming)
-                if (!get(audioEngine.isPlaying) && points.length > 0) {
-                    currentLineCount = Array.isArray(points[0]) && Array.isArray(points[0][0])
-                        ? points.length
-                        : 1;
-                    currentPointCount = Array.isArray(points[0]) && Array.isArray(points[0][0])
-                        ? points.reduce((sum, seg) => sum + seg.length, 0)
-                        : points.length;
-                    currentPathLength = calculatePathLength(points);
+                if (frameProcessor.processedPreview) {
+                    previewPoints = frameProcessor.processedPreview;
                 }
             }
         }, 1000 / previewFPS);
@@ -366,8 +297,7 @@
             doomRenderer.setOptions({
                 deduplicateLines: !debugDisableDedupe,
                 optimizeOrder: !debugDisableOptimize,
-                dedupeThreshold,
-                renderMode
+                dedupeThreshold
             });
         }
     });
@@ -390,7 +320,6 @@
                         <option value={map}>Map {map}</option>
                     {/each}
                 </select>
-                <Button variant="secondary" onclick={handleReset}>{@html ResetIcon}Reset</Button>
             </div>
 
             <Preview points={previewPoints} width={400} height={400} />
@@ -441,19 +370,8 @@
             </div>
         </div>
 
-        <div class="stats-bar">
-            <div class="stat">
-                <span class="stat-label">Segments</span>
-                <span class="stat-value">{currentLineCount}</span>
-            </div>
-            <div class="stat">
-                <span class="stat-label">Points</span>
-                <span class="stat-value">{effectivePointCount()}</span>
-            </div>
-            <div class="stat">
-                <span class="stat-label">Audio FPS</span>
-                <span class="stat-value">{audioFps().toFixed(1)}</span>
-            </div>
+        <div class="reset-row">
+            <Button variant="secondary" onclick={handleReset}>{@html ResetIcon}Reset</Button>
         </div>
 
         {#if doomShowDebug}
@@ -538,43 +456,6 @@
         border: 2px solid #ccc;
     }
 
-    .stats-bar {
-        display: flex;
-        justify-content: center;
-        gap: 24px;
-        padding: 8px 16px;
-        background: #f5f5f5;
-        border-radius: 8px;
-        font-family: 'SF Mono', 'Monaco', 'Menlo', monospace;
-        width: fit-content;
-        align-self: center;
-        box-sizing: border-box;
-    }
-
-    .stat {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        gap: 2px;
-    }
-
-    .stat-label {
-        font-size: 9px;
-        color: #888;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-    }
-
-    .stat-value {
-        font-size: 16px;
-        font-weight: 600;
-        color: #333;
-    }
-
-    .stat-value.active {
-        color: #4caf50;
-    }
-
     .loading, .error {
         text-align: center;
         padding: 40px;
@@ -582,6 +463,11 @@
 
     .error {
         color: #d32f2f;
+    }
+
+    .reset-row {
+        display: flex;
+        justify-content: center;
     }
 
     .nav-grid {

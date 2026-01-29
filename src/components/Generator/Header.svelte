@@ -1,8 +1,10 @@
 <script>
+    import { Icon } from 'svelte-icon';
     import PowerButton from '../Common/PowerButton.svelte';
     import audioPlayingGif from '../../assets/audio-playing.gif';
+    import settingsIcon from '../../assets/icons/settings.svg?raw';
 
-    let { audioEngine, start, stop } = $props();
+    let { audioEngine, start, stop, onSettingsClick } = $props();
     let isPlaying = audioEngine.isPlaying;
 </script>
 
@@ -18,6 +20,10 @@
     {#if $isPlaying}
     <img src={audioPlayingGif} alt="Audio playing" class="audio-playing" />
     {/if}
+
+    <button class="settings-button" onclick={onSettingsClick} style="anchor-name: --settings-button">
+        <Icon data={settingsIcon} />
+    </button>
 </header>
 
 <style>
@@ -43,4 +49,23 @@
         margin-left: 0.5em;
     }
 
+    .settings-button {
+        display: flex;
+        align-items: center;
+        padding: 4px 8px;
+        border-radius: 6px;
+        cursor: pointer;
+        background: none;
+        border: none;
+        margin-left: auto;
+    }
+
+    .settings-button:hover {
+        background: rgba(0, 0, 0, 0.05);
+    }
+
+    .settings-button :global(svg) {
+        width: 1.8em;
+        height: 1.8em;
+    }
 </style>

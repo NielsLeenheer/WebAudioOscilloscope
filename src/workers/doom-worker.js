@@ -6,9 +6,7 @@
 // Import the renderer - worker modules are supported by Vite
 import {
     renderScene3D,
-    linesToPoints,
     deduplicateLines,
-    optimizeLineOrder,
     setRendererSettings,
     triggerDebugCapture
 } from '../utils/doom/renderer3d.js';
@@ -16,11 +14,8 @@ import {
 // Stored map data
 let mapData = null;
 let settings = {
-    pointDensity: 80,  // Points per line segment for frequency mode
-    optimizeOrder: true,
     deduplicateLines: true,
-    dedupeThreshold: 25,  // Rounding factor for deduplication (higher = stricter, 25 = 0.040 tolerance)
-    renderMode: 'frequency'  // 'frequency' or 'points' - determines whether to use linesToPoints
+    dedupeThreshold: 25  // Rounding factor for deduplication (higher = stricter, 25 = 0.040 tolerance)
 };
 
 // Handle messages from main thread
@@ -54,42 +49,19 @@ self.onmessage = function(e) {
                 lines = deduplicateLines(lines, settings.dedupeThreshold);
             }
 
-            // Optionally optimize line order
-            if (settings.optimizeOrder && lines.length > 0) {
-                lines = optimizeLineOrder(lines);
-            }
-
-            // Convert to point segments
-            // In points mode, just return line endpoints (audio engine will resample)
-            // In frequency mode, use linesToPoints for smooth interpolation
-            let points;
-            if (settings.renderMode === 'points') {
-                // Convert lines to simple 2-point segments
-                points = lines.map(line => [line.start, line.end]);
-            } else {
-                // Use dense point sampling for frequency mode
-                points = linesToPoints(lines, settings.pointDensity);
-            }
+            // Convert to raw 2-point segments (frame-processor worker handles reordering/resampling)
+            const points = lines.map(line => [line.start, line.end]);
 
             self.postMessage({ type: 'rendered', payload: { points } });
             break;
 
         case 'setSettings':
             // Update local settings
-            if (payload.pointDensity !== undefined) {
-                settings.pointDensity = payload.pointDensity;
-            }
-            if (payload.optimizeOrder !== undefined) {
-                settings.optimizeOrder = payload.optimizeOrder;
-            }
             if (payload.deduplicateLines !== undefined) {
                 settings.deduplicateLines = payload.deduplicateLines;
             }
             if (payload.dedupeThreshold !== undefined) {
                 settings.dedupeThreshold = payload.dedupeThreshold;
-            }
-            if (payload.renderMode !== undefined) {
-                settings.renderMode = payload.renderMode;
             }
             break;
 

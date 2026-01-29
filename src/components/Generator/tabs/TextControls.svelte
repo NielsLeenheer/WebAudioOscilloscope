@@ -1,12 +1,10 @@
 <script>
     import { onMount, onDestroy } from 'svelte';
-    import { get } from 'svelte/store';
     import Preview from '../../Common/Preview.svelte';
     import Card from '../../Common/Card.svelte';
     import { createTextScroller } from '../../../utils/textGenerator.js';
 
-    let { audioEngine, isActive = false } = $props();
-    let isPlaying = audioEngine.isPlaying;
+    let { audioEngine, frameProcessor, isActive = false } = $props();
 
     // Text settings
     let text = $state('Hello World!');
@@ -24,9 +22,23 @@
     let previewPoints = $state(scroller.getPoints());
     let previewInterval = null;
 
+    // Listen for processed preview updates (e.g. settings changes that re-process cached frame)
+    $effect(() => {
+        if (isActive) {
+            frameProcessor.onPreviewUpdate = () => {
+                if (frameProcessor.processedPreview) {
+                    previewPoints = frameProcessor.processedPreview;
+                }
+            };
+            return () => {
+                frameProcessor.onPreviewUpdate = null;
+            };
+        }
+    });
+
     // Start/stop animation when tab becomes active
     $effect(() => {
-        if ($isPlaying && isActive) {
+        if (isActive) {
             startAnimation();
         } else {
             stopAnimation();
@@ -40,8 +52,12 @@
         const previewDelta = 1 / previewFPS;
 
         previewInterval = setInterval(() => {
+            // Animation loop handles scroller.update() and frame processing.
+            // This loop just reads the latest processed preview for display.
             if (scroller && isActive) {
-                previewPoints = scroller.update(previewDelta);
+                if (frameProcessor.processedPreview) {
+                    previewPoints = frameProcessor.processedPreview;
+                }
             }
         }, 1000 / previewFPS);
     });
@@ -57,23 +73,17 @@
     function startAnimation() {
         if (animationInterval) return;
 
-        // Clear any existing clock interval from clock tab
-        audioEngine.clearClockInterval();
-
         // Reset scroller position
         if (scroller) {
             scroller.reset();
         }
-
-        // Restore default frequency
-        audioEngine.restoreDefaultFrequency();
 
         // Animation runs at higher rate for smooth audio
         const fps = 30;
         let lastTime = performance.now();
 
         animationInterval = setInterval(() => {
-            if (!get(audioEngine.isPlaying) || !scroller) {
+            if (!scroller) {
                 stopAnimation();
                 return;
             }
@@ -85,7 +95,12 @@
             const points = scroller.update(actualDelta);
 
             if (points.length > 0) {
-                audioEngine.createWaveform(points);
+                // Text scroller returns flat points, wrap as single segment
+                const segments = Array.isArray(points[0]?.[0]) ? points : [points];
+                frameProcessor.processFrame(segments);
+
+                // Share points with preview (use processed output when available)
+                previewPoints = frameProcessor.processedPreview ?? points;
             }
         }, 1000 / fps);
     }

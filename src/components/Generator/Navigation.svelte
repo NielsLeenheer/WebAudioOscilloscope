@@ -8,9 +8,8 @@
     import drawIcon from '../../assets/icons/draw.svg?raw';
     import pathsIcon from '../../assets/icons/paths.svg?raw';
     import doomIcon from '../../assets/icons/doom.svg?raw';
-    import settingsIcon from '../../assets/icons/settings.svg?raw';
-
-    let { activeTab = $bindable(), onSettingsClick } = $props();
+    import dinoIcon from '../../assets/icons/dino.svg?raw';
+    let { activeTab = $bindable() } = $props();
 </script>
 
 <div class="navigation">
@@ -57,9 +56,12 @@
             Doom
         </label>
 
-        <button class="settings-button" onclick={onSettingsClick} style="anchor-name: --settings-button">
-            <Icon data={settingsIcon} />
-        </button>
+        <label>
+            <input type="radio" name="tab" value="dino" bind:group={activeTab}>
+            <Icon data={dinoIcon} />
+            Dino
+        </label>
+
     </nav>
 </div>
 
@@ -89,7 +91,7 @@
     label {
         display: flex;
         align-items: center;
-        padding: 0px 12px;
+        padding: 0px 8px;
         border-radius: 6px;
         cursor: pointer;
     }
@@ -111,24 +113,4 @@
         opacity: 0;
     }
 
-    .settings-button {
-        display: flex;
-        align-items: center;
-        padding: 0px 12px;
-        border-radius: 6px;
-        cursor: pointer;
-        background: none;
-        border: none;
-        margin-left: auto;
-        height: 100%;
-    }
-
-    .settings-button:hover {
-        background: rgba(0, 0, 0, 0.05);
-    }
-
-    .settings-button :global(svg) {
-        width: 1.8em;
-        height: 1.8em;
-    }
 </style>

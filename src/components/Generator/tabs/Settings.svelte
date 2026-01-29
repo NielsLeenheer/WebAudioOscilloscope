@@ -2,7 +2,7 @@
     import Card from '../../Common/Card.svelte';
     import TabBar from '../../Common/TabBar.svelte';
 
-    let { audioEngine, activeTab, svgAnimationFPS = $bindable(30), svgSamplePoints = $bindable(200), svgDoubleDraw = $bindable(false), renderMode = $bindable('frequency'), pointSpacing = $bindable(0.02), doomMaxRenderDistance = $bindable(1000), doomDepthPreset = $bindable(3), doomEdgeSampleInterval = $bindable(1), doomShowDebug = $bindable(false) } = $props();
+    let { audioEngine, activeTab, statSegments = 0, statPoints = 0, svgAnimationFPS = $bindable(30), svgSamplePoints = $bindable(200), svgDoubleDraw = $bindable(false), renderMode = $bindable('frequency'), pointSpacing = $bindable(0.02), resampleMode = $bindable('proportional'), optimizeOrder = $bindable(true), trackBeamPosition = $bindable(true), frequency = $bindable(100), rotation = $bindable(0), doomMaxRenderDistance = $bindable(1000), doomDepthPreset = $bindable(3), doomEdgeSampleInterval = $bindable(1), doomShowDebug = $bindable(false), dinoShowDebug = $bindable(false), dinoSceneScale = $bindable(1.25), dinoSimplifySprites = $bindable(true) } = $props();
 
     // Render mode tabs
     const renderModeTabs = [
@@ -10,9 +10,32 @@
         { id: 'points', label: 'Variable' }
     ];
 
-    let frequency = $state(100);
+    // Resample mode tabs
+    const resampleModeTabs = [
+        { id: 'off', label: 'Off' },
+        { id: 'uniform', label: 'Uniform' },
+        { id: 'proportional', label: 'Proportional' }
+    ];
+
+    // Dino scene scale tabs
+    const dinoScaleTabs = [
+        { id: 0.75, label: '75%' },
+        { id: 1.0, label: '100%' },
+        { id: 1.25, label: '125%' }
+    ];
+
     let volume = $state(30);
-    let rotation = $state(0);
+
+    const SAMPLE_RATE = 48000;
+
+    // Audio FPS display
+    let audioFpsDisplay = $derived.by(() => {
+        if (renderMode === 'frequency') {
+            return Number(frequency).toFixed(1);
+        }
+        if (statPoints <= 0) return '0.0';
+        return (SAMPLE_RATE / statPoints).toFixed(1);
+    });
 
     // Waves tab has its own frequency system, so disable frame rate controls
     let isWavesTab = $derived(activeTab === 'waves');
@@ -22,6 +45,9 @@
 
     // Doom settings only apply to doom tab
     let isDoomTab = $derived(activeTab === 'doom');
+
+    // Dino settings only apply to dino tab
+    let isDinoTab = $derived(activeTab === 'dino');
 
     // Depth buffer resolution presets
     const depthBufferPresets = [
@@ -33,7 +59,6 @@
 
     function updateFrequency(value) {
         frequency = value;
-        audioEngine.setDefaultFrequency(value);
     }
 
     function updateVolume(value) {
@@ -43,21 +68,35 @@
 
     function updateRotation(value) {
         rotation = value;
-        audioEngine.setRotation(value);
     }
 
     function updateRenderMode(mode) {
         renderMode = mode;
-        audioEngine.setRenderMode(mode);
     }
 
     function updatePointSpacing(value) {
         pointSpacing = value;
-        audioEngine.setPointSpacing(value);
     }
 </script>
 
 <div class="settings-container">
+    {#if !isWavesTab}
+        <div class="stats-bar">
+            <div class="stat">
+                <span class="stat-label">Segments</span>
+                <span class="stat-value">{statSegments}</span>
+            </div>
+            <div class="stat">
+                <span class="stat-label">Points</span>
+                <span class="stat-value">{statPoints}</span>
+            </div>
+            <div class="stat">
+                <span class="stat-label">Audio FPS</span>
+                <span class="stat-value">{audioFpsDisplay}</span>
+            </div>
+        </div>
+    {/if}
+
     <Card title="Output">
         <div class="card-controls">
             <div class="control-group tab-group" class:disabled={isWavesTab}>
@@ -118,7 +157,6 @@
                     oninput={(e) => updateRotation(e.target.value)}
                 >
                 <span class="value">{rotation}°</span>
-                <div class="value-display">Rotate the output signal clockwise</div>
             </div>
 
             <div class="control-group">
@@ -133,10 +171,47 @@
                     oninput={(e) => updateVolume(e.target.value)}
                 >
                 <span class="value">{volume}%</span>
-                <div class="value-display">Adjust based on your oscilloscope's sensitivity</div>
             </div>
         </div>
     </Card>
+
+    {#if !isWavesTab}
+        <Card title="Processing">
+            <div class="card-controls">
+                <div class="control-group tab-group">
+                    <label>Resample</label>
+                    <div class="tabbar-wrapper">
+                        <TabBar
+                            tabs={resampleModeTabs}
+                            activeTab={resampleMode}
+                            onTabChange={(mode) => resampleMode = mode}
+                        />
+                    </div>
+                    <span></span>
+                </div>
+
+                <div class="control-group checkbox-group">
+                    <label for="optimizeOrder">Optimize Order</label>
+                    <input
+                        type="checkbox"
+                        id="optimizeOrder"
+                        bind:checked={optimizeOrder}
+                    >
+                </div>
+
+                {#if optimizeOrder}
+                    <div class="control-group checkbox-group">
+                        <label for="trackBeamPosition">Track Beam</label>
+                        <input
+                            type="checkbox"
+                            id="trackBeamPosition"
+                            bind:checked={trackBeamPosition}
+                        >
+                    </div>
+                {/if}
+            </div>
+        </Card>
+    {/if}
 
     {#if isSvgTab}
         <Card title="SVG">
@@ -152,7 +227,6 @@
                         step="50"
                     >
                     <span class="value">{svgSamplePoints}</span>
-                    <div class="value-display">Number of points sampled from SVG paths</div>
                 </div>
 
                 <div class="control-group">
@@ -166,7 +240,6 @@
                         step="5"
                     >
                     <span class="value">{svgAnimationFPS} FPS</span>
-                    <div class="value-display">Frame rate for sampling CSS animations in SVG tab</div>
                 </div>
 
                 <div class="control-group checkbox-group">
@@ -176,8 +249,6 @@
                         id="svgDoubleDraw"
                         bind:checked={svgDoubleDraw}
                     >
-                    <span></span>
-                    <div class="value-display">Draw each segment forward and back to minimize beam travel</div>
                 </div>
             </div>
         </Card>
@@ -197,7 +268,6 @@
                         step="100"
                     >
                     <span class="value">{doomMaxRenderDistance === 0 ? 'Off' : doomMaxRenderDistance}</span>
-                    <div class="value-display">0 = no distance culling (render all)</div>
                 </div>
 
                 <div class="control-group">
@@ -207,8 +277,6 @@
                             <option value={i}>{preset.label}</option>
                         {/each}
                     </select>
-                    <span></span>
-                    <div class="value-display">Higher = more accurate occlusion, slower</div>
                 </div>
 
                 <div class="control-group">
@@ -222,7 +290,6 @@
                         step="0.5"
                     >
                     <span class="value">{doomEdgeSampleInterval}px</span>
-                    <div class="value-display">Lower = finer edge visibility testing</div>
                 </div>
 
                 <div class="control-group checkbox-group">
@@ -237,6 +304,41 @@
             </div>
         </Card>
     {/if}
+
+    {#if isDinoTab}
+        <Card title="Dino">
+            <div class="card-controls">
+                <div class="control-group tab-group">
+                    <label>Scale</label>
+                    <div class="tabbar-wrapper">
+                        <TabBar
+                            tabs={dinoScaleTabs}
+                            activeTab={dinoSceneScale}
+                            onTabChange={(scale) => dinoSceneScale = scale}
+                        />
+                    </div>
+                </div>
+
+                <div class="control-group checkbox-group">
+                    <label for="dinoSimplifySprites">Simplified</label>
+                    <input
+                        type="checkbox"
+                        id="dinoSimplifySprites"
+                        bind:checked={dinoSimplifySprites}
+                    >
+                </div>
+
+                <div class="control-group checkbox-group">
+                    <label for="dinoShowDebug">Show Debug</label>
+                    <input
+                        type="checkbox"
+                        id="dinoShowDebug"
+                        bind:checked={dinoShowDebug}
+                    >
+                </div>
+            </div>
+        </Card>
+    {/if}
 </div>
 
 <style>
@@ -245,6 +347,36 @@
         flex-direction: column;
         width: 450px;
         gap: 15px;
+    }
+
+    .stats-bar {
+        display: flex;
+        justify-content: center;
+        gap: 24px;
+        padding: 10px 16px;
+        background: #f5f5f5;
+        border-radius: 8px;
+        font-family: 'SF Mono', 'Monaco', 'Menlo', monospace;
+    }
+
+    .stat {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 2px;
+    }
+
+    .stat-label {
+        font-size: 9px;
+        color: #888;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .stat-value {
+        font-size: 16px;
+        font-weight: 600;
+        color: #333;
     }
 
     .card-controls {
