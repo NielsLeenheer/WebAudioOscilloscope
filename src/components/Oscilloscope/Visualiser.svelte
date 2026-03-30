@@ -34,7 +34,10 @@
         xPosition,
         focus,
         // Microphone input helper (optional)
-        micInput = null
+        micInput = null,
+        // Laser output options
+        laserOutput = false,
+        onLaserData = () => {}
     } = $props();
 
     let canvas;
@@ -43,6 +46,7 @@
     let rightData = null;
     let worker = null;
     let workerBusy = false;
+    let workerTerminated = false;  // Guard against messages after termination
     let lastFrameTime = 0;
 
     // Key to force canvas recreation when powering on with different renderer
@@ -71,11 +75,19 @@
 
         // Initialize Web Worker with OffscreenCanvas
         worker = new Worker(new URL('../../workers/physics-worker.js', import.meta.url), { type: 'module' });
+        workerTerminated = false;  // Reset termination flag
 
         // Listen for messages from worker
         worker.onmessage = (e) => {
+            // Ignore messages if worker was terminated (race condition guard)
+            if (workerTerminated) return;
+            
             if (e.data.type === 'ready') {
                 workerBusy = false;
+                // Forward laser data to callback if present
+                if (e.data.laserData) {
+                    onLaserData(e.data.laserData);
+                }
             } else if (e.data.type === 'initialized') {
                 // Worker initialized with renderer info
                 onRenderersAvailable(e.data.data.availableRenderers);
@@ -100,6 +112,7 @@
 
     function destroyWorker() {
         stopVisualization();
+        workerTerminated = true;  // Set flag BEFORE terminating
         if (worker) {
             worker.terminate();
             worker = null;
@@ -254,7 +267,8 @@
                     canvasHeight,
                     visibleWidth,
                     sampleRate,
-                    deltaTime
+                    deltaTime,
+                    laserOutput
                 }
             });
         }
@@ -296,6 +310,10 @@
                     });
                 });
             } else {
+                // Notify laser to clear FIRST (before worker might send any more messages)
+                if (laserOutput) {
+                    onLaserData({ clear: true });
+                }
                 // Stop and destroy worker when powered off
                 destroyWorker();
                 // Increment key to destroy old canvas and create fresh one

@@ -4,7 +4,15 @@
     import Grid from './Grid.svelte';
     import Visualiser from './Visualiser.svelte';
 
-    let { isPowered, mode, inputSource, generatorInput, micInput } = $props();
+    let { 
+        isPowered, 
+        mode, 
+        inputSource, 
+        generatorInput, 
+        micInput,
+        laserOutput = false,
+        onLaserData = () => {}
+    } = $props();
 
     let visualiser;
 
@@ -104,6 +112,8 @@
                 {xPosition}
                 {focus}
                 {micInput}
+                {laserOutput}
+                {onLaserData}
             />
             <Grid />
         </div>

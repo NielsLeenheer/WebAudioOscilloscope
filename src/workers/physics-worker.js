@@ -16,6 +16,7 @@ let logicalWidth = 600;
 let logicalHeight = 600;
 let currentRendererType = RendererType.CANVAS_2D;
 let renderSkipLogged = false; // Debug flag for one-time logging
+let lastLaserOutput = false; // Track laser output changes
 
 // ============================================================================
 // VIRTUAL COORDINATE SYSTEM
@@ -737,8 +738,15 @@ self.onmessage = async function(e) {
             canvasHeight,
             visibleWidth,
             sampleRate,
-            deltaTime
+            deltaTime,
+            laserOutput = false  // Whether to send processed points back for laser output
         } = data;
+
+        // Debug: Log laserOutput changes
+        if (laserOutput !== lastLaserOutput) {
+            console.log('physics-worker: laserOutput changed to:', laserOutput);
+            lastLaserOutput = laserOutput;
+        }
 
         if (!rendererManager || !rendererManager.isReady()) {
             // Debug: Log why we're returning early (once)
@@ -781,6 +789,10 @@ self.onmessage = async function(e) {
         // Handle A/B mode: render both channels sequentially
         const modesToRender = mode === 'ab' ? ['a', 'b'] : [mode];
 
+        // Collect all points for laser output (in virtual coordinates)
+        let laserPoints = laserOutput ? [] : null;
+        let laserSpeeds = laserOutput ? [] : null;
+
         for (const currentMode of modesToRender) {
             // STAGE B: Interpretation - Convert signals to target coordinates based on mode
             const targets = interpretSignals(processedLeft, processedRight, currentMode, scale, visibleScale, centerX, centerY, canvasWidth, timeDiv, triggerLevel, triggerChannel, amplDivA, positionA, amplDivB, positionB, xPosition, visibleWidth, sampleRate, decay);
@@ -822,6 +834,22 @@ self.onmessage = async function(e) {
                 calculatePhosphorExcitation,
                 interpolatePoints
             });
+
+            // Collect points for laser output from raw targets (pre-physics)
+            // Using targets directly avoids beam inertia, noise, and jitter artifacts
+            if (laserOutput && targets.length > 0) {
+                // Mark the start of a new segment for laser blanking
+                const segmentStart = laserPoints.length > 0;
+                
+                for (let i = 0; i < targets.length; i++) {
+                    laserPoints.push({
+                        x: targets[i].x,
+                        y: targets[i].y,
+                        segmentStart: i === 0 && segmentStart
+                    });
+                    laserSpeeds.push(0); // No speed data for raw targets
+                }
+            }
         }
 
         // Draw debug info (renderer type and FPS) in debug mode
@@ -829,7 +857,19 @@ self.onmessage = async function(e) {
             rendererManager.drawDebugInfo(fps);
         }
 
-        // Send ready message back to main thread
-        self.postMessage({ type: 'ready' });
+        // Send ready message back to main thread, optionally with laser data
+        if (laserOutput && laserPoints && laserPoints.length > 0) {
+            self.postMessage({ 
+                type: 'ready',
+                laserData: {
+                    points: laserPoints,
+                    speeds: laserSpeeds,
+                    velocityDimming,
+                    basePower
+                }
+            });
+        } else {
+            self.postMessage({ type: 'ready' });
+        }
     }
 };

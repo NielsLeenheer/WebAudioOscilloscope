@@ -6,7 +6,11 @@
     import Display from './Display.svelte';
     import { MicrophoneInput } from '../../utils/microphoneInput.js';
 
-    let { generatorInput } = $props();
+    let { 
+        generatorInput,
+        laserOutput = false,
+        onLaserData = () => {}
+    } = $props();
 
     let isPowered = $state(false);
     let inputSource = $state('generated');
@@ -52,7 +56,7 @@
         <InputSelector bind:inputSource />
         <ModeSelector bind:mode />
     </div>
-    <Display {isPowered} {mode} {inputSource} {generatorInput} {micInput} />
+    <Display {isPowered} {mode} {inputSource} {generatorInput} {micInput} {laserOutput} {onLaserData} />
 </div>
 
 <style>

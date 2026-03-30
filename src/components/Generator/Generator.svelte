@@ -13,7 +13,7 @@
     import Dialog from '../Common/Dialog.svelte';
     import { FrameProcessor } from '../../utils/FrameProcessor.js';
 
-    let { audioEngine, start, stop } = $props();
+    let { audioEngine, start, stop, onLaserFrame = null } = $props();
     let activeTab = $state('waves');
 
     // SVG settings shared between Settings tab and SVG tab
@@ -64,6 +64,11 @@
             audioEngine.playProcessedFrequencyFrame(data.left, data.right);
         } else if (data.interleaved) {
             audioEngine.playProcessedPointsFrame(data.interleaved);
+        }
+
+        // Send raw preview segments to laser in direct mode
+        if (onLaserFrame && frameProcessor.processedPreview) {
+            onLaserFrame(frameProcessor.processedPreview);
         }
     };
 
