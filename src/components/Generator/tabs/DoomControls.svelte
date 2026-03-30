@@ -5,7 +5,6 @@
     import Button from '../../Common/Button.svelte';
     import ResetIcon from '../../../assets/icons/reset-position.svg?raw';
     import { createDoomRenderer } from '../../../utils/doom/doomGenerator.js';
-    import wadUrl from '../../../assets/doom1.wad?url';
 
     let { audioEngine, frameProcessor, isActive = false, maxRenderDistance = $bindable(1000), depthPreset = $bindable(3), edgeSampleInterval = $bindable(1), doomShowDebug = false } = $props();
 
@@ -52,7 +51,7 @@
     // Initialize DOOM on mount
     onMount(async () => {
         try {
-            const renderer = await createDoomRenderer(wadUrl, selectedMap);
+            const renderer = await createDoomRenderer(selectedMap);
             doomRenderer = renderer;
             handlerState.renderer = renderer;  // Also store for event handlers
             availableMaps = doomRenderer.getAvailableMaps();
@@ -219,10 +218,10 @@
     }
 
     // Handle map change
-    function handleMapChange() {
+    async function handleMapChange() {
         if (doomRenderer && selectedMap) {
             try {
-                doomRenderer.loadMap(selectedMap);
+                await doomRenderer.loadMap(selectedMap);
                 previewPoints = doomRenderer.getPoints();
             } catch (e) {
                 console.error('Failed to load map:', e);

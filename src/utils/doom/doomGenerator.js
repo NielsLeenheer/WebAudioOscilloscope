@@ -1,34 +1,34 @@
 /**
  * DOOM Wireframe Generator
- * Main entry point integrating WAD parsing, geometry, camera, and rendering
+ * Main entry point integrating map loading, geometry, camera, and rendering
+ * Uses pre-extracted JSON map files instead of parsing WAD binary at runtime
  * Uses a Web Worker for off-thread rendering
  */
 
-import {
-    parseWad,
-    findMapLumps,
-    parseVertexes,
-    parseLinedefs,
-    parseSidedefs,
-    parseSectors,
-    parseThings,
-    getMapList
-} from './wadParser.js';
 import { processMap, getSolidWalls, getFloorHeightAt, buildSectorPolygons, setSectorPolygonsForFloorLookup } from './mapGeometry.js';
 import { createCamera, updateCamera, resetCamera, setDebugCollision, setDebugHeight } from './camera.js';
 
+// Available maps (DOOM 1 shareware episode 1)
+const AVAILABLE_MAPS = ['E1M1', 'E1M2', 'E1M3', 'E1M4', 'E1M5', 'E1M6', 'E1M7', 'E1M8', 'E1M9'];
+
+/**
+ * Fetch and parse a JSON map file
+ * @param {string} mapName - Map name (e.g. 'E1M1')
+ * @returns {Promise<Object>} Parsed map JSON data
+ */
+async function fetchMapJson(mapName) {
+    const response = await fetch(`${import.meta.env.BASE_URL}maps/${mapName}.json`);
+    if (!response.ok) throw new Error(`Failed to load map ${mapName}: ${response.status}`);
+    return response.json();
+}
+
 /**
  * Create a DOOM renderer instance
- * @param {string} wadUrl - URL to the WAD file
  * @param {string} mapName - Initial map name (default: 'E1M1')
  * @returns {Promise<Object>} DOOM renderer object
  */
-export async function createDoomRenderer(wadUrl, mapName = 'E1M1') {
-    // Parse WAD file
-    const wad = await parseWad(wadUrl);
-
-    // Get list of available maps
-    const availableMaps = getMapList(wad.lumps);
+export async function createDoomRenderer(mapName = 'E1M1') {
+    const availableMaps = AVAILABLE_MAPS;
 
     // Use first available map if requested map not found
     if (!availableMaps.includes(mapName)) {
@@ -36,7 +36,7 @@ export async function createDoomRenderer(wadUrl, mapName = 'E1M1') {
     }
 
     // Load initial map
-    let mapData = loadMapData(wad, mapName);
+    let mapData = await loadMapData(mapName);
     let solidWalls = getSolidWalls(mapData.walls);
 
     // Create floor height lookup function
@@ -150,16 +150,12 @@ export async function createDoomRenderer(wadUrl, mapName = 'E1M1') {
     }
 
     /**
-     * Load map data from WAD
+     * Load map data from pre-extracted JSON
      */
-    function loadMapData(wad, mapName) {
-        const mapLumps = findMapLumps(wad.lumps, mapName);
+    async function loadMapData(mapName) {
+        const json = await fetchMapJson(mapName);
 
-        const vertices = parseVertexes(wad.buffer, mapLumps.VERTEXES);
-        const linedefs = parseLinedefs(wad.buffer, mapLumps.LINEDEFS);
-        const sidedefs = parseSidedefs(wad.buffer, mapLumps.SIDEDEFS);
-        const sectors = parseSectors(wad.buffer, mapLumps.SECTORS);
-        const things = parseThings(wad.buffer, mapLumps.THINGS);
+        const { vertices, linedefs, sidedefs, sectors, things } = json;
 
         const mapData = processMap(vertices, linedefs, sidedefs, sectors, things);
 
@@ -193,12 +189,12 @@ export async function createDoomRenderer(wadUrl, mapName = 'E1M1') {
         /**
          * Load a different map
          */
-        loadMap(newMapName) {
+        async loadMap(newMapName) {
             if (!availableMaps.includes(newMapName)) {
                 throw new Error(`Map ${newMapName} not found`);
             }
             mapName = newMapName;
-            mapData = loadMapData(wad, mapName);
+            mapData = await loadMapData(mapName);
             solidWalls = getSolidWalls(mapData.walls);
 
             // Reset camera to new player start with floor height
