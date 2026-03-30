@@ -561,11 +561,22 @@ export function parseSVGMarkupStatic(markup, samples, optimize = true, doubleDra
     }
 
     // Get bounding box to normalize coordinates
+    // Prefer viewBox over getBBox - viewBox defines the intended coordinate space,
+    // while getBBox includes transformed/animated element positions
     let bbox;
-    try {
-        bbox = svgElement.getBBox();
-    } catch (error) {
-        throw new Error(`Could not get bounding box from SVG: ${error.message}`);
+    const vb = svgElement.getAttribute('viewBox');
+    if (vb) {
+        const parts = vb.split(/[\s,]+/).map(Number);
+        if (parts.length === 4 && parts.every(n => isFinite(n)) && parts[2] > 0 && parts[3] > 0) {
+            bbox = { x: parts[0], y: parts[1], width: parts[2], height: parts[3] };
+        }
+    }
+    if (!bbox) {
+        try {
+            bbox = svgElement.getBBox();
+        } catch (error) {
+            throw new Error(`Could not get bounding box from SVG: ${error.message}`);
+        }
     }
 
     // Validate bbox
@@ -686,8 +697,18 @@ export function createContinuousSampler(markup, samples, fps, onFrame, isPlaying
         throw new Error('No drawable shapes found in SVG');
     }
 
-    // Get bounding box for normalization
-    const bbox = svgElement.getBBox();
+    // Prefer viewBox over getBBox for normalization - viewBox defines the intended
+    // coordinate space, while getBBox includes transformed/animated element positions
+    let bbox;
+    if (viewBox) {
+        const parts = viewBox.split(/[\s,]+/).map(Number);
+        if (parts.length === 4 && parts.every(n => isFinite(n)) && parts[2] > 0 && parts[3] > 0) {
+            bbox = { x: parts[0], y: parts[1], width: parts[2], height: parts[3] };
+        }
+    }
+    if (!bbox) {
+        bbox = svgElement.getBBox();
+    }
 
     const frameDuration = 1000 / fps;
     let samplingInterval = null;
