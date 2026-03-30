@@ -58,11 +58,17 @@ function samplePathSegment(pathData, numSamples) {
             return [];
         }
 
+        const isClosed = /[Zz]\s*$/.test(pathData.trim());
         const points = [];
         for (let i = 0; i < numSamples; i++) {
             const distance = numSamples > 1 ? (i / (numSamples - 1)) * length : 0;
             const point = properties.getPointAtLength(distance);
             points.push([point.x, point.y]);
+        }
+
+        // For closed paths, ensure the last point matches the first exactly
+        if (isClosed && points.length >= 2) {
+            points[points.length - 1] = [points[0][0], points[0][1]];
         }
 
         return points;
