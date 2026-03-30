@@ -634,7 +634,7 @@ export function sampleCurrentFrame(svgElement, elements, samples, optimize = tru
 
         samplesUsed += elementSamples;
 
-        const elementSegments = extractPointsFromElement(element, elementSamples);
+        const elementSegments = extractPointsFromElement(element, elementSamples, true);
         if (elementSegments.length > 0) {
             frameSegments = frameSegments.concat(elementSegments);
         }
