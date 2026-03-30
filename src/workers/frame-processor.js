@@ -334,11 +334,10 @@ function resampleSegment(segment, spacing) {
         }
     }
 
-    // Include final point if not too close
+    // Always include the final point to preserve closed shapes
     const end = segment[segment.length - 1];
-    const fdx = end[0] - resampled[resampled.length - 1][0];
-    const fdy = end[1] - resampled[resampled.length - 1][1];
-    if (Math.sqrt(fdx * fdx + fdy * fdy) > spacing * 0.1) {
+    const lastResampled = resampled[resampled.length - 1];
+    if (end[0] !== lastResampled[0] || end[1] !== lastResampled[1]) {
         resampled.push(end);
     }
 
