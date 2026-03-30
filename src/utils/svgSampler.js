@@ -311,10 +311,19 @@ export function extractPathPoints(pathData, numSamples = 200, optimize = true, d
  * Detects segments within path elements based on M/m commands
  * @param {SVGGeometryElement} element - SVG element to extract points from
  * @param {number} samples - Number of samples to take
+ * @param {boolean} checkVisibility - If true, skip hidden/invisible elements
  * @returns {Array<Array<[number, number]>>} Array of segments, each containing points
  */
-export function extractPointsFromElement(element, samples) {
+export function extractPointsFromElement(element, samples, checkVisibility = false) {
     const segments = [];
+
+    // Skip hidden or invisible elements (only during live animation sampling)
+    if (checkVisibility) {
+        const style = window.getComputedStyle(element);
+        if (style.display === 'none' || style.visibility === 'hidden') {
+            return segments;
+        }
+    }
 
     // Check if element is an SVGGeometryElement (has getTotalLength)
     if (typeof element.getTotalLength === 'function') {
