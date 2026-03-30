@@ -227,6 +227,7 @@
     }
 
     .close-button:hover {
+        background: transparent;
         color: #4CAF50;
     }
 
