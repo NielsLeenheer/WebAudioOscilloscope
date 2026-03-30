@@ -1,32 +1,54 @@
 <script>
     import { Icon } from 'svelte-icon';
     import webcamIcon from '../../assets/icons/glyph/webcam.svg?raw';
+    import laserIcon from '../../assets/icons/glyph/laser.svg?raw';
 
     /**
      * ViewSelector component - toggles between Oscilloscope and Webcam views
+     * Also includes Laser controls button
      * Placed at top-right of the application window
      */
-    let { currentView = $bindable('oscilloscope') } = $props();
+    let { 
+        currentView = $bindable('oscilloscope'),
+        laserConnected = false,
+        onLaserClick = () => {}
+    } = $props();
 
     function toggleView() {
         currentView = currentView === 'oscilloscope' ? 'webcam' : 'oscilloscope';
     }
 </script>
 
-<button
-    class="view-selector"
-    class:active={currentView === 'webcam'}
-    onclick={toggleView}
->
-    <Icon data={webcamIcon} />
-</button>
+<div class="button-group">
+    <button
+        class="toolbar-button laser-button"
+        class:connected={laserConnected}
+        onclick={onLaserClick}
+        title={laserConnected ? "Disconnect Laser" : "Connect Laser"}
+    >
+        <Icon data={laserIcon} />
+    </button>
+    <button
+        class="toolbar-button"
+        class:active={currentView === 'webcam'}
+        onclick={toggleView}
+        title="Webcam Input"
+    >
+        <Icon data={webcamIcon} />
+    </button>
+</div>
 
 <style>
-    .view-selector {
+    .button-group {
         position: fixed;
         top: 15px;
         right: 20px;
         z-index: 1000;
+        display: flex;
+        gap: 8px;
+    }
+
+    .toolbar-button {
         border-radius: 6px;
         height: 36px;
         width: 36px;
@@ -42,17 +64,27 @@
         color: #888;
         border: 1px solid #333;
     }
-    .view-selector:hover {
+
+    .toolbar-button:hover {
         background-color: #1d1d1d;
     }
     
-    .view-selector.active {
+    .toolbar-button.active {
+        background-color: #1b5e20;
         color: #4CAF50;
+        border-color: #2d5e30;
     }
 
-    .view-selector :global(svg) {
+    .toolbar-button :global(svg) {
         height: 18px;
         width: 18px;
         stroke-width: 0;
     }
+
+    .laser-button.connected {
+        background-color: #1b5e20;
+        color: #4CAF50;
+        border-color: #2d5e30;
+    }
+
 </style>
