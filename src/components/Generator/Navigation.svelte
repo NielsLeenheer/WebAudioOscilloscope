@@ -44,15 +44,15 @@
         </label>
 
         <label>
-            <input type="radio" name="tab" value="doom" bind:group={activeTab}>
-            <Icon data={doomIcon} />
-            Doom
-        </label>
-
-        <label>
             <input type="radio" name="tab" value="dino" bind:group={activeTab}>
             <Icon data={dinoIcon} />
             Dino
+        </label>
+
+        <label>
+            <input type="radio" name="tab" value="doom" bind:group={activeTab}>
+            <Icon data={doomIcon} />
+            Doom
         </label>
 
     </nav>
