@@ -75,15 +75,18 @@
         font-family: system-ui;
         font-size: 10pt;
         display: flex;
-        height: 32px;
+        flex-wrap: wrap;
+        min-height: 32px;
         align-items: stretch;
         user-select: none;
-        gap: 6px;
+        row-gap: 8px;
+        column-gap: 6px;
     }
 
     label {
         display: flex;
         align-items: center;
+        height: 32px;
         padding: 0px 8px;
         border-radius: 6px;
         cursor: pointer;
