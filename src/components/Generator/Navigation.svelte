@@ -8,6 +8,7 @@
     import pathsIcon from '../../assets/icons/paths.svg?raw';
     import doomIcon from '../../assets/icons/doom.svg?raw';
     import dinoIcon from '../../assets/icons/dino.svg?raw';
+    import ecgIcon from '../../assets/icons/ecg.svg?raw';
     let { activeTab = $bindable() } = $props();
 </script>
 
@@ -29,6 +30,12 @@
             <input type="radio" name="tab" value="clock" bind:group={activeTab}>
             <Icon data={clockIcon} />
             Clock
+        </label>
+
+        <label>
+            <input type="radio" name="tab" value="ecg" bind:group={activeTab}>
+            <Icon data={ecgIcon} />
+            ECG
         </label>
 
         <label>

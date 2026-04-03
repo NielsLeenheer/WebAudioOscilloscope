@@ -9,6 +9,7 @@
     import SVGControls from './tabs/SVGControls.svelte';
     import DoomControls from './tabs/DoomControls.svelte';
     import DinoControls from './tabs/DinoControls.svelte';
+    import ECGControls from './tabs/ECGControls.svelte';
     import Settings from './tabs/Settings.svelte';
     import Dialog from '../Common/Dialog.svelte';
     import { FrameProcessor } from '../../utils/FrameProcessor.js';
@@ -135,6 +136,9 @@
         </div>
         <div class="tab-panel" class:active={activeTab === 'dino'}>
             <DinoControls {audioEngine} {frameProcessor} isActive={activeTab === 'dino'} {dinoShowDebug} bind:sceneScale={dinoSceneScale} bind:simplifySprites={dinoSimplifySprites} />
+        </div>
+        <div class="tab-panel" class:active={activeTab === 'ecg'}>
+            <ECGControls {audioEngine} {frameProcessor} isActive={activeTab === 'ecg'} />
         </div>
     </div>
 
