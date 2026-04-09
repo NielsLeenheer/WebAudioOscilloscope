@@ -65,11 +65,14 @@
             audioEngine.playProcessedFrequencyFrame(data.left, data.right);
         } else if (data.interleaved) {
             audioEngine.playProcessedPointsFrame(data.interleaved);
+        } else {
+            // Empty frame — stop looping oscillators so the display clears
+            audioEngine.silenceGenerators();
         }
 
         // Send raw preview segments to laser in direct mode
-        if (onLaserFrame && frameProcessor.processedPreview) {
-            onLaserFrame(frameProcessor.processedPreview);
+        if (onLaserFrame) {
+            onLaserFrame(frameProcessor.processedPreview || []);
         }
     };
 

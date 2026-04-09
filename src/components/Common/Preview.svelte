@@ -6,7 +6,9 @@
         width = 150,
         height = 150,
         strokeColor = 'rgba(60, 60, 60, 0.7)',
-        lineWidth = 1.5
+        lineWidth = 1.5,
+        marginLeft = 40,
+        marginBottom = 40
     } = $props();
 
     let canvas;
@@ -20,19 +22,21 @@
 
     // Draw the preview when points change
     $effect(() => {
-        if (!canvas || !ctx || !points || points.length === 0) return;
+        if (!canvas || !ctx) return;
 
         // Clear canvas
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+        if (!points || points.length === 0) return;
+
         // Calculate padding and available space
         const padding = 10;
-        const availableWidth = canvas.width - padding * 2;
-        const availableHeight = canvas.height - padding * 2;
+        const availableWidth = canvas.width - marginLeft - padding;
+        const availableHeight = canvas.height - padding - marginBottom;
         const scale = Math.min(availableWidth, availableHeight) / 2;  // Divide by 2 because normalized is -1 to 1
 
-        const centerX = canvas.width / 2;
-        const centerY = canvas.height / 2;
+        const centerX = marginLeft + availableWidth / 2;
+        const centerY = padding + availableHeight / 2;
 
         // Detect if input is segments (array of arrays) or flat points
         const isSegmented = points.length > 0 &&

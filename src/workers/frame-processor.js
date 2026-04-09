@@ -62,11 +62,14 @@ self.postMessage({ type: 'ready' });
 // ─── Frame Processing Pipeline ───────────────────────────────────────────────
 
 function processFrame(segments, id) {
-    if (!segments || segments.length === 0) return;
-
     // Filter out empty segments
-    let segs = segments.filter(s => s && s.length >= 2);
-    if (segs.length === 0) return;
+    let segs = (segments || []).filter(s => s && s.length >= 2);
+
+    if (segs.length === 0) {
+        // Post an empty frame so the display clears (no stale visuals)
+        self.postMessage({ type: 'frameReady', id, segmentCount: 0, pointCount: 0 });
+        return;
+    }
 
     // 1. Optimize segment order
     if (settings.optimizeOrder) {

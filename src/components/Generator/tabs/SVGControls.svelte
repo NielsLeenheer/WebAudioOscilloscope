@@ -53,9 +53,7 @@
     $effect(() => {
         if (isActive) {
             frameProcessor.onPreviewUpdate = () => {
-                if (frameProcessor.processedPreview) {
-                    codePreviewPoints = frameProcessor.processedPreview;
-                }
+                codePreviewPoints = frameProcessor.processedPreview ?? [];
             };
             return () => {
                 frameProcessor.onPreviewUpdate = null;

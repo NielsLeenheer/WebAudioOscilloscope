@@ -60,6 +60,8 @@ export class FrameProcessor {
                     this.processedPreview = reconstructSegments(
                         msg.previewData, msg.segmentOffsets
                     );
+                } else {
+                    this.processedPreview = null;
                 }
                 this.processedPointCount = msg.pointCount || 0;
                 this.processedSegmentCount = msg.segmentOffsets

@@ -85,6 +85,23 @@ export class AudioEngine {
         this.isPlaying.set(false);
     }
 
+    /**
+     * Stop all active generators (oscillators and points worklet) without
+     * changing isPlaying state. Used to clear the display when a frame
+     * has no visible content.
+     */
+    silenceGenerators() {
+        if (this.leftOscillator) {
+            this.leftOscillator.stop();
+            this.leftOscillator = null;
+        }
+        if (this.rightOscillator) {
+            this.rightOscillator.stop();
+            this.rightOscillator = null;
+        }
+        this.stopPointsWorklet();
+    }
+
     setVolume(value) {
         // Apply volume to channel gains (before analysers) so it affects both scope and speakers
         const gainValue = value / 100;
