@@ -1,9 +1,9 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="400" height="400">
   <style>
     :root {
-      --hours: 10;
-      --minutes: 10;
-      --seconds: 30;
+      --hours: env(time-hour,10);
+      --minutes: env(time-minute,10);
+      --seconds: env(time-second,30);
     }
     
     .hand {
