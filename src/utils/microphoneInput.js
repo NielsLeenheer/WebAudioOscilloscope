@@ -76,6 +76,8 @@ export class MicrophoneInput {
      * Stop microphone input and clean up resources
      */
     stop() {
+        if (!this.stream && !this.audioContext) return;
+
         if (this.stream) {
             this.stream.getTracks().forEach(track => track.stop());
             this.stream = null;
