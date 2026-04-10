@@ -24,6 +24,15 @@ export class AudioEngine {
         this._audioGeneration = 0;
     }
 
+    async setOutputDevice(deviceId) {
+        if (!this.audioContext || typeof this.audioContext.setSinkId !== 'function') return;
+        await this.audioContext.setSinkId(deviceId);
+    }
+
+    getOutputDeviceId() {
+        return this.audioContext?.sinkId ?? '';
+    }
+
     initialize() {
         if (!this.audioContext) {
             this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
@@ -54,6 +63,12 @@ export class AudioEngine {
             this.rightAnalyser.connect(this.merger, 0, 1);  // Right channel
             this.merger.connect(this.masterGain);
             this.masterGain.connect(this.audioContext.destination);
+
+            // Restore saved output device
+            const savedDevice = localStorage.getItem('generator-output-device');
+            if (savedDevice) {
+                this.setOutputDevice(savedDevice);
+            }
         }
     }
 

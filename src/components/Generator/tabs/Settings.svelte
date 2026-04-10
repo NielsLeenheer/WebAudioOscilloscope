@@ -1,8 +1,70 @@
 <script>
+    import { onMount, onDestroy } from 'svelte';
     import Card from '../../Common/Card.svelte';
     import TabBar from '../../Common/TabBar.svelte';
 
     let { audioEngine, activeTab, statSegments = 0, statPoints = 0, svgAnimationFPS = $bindable(30), svgSamplePoints = $bindable(200), svgDoubleDraw = $bindable(false), renderMode = $bindable('frequency'), pointSpacing = $bindable(0.02), resampleMode = $bindable('proportional'), optimizeOrder = $bindable(true), trackBeamPosition = $bindable(true), frequency = $bindable(100), rotation = $bindable(0), doomMaxRenderDistance = $bindable(1000), doomDepthPreset = $bindable(3), doomEdgeSampleInterval = $bindable(1), doomShowDebug = $bindable(false), dinoShowDebug = $bindable(false), dinoSceneScale = $bindable(1.25), dinoSimplifySprites = $bindable(true) } = $props();
+
+    // Output device selection
+    const OUTPUT_DEVICE_KEY = 'generator-output-device';
+    let outputDevices = $state([]);
+    let selectedDeviceId = $state(localStorage.getItem(OUTPUT_DEVICE_KEY) || '');
+
+    function cleanDeviceLabel(label) {
+        if (!label) return null;
+        if (label.startsWith('Default - ')) return 'Default';
+        return label.replace(/\s*\([0-9a-f]{4}:[0-9a-f]{4}\)\s*$/i, '');
+    }
+
+    async function enumerateOutputDevices() {
+        if (!navigator.mediaDevices?.enumerateDevices) return;
+
+        // If microphone permission is already granted, briefly acquire a stream
+        // to unlock full device enumeration (labels + all output devices)
+        try {
+            const perm = await navigator.permissions.query({ name: 'microphone' });
+            if (perm.state === 'granted') {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                stream.getTracks().forEach(t => t.stop());
+            }
+            perm.onchange = () => enumerateOutputDevices();
+        } catch {}
+
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const filtered = devices.filter(d => d.kind === 'audiooutput' && d.deviceId);
+        outputDevices = filtered.filter(d => !d.label.startsWith('RemotePC') && !d.label.startsWith('Microsoft Teams'));
+    }
+
+    async function requestDeviceAccess() {
+        if (!navigator.mediaDevices?.getUserMedia) return;
+
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            stream.getTracks().forEach(t => t.stop());
+            await enumerateOutputDevices();
+        } catch {}
+    }
+
+    async function selectOutputDevice(deviceId) {
+        selectedDeviceId = deviceId;
+        localStorage.setItem(OUTPUT_DEVICE_KEY, deviceId);
+        await audioEngine.setOutputDevice(deviceId);
+    }
+
+    // Note: saved device is restored in AudioEngine.initialize() via localStorage
+
+    function handleDeviceChange() {
+        enumerateOutputDevices();
+    }
+
+    onMount(() => {
+        enumerateOutputDevices();
+        navigator.mediaDevices?.addEventListener('devicechange', handleDeviceChange);
+    });
+
+    onDestroy(() => {
+        navigator.mediaDevices?.removeEventListener('devicechange', handleDeviceChange);
+    });
 
     // Render mode tabs
     const renderModeTabs = [
@@ -99,6 +161,33 @@
 
     <Card title="Output">
         <div class="card-controls">
+            <div class="control-group">
+                <label for="outputDevice">Device</label>
+                <select
+                    id="outputDevice"
+                    value={selectedDeviceId}
+                    onchange={(e) => selectOutputDevice(e.target.value)}
+                >
+                    {#if outputDevices.length === 0}
+                        <option value="">Default</option>
+                    {:else}
+                        {#each outputDevices as device, i}
+                            {#if device.deviceId}
+                                <option value={device.deviceId}>
+                                    {cleanDeviceLabel(device.label) || `Output ${i + 1}`}
+                                </option>
+                                {#if i === 0 && outputDevices.length > 1}
+                                    <hr>
+                                {/if}
+                            {/if}
+                        {/each}
+                    {/if}
+                </select>
+                {#if !outputDevices.some(d => d.label)}
+                    <button class="refresh-devices" onclick={requestDeviceAccess} title="Grant audio permission to list devices">...</button>
+                {/if}
+            </div>
+
             <div class="control-group tab-group" class:disabled={isWavesTab}>
                 <label>Frame Rate</label>
                 <div class="tabbar-wrapper">
@@ -429,8 +518,23 @@
     .control-group select {
         border: 1px solid #ccc;
         position: relative;
-        top: 12px;        
+        top: 12px;
         margin-bottom: 20px;
+    }
+
+    .control-group select#outputDevice {
+        top: 0;
+        margin-bottom: 0;
+    }
+
+    .refresh-devices {
+        min-width: 0;
+        padding: 0 8px;
+        height: 32px;
+        font-size: 14px;
+        letter-spacing: 2px;
+        color: #999;
+        background: #f0f0f0;
     }
 
     .value-display {
