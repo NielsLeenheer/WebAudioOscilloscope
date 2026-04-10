@@ -4,12 +4,14 @@
     import InputSelector from './InputSelector.svelte';
     import ModeSelector from './ModeSelector.svelte';
     import Display from './Display.svelte';
+    import Webcam from '../Webcam/Webcam.svelte';
     import { MicrophoneInput } from '../../utils/microphoneInput.js';
 
-    let { 
+    let {
         generatorInput,
         laserOutput = false,
-        onLaserData = () => {}
+        onLaserData = () => {},
+        showWebcam = false
     } = $props();
 
     let isPowered = $state(false);
@@ -52,11 +54,15 @@
 
 <div class="oscilloscope">
     <Header bind:isPowered />
-    <div class="selector-bar">
-        <InputSelector bind:inputSource />
-        <ModeSelector bind:mode />
-    </div>
-    <Display {isPowered} {mode} {inputSource} {generatorInput} {micInput} {laserOutput} {onLaserData} />
+    {#if showWebcam}
+        <Webcam />
+    {:else}
+        <div class="selector-bar">
+            <InputSelector bind:inputSource />
+            <ModeSelector bind:mode />
+        </div>
+        <Display {isPowered} {mode} {inputSource} {generatorInput} {micInput} {laserOutput} {onLaserData} />
+    {/if}
 </div>
 
 <style>

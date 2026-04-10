@@ -1,64 +1,56 @@
 <script>
-    import { onDestroy } from 'svelte';
-    import PowerButton from '../Common/PowerButton.svelte';
+    import { onMount, onDestroy } from 'svelte';
 
+    const CAMERA_KEY = 'webcam-device';
     let videoElement;
     let stream = null;
-    let error = null;
-    let isLoading = false;
-    let isPowered = $state(false);
+    let error = $state(null);
+    let cameras = $state([]);
+    let selectedDeviceId = $state(localStorage.getItem(CAMERA_KEY) || '');
 
-    async function startWebcam() {
-        console.log('Starting webcam...');
+    async function enumerateCameras() {
+        if (!navigator.mediaDevices?.enumerateDevices) return;
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        cameras = devices.filter(d => d.kind === 'videoinput');
+    }
 
-        // Check if getUserMedia is supported
-        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-            console.error('getUserMedia not supported');
-            error = 'Your browser does not support camera access';
-            isPowered = false;
+    async function startWebcam(deviceId) {
+        if (!navigator.mediaDevices?.getUserMedia) {
+            error = window.isSecureContext
+                ? 'Your browser does not support camera access'
+                : 'Camera access requires localhost or HTTPS';
             return;
         }
 
-        isLoading = true;
+        stopWebcam();
         error = null;
 
         try {
-            console.log('Requesting webcam access...');
+            const constraints = {
+                video: deviceId
+                    ? { deviceId: { exact: deviceId }, width: { ideal: 1920 }, height: { ideal: 1080 } }
+                    : { width: { ideal: 1920 }, height: { ideal: 1080 } },
+                audio: false
+            };
 
-            // Add timeout to prevent hanging
             const timeoutPromise = new Promise((_, reject) => {
                 setTimeout(() => reject(new Error('Camera access request timed out')), 10000);
             });
 
-            const getUserMediaPromise = navigator.mediaDevices.getUserMedia({
-                video: {
-                    width: { ideal: 1920 },
-                    height: { ideal: 1080 }
-                },
-                audio: false
-            });
-
-            stream = await Promise.race([getUserMediaPromise, timeoutPromise]);
-            console.log('Webcam access granted', stream);
+            stream = await Promise.race([
+                navigator.mediaDevices.getUserMedia(constraints),
+                timeoutPromise
+            ]);
 
             if (videoElement) {
                 videoElement.srcObject = stream;
                 await videoElement.play();
-                isLoading = false;
-                console.log('Video playing');
-            } else {
-                console.error('Video element not found');
-                error = 'Video element not initialized';
-                isLoading = false;
-                isPowered = false;
             }
-        } catch (err) {
-            console.error('Error accessing webcam:', err);
-            error = err.message || 'Failed to access camera';
-            isLoading = false;
-            isPowered = false;
 
-            // Clean up stream if it was created
+            // Re-enumerate after permission is granted to get labels
+            await enumerateCameras();
+        } catch (err) {
+            error = err.message || 'Failed to access camera';
             if (stream) {
                 stream.getTracks().forEach(track => track.stop());
                 stream = null;
@@ -67,7 +59,6 @@
     }
 
     function stopWebcam() {
-        console.log('Stopping webcam...');
         if (stream) {
             stream.getTracks().forEach(track => track.stop());
             stream = null;
@@ -75,87 +66,73 @@
         if (videoElement) {
             videoElement.srcObject = null;
         }
-        error = null;
-        isLoading = false;
     }
 
-    onDestroy(() => {
-        console.log('Webcam component destroyed');
-        stopWebcam();
+    function selectCamera(deviceId) {
+        selectedDeviceId = deviceId;
+        localStorage.setItem(CAMERA_KEY, deviceId);
+        startWebcam(deviceId);
+    }
+
+    async function handleDeviceChange() {
+        await enumerateCameras();
+
+        // If the current camera disappeared, switch to the first available
+        if (stream) {
+            const track = stream.getVideoTracks()[0];
+            if (!track || track.readyState === 'ended') {
+                const fallback = cameras.length > 0 ? cameras[0].deviceId : '';
+                selectCamera(fallback);
+            }
+        }
+    }
+
+    onMount(() => {
+        enumerateCameras();
+        startWebcam(selectedDeviceId);
+        navigator.mediaDevices?.addEventListener('devicechange', handleDeviceChange);
     });
 
-    // React to power state changes
-    $effect(() => {
-        if (isPowered) {
-            startWebcam();
-        } else {
-            stopWebcam();
-        }
+    onDestroy(() => {
+        stopWebcam();
+        navigator.mediaDevices?.removeEventListener('devicechange', handleDeviceChange);
     });
 </script>
 
-<div class="webcam">
-    <header>
-        <PowerButton variant="dark" bind:isPowered />
-        <h1>Camera</h1>
-    </header>
+<div class="webcam-container">
+    <video
+        bind:this={videoElement}
+        autoplay
+        playsinline
+        muted
+    ></video>
 
-    <div class="webcam-container">
-        <video
-            bind:this={videoElement}
-            autoplay
-            playsinline
-            muted
-        ></video>
+    {#if cameras.length > 1}
+        <select
+            class="camera-select"
+            value={selectedDeviceId}
+            onchange={(e) => selectCamera(e.target.value)}
+        >
+            {#each cameras as camera, i}
+                <option value={camera.deviceId}>
+                    {camera.label?.replace(/\s*\([0-9a-f]{4}:[0-9a-f]{4}\)\s*$/i, '') || `Camera ${i + 1}`}
+                </option>
+            {/each}
+        </select>
+    {/if}
 
-        {#if isLoading}
-            <div class="message">
-                <p>Requesting webcam access...</p>
-            </div>
-        {:else if error}
-            <div class="message error">
-                <h2>Webcam Access Error</h2>
-                <p>{error}</p>
-                <p class="hint">Please ensure you've granted camera permissions in your browser.</p>
-            </div>
-        {/if}
-    </div>
+    {#if error}
+        <div class="message error">
+            <h2>Webcam Access Error</h2>
+            <p>{error}</p>
+            <p class="hint">Please ensure you've granted camera permissions in your browser.</p>
+        </div>
+    {/if}
 </div>
 
 <style>
-    .webcam {
-        display: flex;
-        flex-direction: column;
-        height: 100%;
-        background: #0d0d0d;
-        position: relative;
-    }
-
-    header {
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        z-index: 10;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        padding: 15px 20px;
-        background: rgba(26, 26, 26, 0.7);
-        backdrop-filter: blur(10px);
-        border-bottom: 1px solid rgba(51, 51, 51, 0.5);
-    }
-
-    h1 {
-        margin: 0;
-        color: rgba(255, 255, 255, 0.3);
-        font-size: 1.5em;
-        margin-left: 0.5em;
-    }
-
     .webcam-container {
-        width: 100%;
-        height: 100%;
+        flex: 1;
         background: #000;
         display: flex;
         align-items: center;
@@ -170,21 +147,36 @@
         object-fit: cover;
     }
 
+    .camera-select {
+        position: absolute;
+        top: 12px;
+        left: 12px;
+        z-index: 10;
+        background: rgba(0, 0, 0, 0.2);
+        color: #eee;
+        backdrop-filter: blur(10px);
+    }
+
+    .camera-select:hover {
+        background: rgba(0, 0, 0, 0.5);
+        color: #fff;
+    }
+
+    .camera-select:focus {
+        outline: none;
+    }
+
     .message {
         position: absolute;
         top: 50%;
         left: 50%;
         transform: translate(-50%, -50%);
         text-align: center;
-        color: #888;
+        color: #ff6b6b;
         padding: 40px;
         background: rgba(13, 13, 13, 0.9);
         border-radius: 8px;
         z-index: 5;
-    }
-
-    .message.error {
-        color: #ff6b6b;
     }
 
     .message h2 {

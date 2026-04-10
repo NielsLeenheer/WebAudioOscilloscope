@@ -9,7 +9,6 @@
 
     let audioEngine = new AudioEngine();
     let currentView = $state('oscilloscope');
-
     // Laser state (managed at app level so it works across views)
     let laserRenderer = $state(null);
     let laserConnected = $state(false);
@@ -168,17 +167,14 @@
         <Generator {audioEngine} {start} {stop} onLaserFrame={laserConnected && laserMode === 'generator' ? handleLaserFrame : null} />
     </div>
 
-    <!-- Right Side: Oscilloscope or Webcam -->
+    <!-- Right Side: Oscilloscope (always mounted) -->
     <div class="right-side">
-        {#if currentView === 'oscilloscope'}
-            <Oscilloscope 
-                generatorInput={audioEngine} 
-                laserOutput={laserConnected && laserMode === 'scope'}
-                onLaserData={handleLaserData}
-            />
-        {:else if currentView === 'webcam'}
-            <Webcam />
-        {/if}
+        <Oscilloscope
+            generatorInput={audioEngine}
+            laserOutput={laserConnected && laserMode === 'scope'}
+            onLaserData={handleLaserData}
+            showWebcam={currentView === 'webcam'}
+        />
     </div>
 </div>
 
