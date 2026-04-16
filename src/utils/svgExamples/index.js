@@ -14,6 +14,7 @@ import halfstackPath from './halfstack.txt?raw';
 import beyondtellerrandPath from './beyondtellerrand.txt?raw';
 import clockPath from './clock.txt?raw';
 import cssdayPath from './cssday.txt?raw';
+import asteroidsPath from './asteroids.txt?raw';
 
 // Export as array with id, label, path, and complexity
 export const svgExamples = [
@@ -32,4 +33,5 @@ export const svgExamples = [
     { id: 'beyondtellerrand', label: 'Beyond Tellerrand', path: beyondtellerrandPath.trim(), complex: true },
     { id: 'clock', label: 'Clock', path: clockPath.trim(), complex: true },
     { id: 'cssday', label: 'CSS Day', path: cssdayPath.trim(), complex: true },
+    { id: 'asteroids', label: 'Asteroids', path: asteroidsPath.trim(), complex: true },
 ];

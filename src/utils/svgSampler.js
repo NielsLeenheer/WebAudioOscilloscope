@@ -49,6 +49,143 @@ function getContainer() {
     return svgContainer;
 }
 
+// ---- Script Execution ----
+
+let lastScriptContent = null;
+let trackedTimers = [];
+
+/**
+ * Clean up timers created by previously executed SVG scripts
+ */
+function cleanupScriptTimers() {
+    for (const { type, id } of trackedTimers) {
+        if (type === 'interval') clearInterval(id);
+        else if (type === 'timeout') clearTimeout(id);
+        else if (type === 'raf') cancelAnimationFrame(id);
+    }
+    trackedTimers = [];
+}
+
+/**
+ * Execute <script> tags within an SVG element.
+ *
+ * All scripts are concatenated and run in a single new Function() scope so
+ * they can share variables. The function receives shadowed globals:
+ *
+ *   document  – a Proxy that scopes query methods (querySelector, getElementById,
+ *               etc.) to the SVG element while forwarding everything else
+ *               (addEventListener, createElementNS, …) to the real document.
+ *   svg       – the SVG element directly, as a convenience.
+ *   setInterval / setTimeout / requestAnimationFrame – wrapped versions that
+ *               track timer IDs (including recursive rAF) for cleanup.
+ *
+ * After the script body executes, the SVG element's `onload` attribute (if
+ * any) is evaluated in the same scope so it can call functions defined by
+ * the scripts.
+ *
+ * CDATA wrappers are stripped automatically.
+ *
+ * Re-execution is skipped when the concatenated script content hasn't
+ * changed, unless `force` is true.
+ */
+function executeScripts(svgElement, force = false) {
+    const scripts = svgElement.querySelectorAll('script');
+    if (scripts.length === 0) return;
+
+    // Concatenate all scripts, stripping CDATA wrappers
+    const rawContent = Array.from(scripts)
+        .map(s => s.textContent.replace(/^\s*<!\[CDATA\[/, '').replace(/\]\]>\s*$/, ''))
+        .join('\n');
+
+    if (!force && rawContent === lastScriptContent) {
+        console.log('[svgSampler] Scripts unchanged, skipping execution');
+        return;
+    }
+
+    cleanupScriptTimers();
+    lastScriptContent = rawContent;
+
+    // Append onload handler so it runs in the same scope as the scripts
+    let code = rawContent;
+    const onload = svgElement.getAttribute('onload');
+    if (onload) {
+        code += `\n;${onload};`;
+    }
+    console.log(`[svgSampler] Executing ${scripts.length} script(s), ${rawContent.length} chars, onload=${onload || 'none'}`);
+
+    // Proxy scopes DOM queries to the SVG element while forwarding
+    // everything else (addEventListener, createElementNS, …) to the
+    // real document.
+    const scopedDocument = new Proxy(document, {
+        get(target, prop) {
+            switch (prop) {
+                case 'querySelector':
+                    return (sel) => svgElement.querySelector(sel);
+                case 'querySelectorAll':
+                    return (sel) => svgElement.querySelectorAll(sel);
+                case 'getElementById':
+                    return (id) => svgElement.querySelector(`#${CSS.escape(id)}`);
+                case 'getElementsByTagName':
+                    return (tag) => svgElement.getElementsByTagName(tag);
+                case 'getElementsByClassName':
+                    return (cls) => svgElement.getElementsByClassName(cls);
+                case 'documentElement':
+                case 'rootElement':
+                    return svgElement;
+            }
+            const val = target[prop];
+            return typeof val === 'function' ? val.bind(target) : val;
+        }
+    });
+
+    try {
+        const fn = new Function(
+            'document',
+            'svg',
+            'setInterval',
+            'setTimeout',
+            'requestAnimationFrame',
+            code
+        );
+
+        fn(
+            scopedDocument,
+            svgElement,
+            (...args) => {
+                const id = setInterval(...args);
+                trackedTimers.push({ type: 'interval', id });
+                return id;
+            },
+            (...args) => {
+                const id = setTimeout(...args);
+                trackedTimers.push({ type: 'timeout', id });
+                return id;
+            },
+            (...args) => {
+                const id = requestAnimationFrame(...args);
+                trackedTimers.push({ type: 'raf', id });
+                return id;
+            }
+        );
+    } catch (error) {
+        console.error('Error executing SVG script:', error);
+    }
+}
+
+/**
+ * Reset the SVG container, cleaning up all script timers and DOM.
+ * After calling this, the next createContinuousSampler call will
+ * build a fresh container and re-execute all scripts.
+ */
+export function resetSVGContainer() {
+    cleanupScriptTimers();
+    lastScriptContent = null;
+    if (svgContainer) {
+        svgContainer.remove();
+        svgContainer = null;
+    }
+}
+
 // ---- Direct Bezier Evaluation ----
 
 function cubicAt(x0, y0, x1, y1, x2, y2, x3, y3, t) {
@@ -965,8 +1102,15 @@ export function parseSVGMarkupStatic(markup, samples, optimize = true, doubleDra
     }
 
     const elements = svgElement.querySelectorAll(DRAWABLE_SELECTOR);
-    if (elements.length === 0) {
+    const hasScripts = svgElement.querySelectorAll('script').length > 0;
+    if (elements.length === 0 && !hasScripts) {
         throw new Error('No drawable shapes found in SVG');
+    }
+
+    // For scripted SVGs with no initial elements, return empty — the
+    // continuous sampler will execute the scripts and sample dynamically.
+    if (elements.length === 0) {
+        return [];
     }
 
     // Extract segments from all elements using adaptive density
@@ -1131,8 +1275,16 @@ export function createContinuousSampler(markup, samples, fps, onFrame, isPlaying
         }
     }
 
+    // Execute scripts before querying elements — scripts may create them.
+    // Always force: innerHTML rebuilds the DOM, so script state is lost.
+    executeScripts(svgElement, true);
+
+    const hasScripts = svgElement.querySelectorAll('script').length > 0;
     const elements = svgElement.querySelectorAll(DRAWABLE_SELECTOR);
-    if (elements.length === 0) {
+    if (hasScripts) {
+        console.log('[svgSampler] Scripts executed, initial drawable elements:', elements.length);
+    }
+    if (elements.length === 0 && !hasScripts) {
         throw new Error('No drawable shapes found in SVG');
     }
 
@@ -1144,6 +1296,7 @@ export function createContinuousSampler(markup, samples, fps, onFrame, isPlaying
 
     const frameDuration = 1000 / fps;
     let samplingInterval = null;
+    let frameLogCounter = 0;
 
     samplingInterval = setInterval(() => {
         if (!isPlayingGetter()) {
@@ -1155,7 +1308,17 @@ export function createContinuousSampler(markup, samples, fps, onFrame, isPlaying
         }
 
         try {
-            const frameSegments = sampleCurrentFrame(svgElement, elements, samples, optimize, doubleDraw);
+            // Re-query each frame for scripts that dynamically add/remove elements
+            const currentElements = hasScripts
+                ? svgElement.querySelectorAll(DRAWABLE_SELECTOR)
+                : elements;
+            if (currentElements.length === 0) return;
+
+            const frameSegments = sampleCurrentFrame(svgElement, currentElements, samples, optimize, doubleDraw);
+
+            if (hasScripts && (frameLogCounter++ % 60 === 0)) {
+                console.log(`[svgSampler] frame: ${currentElements.length} elements, ${frameSegments.length} segments, ${frameSegments.reduce((s, seg) => s + seg.length, 0)} points`);
+            }
 
             // Normalize and clip to visible range
             const normalizedSegments = [];

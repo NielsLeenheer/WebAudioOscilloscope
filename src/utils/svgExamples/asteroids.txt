@@ -1,0 +1,238 @@
+<svg
+  xmlns="http://www.w3.org/2000/svg"
+  viewBox="0 0 500 500"
+  onload="init()">
+
+  <style>
+    #game * { stroke: #000; fill: none; }
+  </style>
+
+  <g id="game"></g>
+
+  <script type="text/javascript"><![CDATA[
+    const SVG_NS = "http://www.w3.org/2000/svg";
+    const W = 500, H = 500;
+    const TAU = Math.PI * 2;
+
+    let game, ship, bullets, asteroids, keys, alive, respawnTimer;
+
+    function init() {
+      game = document.getElementById("game");
+      keys = {};
+      document.addEventListener("keydown", e => { keys[e.code] = true; if (["Space","ArrowUp","ArrowDown","ArrowLeft","ArrowRight"].includes(e.code)) e.preventDefault(); });
+      document.addEventListener("keyup", e => { keys[e.code] = false; });
+      restart();
+      requestAnimationFrame(loop);
+    }
+
+    function restart() {
+      while (game.firstChild) game.removeChild(game.firstChild);
+      ship = {
+        x: W / 2, y: H / 2, vx: 0, vy: 0, angle: -Math.PI / 2,
+        fireCooldown: 0, el: null, thrustEl: null
+      };
+      ship.el = createPoly([[0,-14],[10,10],[-10,10]]);
+      ship.thrustEl = createPoly([[5,10],[0,18],[-5,10]]);
+      ship.thrustEl.setAttribute("visibility", "hidden");
+      bullets = [];
+      asteroids = [];
+      alive = true;
+      respawnTimer = 0;
+
+      for (let i = 0; i < 4; i++) spawnAsteroid(3);
+    }
+
+    function createPoly(pts) {
+      const el = document.createElementNS(SVG_NS, "polygon");
+      el.setAttribute("points", pts.map(p => p.join(",")).join(" "));
+      game.appendChild(el);
+      return el;
+    }
+
+    function createCircle(cx, cy, r) {
+      const el = document.createElementNS(SVG_NS, "circle");
+      el.setAttribute("cx", cx);
+      el.setAttribute("cy", cy);
+      el.setAttribute("r", r);
+      game.appendChild(el);
+      return el;
+    }
+
+    function asteroidShape(size) {
+      const r = size * 16;
+      const pts = [];
+      const n = 8 + Math.floor(Math.random() * 5);
+      for (let i = 0; i < n; i++) {
+        const a = (i / n) * TAU;
+        const jitter = r * (0.7 + Math.random() * 0.6);
+        pts.push([Math.cos(a) * jitter, Math.sin(a) * jitter]);
+      }
+      return pts;
+    }
+
+    function spawnAsteroid(size, x, y) {
+      if (x === undefined) {
+        const edge = Math.floor(Math.random() * 4);
+        if (edge === 0) { x = 0; y = Math.random() * H; }
+        else if (edge === 1) { x = W; y = Math.random() * H; }
+        else if (edge === 2) { x = Math.random() * W; y = 0; }
+        else { x = Math.random() * W; y = H; }
+      }
+      const speed = (4 - size) * 0.5 + Math.random() * 1.2;
+      const a = Math.random() * TAU;
+      const ast = {
+        x, y,
+        vx: Math.cos(a) * speed,
+        vy: Math.sin(a) * speed,
+        size,
+        radius: size * 16,
+        spin: (Math.random() - 0.5) * 0.03,
+        rotation: Math.random() * TAU,
+        el: createPoly(asteroidShape(size))
+      };
+      asteroids.push(ast);
+    }
+
+    function wrap(obj) {
+      if (obj.x < -20) obj.x += W + 40;
+      if (obj.x > W + 20) obj.x -= W + 40;
+      if (obj.y < -20) obj.y += H + 40;
+      if (obj.y > H + 20) obj.y -= H + 40;
+    }
+
+    function dist(a, b) {
+      return Math.hypot(a.x - b.x, a.y - b.y);
+    }
+
+    function setTransform(el, x, y, angle) {
+      el.setAttribute("transform",
+        "translate(" + x + "," + y + ") rotate(" + (angle * 180 / Math.PI) + ")");
+    }
+
+    let lastTime = 0;
+    function loop(t) {
+      const dt = Math.min((t - lastTime) / 16.667, 3);
+      lastTime = t;
+
+      update(dt);
+      render();
+      requestAnimationFrame(loop);
+    }
+
+    function update(dt) {
+      if (keys["KeyR"]) { restart(); return; }
+
+      if (alive) {
+        if (keys["ArrowLeft"])  ship.angle -= 0.06 * dt;
+        if (keys["ArrowRight"]) ship.angle += 0.06 * dt;
+
+        if (keys["ArrowUp"]) {
+          ship.vx += Math.cos(ship.angle) * 0.12 * dt;
+          ship.vy += Math.sin(ship.angle) * 0.12 * dt;
+        }
+        ship.thrustEl.setAttribute("visibility", keys["ArrowUp"] ? "visible" : "hidden");
+
+        ship.vx *= (1 - 0.008 * dt);
+        ship.vy *= (1 - 0.008 * dt);
+
+        const spd = Math.hypot(ship.vx, ship.vy);
+        if (spd > 7) { ship.vx *= 7/spd; ship.vy *= 7/spd; }
+
+        ship.x += ship.vx * dt;
+        ship.y += ship.vy * dt;
+        wrap(ship);
+
+        ship.fireCooldown -= dt;
+        if (keys["Space"] && ship.fireCooldown <= 0) {
+          ship.fireCooldown = 10;
+          const bx = ship.x + Math.cos(ship.angle) * 16;
+          const by = ship.y + Math.sin(ship.angle) * 16;
+          const b = {
+            x: bx, y: by,
+            vx: Math.cos(ship.angle) * 6 + ship.vx * 0.3,
+            vy: Math.sin(ship.angle) * 6 + ship.vy * 0.3,
+            life: 60,
+            el: createCircle(bx, by, 2)
+          };
+          bullets.push(b);
+        }
+      } else {
+        respawnTimer -= dt;
+        if (respawnTimer <= 0) {
+          alive = true;
+          ship.x = W / 2; ship.y = H / 2;
+          ship.vx = 0; ship.vy = 0;
+          ship.angle = -Math.PI / 2;
+          ship.el.setAttribute("visibility", "visible");
+          ship.thrustEl.setAttribute("visibility", "visible");
+        }
+      }
+
+      for (let i = bullets.length - 1; i >= 0; i--) {
+        const b = bullets[i];
+        b.x += b.vx * dt;
+        b.y += b.vy * dt;
+        b.life -= dt;
+        if (b.life <= 0 || b.x < -10 || b.x > W+10 || b.y < -10 || b.y > H+10) {
+          game.removeChild(b.el);
+          bullets.splice(i, 1);
+        }
+      }
+
+      for (let i = asteroids.length - 1; i >= 0; i--) {
+        const a = asteroids[i];
+        a.x += a.vx * dt;
+        a.y += a.vy * dt;
+        a.rotation += a.spin * dt;
+        wrap(a);
+      }
+
+      for (let i = bullets.length - 1; i >= 0; i--) {
+        for (let j = asteroids.length - 1; j >= 0; j--) {
+          if (dist(bullets[i], asteroids[j]) < asteroids[j].radius) {
+            const a = asteroids[j];
+            if (a.size > 1) {
+              spawnAsteroid(a.size - 1, a.x, a.y);
+              spawnAsteroid(a.size - 1, a.x, a.y);
+            }
+            game.removeChild(a.el);
+            asteroids.splice(j, 1);
+            game.removeChild(bullets[i].el);
+            bullets.splice(i, 1);
+            break;
+          }
+        }
+      }
+
+      if (alive) {
+        for (let j = 0; j < asteroids.length; j++) {
+          if (dist(ship, asteroids[j]) < asteroids[j].radius * 0.7 + 10) {
+            alive = false;
+            respawnTimer = 90;
+            ship.el.setAttribute("visibility", "hidden");
+            ship.thrustEl.setAttribute("visibility", "hidden");
+            break;
+          }
+        }
+      }
+
+      if (asteroids.length === 0) {
+        for (let i = 0; i < 4; i++) spawnAsteroid(3);
+      }
+    }
+
+    function render() {
+      setTransform(ship.el, ship.x, ship.y, ship.angle + Math.PI/2);
+      setTransform(ship.thrustEl, ship.x, ship.y, ship.angle + Math.PI/2);
+
+      for (const b of bullets) {
+        b.el.setAttribute("cx", b.x);
+        b.el.setAttribute("cy", b.y);
+      }
+
+      for (const a of asteroids) {
+        setTransform(a.el, a.x, a.y, a.rotation);
+      }
+    }
+  ]]></script>
+</svg>

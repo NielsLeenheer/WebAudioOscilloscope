@@ -14,8 +14,10 @@
         normalizePoints,
         extractPathPoints,
         parseSVGMarkupStatic,
-        createContinuousSampler
+        createContinuousSampler,
+        resetSVGContainer
     } from '../../../utils/svgSampler.js';
+    import RestartIcon from '../../../assets/icons/restart.svg?raw';
 
     let { audioEngine, frameProcessor, isActive = false, animationFPS = $bindable(30), numSamples = $bindable(200), optimizeSegments = $bindable(true), doubleDraw = $bindable(true) } = $props();
 
@@ -108,6 +110,15 @@
         if (staticFrameInterval !== null) {
             clearInterval(staticFrameInterval);
             staticFrameInterval = null;
+        }
+    }
+
+    function handleRestart() {
+        stopContinuousSampling();
+        stopStaticFrameLoop();
+        resetSVGContainer();
+        if (svgInput && isValid) {
+            applyInput(svgInput);
         }
     }
 
@@ -284,12 +295,19 @@
             <div class="header">
                 <Preview points={codePreviewPoints} width={150} height={150} />
 
-                <select bind:value={selectedExample} onchange={handleSelectChange}>
-                    <option value="custom">Custom...</option>
-                    {#each svgExamples as example}
-                        <option value={example.id}>{example.label}</option>
-                    {/each}
-                </select>
+                <div class="header-controls">
+                    <select bind:value={selectedExample} onchange={handleSelectChange}>
+                        <option value="custom">Custom...</option>
+                        {#each svgExamples as example}
+                            <option value={example.id}>{example.label}</option>
+                        {/each}
+                    </select>
+
+                    <Button variant="secondary" onclick={handleRestart}>
+                        {@html RestartIcon}
+                        Restart
+                    </Button>
+                </div>
             </div>
 
             <CodeEditor
@@ -373,6 +391,12 @@ Full SVG example:
         flex-direction: column;
         align-items: center;
         gap: 12px;
+    }
+
+    .header-controls {
+        display: flex;
+        align-items: center;
+        gap: 8px;
     }
 
     select {
