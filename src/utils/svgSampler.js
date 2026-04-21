@@ -3,7 +3,7 @@
  * Handles SVG DOM creation and continuous path sampling for oscilloscope visualization
  *
  * Optimizations ported from WebDmxController/src/lib/outputs/laser/SVGSampler.js:
- * - Direct bezier evaluation (bypasses svg-path-properties for most paths)
+ * - Direct bezier evaluation (bypasses svg-path-properties entirely)
  * - Section-level path caching for animations
  * - Geometry caching via WeakMap
  * - Corner detection for geometric primitives
@@ -12,9 +12,9 @@
  * - Ancestor visibility walk
  * - CSS d property / path("...") wrapper support
  * - Fixed transform matrix multiplication order
+ * - Native arc command parsing into cubic beziers
  */
 
-import { svgPathProperties } from 'svg-path-properties';
 import { resolveEnv } from './env.js';
 
 // ---- Constants ----
@@ -244,9 +244,158 @@ function stripPathWrapper(d) {
 }
 
 /**
+ * Parse the argument list of an SVG arc (A/a) command into tuples of
+ * { rx, ry, xRot, largeArc, sweep, x, y }.
+ *
+ * The arc flags (large-arc, sweep) are single '0' or '1' characters per the
+ * SVG spec — they can be adjacent with no separator, so `11` is two flags,
+ * not the number eleven. The generic number tokenizer gets this wrong, hence
+ * this position-aware parser.
+ */
+function parseArcArgs(s) {
+    const NUM_RE = /^([+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?)/;
+    let pos = 0;
+    const len = s.length;
+    const skipSep = () => { while (pos < len && /[\s,]/.test(s[pos])) pos++; };
+    const num = () => {
+        skipSep();
+        const m = s.slice(pos).match(NUM_RE);
+        if (!m) return null;
+        pos += m[1].length;
+        return parseFloat(m[1]);
+    };
+    const flag = () => {
+        skipSep();
+        if (pos >= len) return null;
+        const c = s[pos];
+        if (c !== '0' && c !== '1') return null;
+        pos++;
+        return c === '1' ? 1 : 0;
+    };
+
+    const tuples = [];
+    while (pos < len) {
+        const rx = num(); if (rx === null) break;
+        const ry = num();
+        const xRot = num();
+        const largeArc = flag();
+        const sweep = flag();
+        const x = num();
+        const y = num();
+        if (ry === null || xRot === null || largeArc === null || sweep === null || x === null || y === null) break;
+        tuples.push({ rx, ry, xRot, largeArc, sweep, x, y });
+    }
+    return tuples;
+}
+
+/**
+ * Decompose an SVG elliptical arc into a sequence of cubic bezier curves.
+ * Implements the endpoint → center parameterization conversion from SVG
+ * spec appendix B.2.4, then approximates each sub-arc (≤ 90°) with a
+ * cubic bezier using the standard t = 4/3 · tan(θ/4) control-point formula.
+ *
+ * Returns [] for degenerate cases (coincident endpoints); returns a single
+ * L-style segment (as a line expressed via a cubic) when either radius is 0.
+ */
+function arcToCubics(x1, y1, rx, ry, phiDeg, largeArc, sweep, x2, y2) {
+    if (x1 === x2 && y1 === y2) return [];
+    if (rx === 0 || ry === 0) {
+        return [{ x1, y1, x2: x2, y2: y2, x: x2, y: y2 }];
+    }
+    rx = Math.abs(rx);
+    ry = Math.abs(ry);
+
+    const phi = (phiDeg * Math.PI) / 180;
+    const cosPhi = Math.cos(phi);
+    const sinPhi = Math.sin(phi);
+
+    const dx = (x1 - x2) / 2;
+    const dy = (y1 - y2) / 2;
+    const x1p = cosPhi * dx + sinPhi * dy;
+    const y1p = -sinPhi * dx + cosPhi * dy;
+
+    const lambda = (x1p * x1p) / (rx * rx) + (y1p * y1p) / (ry * ry);
+    if (lambda > 1) {
+        const s = Math.sqrt(lambda);
+        rx *= s;
+        ry *= s;
+    }
+
+    const rxSq = rx * rx;
+    const rySq = ry * ry;
+    const x1pSq = x1p * x1p;
+    const y1pSq = y1p * y1p;
+    let num = rxSq * rySq - rxSq * y1pSq - rySq * x1pSq;
+    if (num < 0) num = 0;
+    const denom = rxSq * y1pSq + rySq * x1pSq;
+    const sign = largeArc === sweep ? -1 : 1;
+    const coef = sign * Math.sqrt(num / denom);
+    const cxp = coef * ((rx * y1p) / ry);
+    const cyp = coef * (-(ry * x1p) / rx);
+
+    const cx = cosPhi * cxp - sinPhi * cyp + (x1 + x2) / 2;
+    const cy = sinPhi * cxp + cosPhi * cyp + (y1 + y2) / 2;
+
+    const vectorAngle = (ux, uy, vx, vy) => {
+        const dot = ux * vx + uy * vy;
+        const lenU = Math.sqrt(ux * ux + uy * uy);
+        const lenV = Math.sqrt(vx * vx + vy * vy);
+        let a = Math.acos(Math.max(-1, Math.min(1, dot / (lenU * lenV))));
+        if (ux * vy - uy * vx < 0) a = -a;
+        return a;
+    };
+    const startAngle = vectorAngle(1, 0, (x1p - cxp) / rx, (y1p - cyp) / ry);
+    let deltaAngle = vectorAngle(
+        (x1p - cxp) / rx, (y1p - cyp) / ry,
+        (-x1p - cxp) / rx, (-y1p - cyp) / ry
+    );
+    if (!sweep && deltaAngle > 0) deltaAngle -= 2 * Math.PI;
+    else if (sweep && deltaAngle < 0) deltaAngle += 2 * Math.PI;
+
+    const segCount = Math.max(1, Math.ceil(Math.abs(deltaAngle) / (Math.PI / 2)));
+    const step = deltaAngle / segCount;
+    const t = (4 / 3) * Math.tan(step / 4);
+
+    const cubics = [];
+    let a1 = startAngle;
+    let fromX = x1;
+    let fromY = y1;
+
+    for (let i = 0; i < segCount; i++) {
+        const a2 = a1 + step;
+        const cosA1 = Math.cos(a1), sinA1 = Math.sin(a1);
+        const cosA2 = Math.cos(a2), sinA2 = Math.sin(a2);
+
+        const endX = cosPhi * rx * cosA2 - sinPhi * ry * sinA2 + cx;
+        const endY = sinPhi * rx * cosA2 + cosPhi * ry * sinA2 + cy;
+
+        const tan1X = cosPhi * (-rx * sinA1) - sinPhi * (ry * cosA1);
+        const tan1Y = sinPhi * (-rx * sinA1) + cosPhi * (ry * cosA1);
+        const tan2X = cosPhi * (-rx * sinA2) - sinPhi * (ry * cosA2);
+        const tan2Y = sinPhi * (-rx * sinA2) + cosPhi * (ry * cosA2);
+
+        cubics.push({
+            x1: fromX + t * tan1X,
+            y1: fromY + t * tan1Y,
+            x2: endX - t * tan2X,
+            y2: endY - t * tan2Y,
+            x: endX,
+            y: endY
+        });
+
+        a1 = a2;
+        fromX = endX;
+        fromY = endY;
+    }
+
+    return cubics;
+}
+
+/**
  * Parse SVG path d-attribute into absolute-coordinate segment objects.
- * Supports M, L, H, V, C, S, Q, T, Z (and lowercase relative versions).
- * Returns null if an arc (A) command or unknown command is encountered.
+ * Supports M, L, H, V, C, S, Q, T, A, Z (and lowercase relative versions).
+ * Arcs are decomposed into cubic bezier approximations.
+ * Returns null on unknown commands.
  */
 function parsePathD(d) {
     d = stripPathWrapper(d);
@@ -262,12 +411,10 @@ function parsePathD(d) {
 
     while ((match = cmdRe.exec(d)) !== null) {
         const cmd = match[1];
-        const nums = tokenizeNumbers(match[2]);
         const isRel = cmd === cmd.toLowerCase();
         const CMD = cmd.toUpperCase();
-
-        // Arc commands — bail out, too complex to evaluate directly
-        if (CMD === 'A') return null;
+        
+        const nums = CMD === 'A' ? null : tokenizeNumbers(match[2]);
 
         switch (CMD) {
             case 'M': {
@@ -369,6 +516,22 @@ function parsePathD(d) {
                 }
                 break;
             }
+            case 'A': {
+                const tuples = parseArcArgs(match[2]);
+                for (const arc of tuples) {
+                    const endX = isRel ? cx + arc.x : arc.x;
+                    const endY = isRel ? cy + arc.y : arc.y;
+                    const cubics = arcToCubics(cx, cy, arc.rx, arc.ry, arc.xRot, arc.largeArc, arc.sweep, endX, endY);
+                    if (cubics.length === 0) continue;
+                    for (const c of cubics) {
+                        segments.push({ type: 'C', x1: c.x1, y1: c.y1, x2: c.x2, y2: c.y2, x: c.x, y: c.y, fx: cx, fy: cy });
+                        lastCx1 = c.x2; lastCy1 = c.y2;
+                        cx = c.x; cy = c.y;
+                    }
+                }
+                lastCmd = 'A';
+                break;
+            }
             case 'Z': {
                 if (cx !== mx || cy !== my) {
                     segments.push({ type: 'L', x: mx, y: my });
@@ -460,59 +623,22 @@ function sampleSection(sectionStr, samplesPerUnit) {
 }
 
 /**
- * Fallback: sample a path section using svg-path-properties (handles arc commands)
- */
-function samplePathFallback(pathData, numSamples) {
-    try {
-        const properties = new svgPathProperties(pathData);
-        const length = properties.getTotalLength();
-        if (!isFinite(length) || length === 0) return null;
-
-        if (!numSamples) {
-            numSamples = Math.max(MIN_SAMPLES, Math.min(MAX_SAMPLES, Math.round(length * SAMPLES_PER_UNIT)));
-        }
-
-        const points = [];
-        for (let i = 0; i < numSamples; i++) {
-            const d = numSamples > 1 ? (i / (numSamples - 1)) * length : 0;
-            const point = properties.getPointAtLength(d);
-            points.push([point.x, point.y]);
-        }
-
-        return points.length >= 2 ? points : null;
-    } catch (error) {
-        console.warn('Fallback path sampling failed:', error.message);
-        return null;
-    }
-}
-
-/**
  * Sample all sections of a path, returning separate segments for each.
- * Uses direct bezier evaluation, falls back to svg-path-properties for arcs.
+ * Uses direct bezier evaluation.
  */
 function samplePathSections(pathData, samplesPerUnit) {
     const sections = splitPathSections(pathData);
 
     // If no M commands found, try the whole path as a single section
     if (sections.length === 0) {
-        const points = sampleSection(pathData, samplesPerUnit) || samplePathFallback(pathData);
+        const points = sampleSection(pathData, samplesPerUnit);
         return (points && points.length >= 2) ? [points] : [];
     }
 
-    const segments = [];
+    const sectionResults = [];
 
     for (const sectionStr of sections) {
         let points = sampleSection(sectionStr, samplesPerUnit);
-
-        if (!points) {
-            // Check if this is a genuine parse failure (arcs) vs M-only section
-            const parsed = parsePathD(sectionStr);
-            if (parsed === null) {
-                // Arc or unknown command -- fall back to svg-path-properties
-                points = samplePathFallback(sectionStr);
-            }
-            // If parsed is not null but sampleSection returned null, it's M-only -- skip
-        }
 
         if (points && points.length >= 2) {
             // Ensure closed paths close exactly
@@ -520,9 +646,41 @@ function samplePathSections(pathData, samplesPerUnit) {
             if (isClosed) {
                 points[points.length - 1] = [points[0][0], points[0][1]];
             }
-            segments.push(points);
+            sectionResults.push(points);
+        } else {
+            sectionResults.push(null);
         }
     }
+
+    const segments = [];
+    let currentPart = [];
+    const EPS = 1e-4;
+
+    for (const pts of sectionResults) {
+        if (!pts || pts.length < 2) {
+            if (currentPart.length >= 2) segments.push(currentPart);
+            currentPart = [];
+            continue;
+        }
+
+        if (currentPart.length === 0) {
+            currentPart = pts.slice();
+            continue;
+        }
+
+        const prevEnd = currentPart[currentPart.length - 1];
+        const newStart = pts[0];
+        const continuation = Math.abs(prevEnd[0] - newStart[0]) < EPS && 
+                             Math.abs(prevEnd[1] - newStart[1]) < EPS;
+
+        if (continuation) {
+            for (let j = 1; j < pts.length; j++) currentPart.push(pts[j]);
+        } else {
+            segments.push(currentPart);
+            currentPart = pts.slice();
+        }
+    }
+    if (currentPart.length >= 2) segments.push(currentPart);
 
     return segments;
 }
@@ -554,12 +712,6 @@ function samplePathCached(pathData, samplesPerUnit, cache) {
             sectionResults.push(cache.sectionResults[i]);
         } else {
             let points = sampleSection(sections[i], samplesPerUnit);
-            if (!points) {
-                const parsed = parsePathD(sections[i]);
-                if (parsed === null) {
-                    points = samplePathFallback(sections[i]);
-                }
-            }
             if (points && points.length >= 2) {
                 const isClosed = /[Zz]\s*$/.test(sections[i].trim());
                 if (isClosed) {
@@ -573,7 +725,37 @@ function samplePathCached(pathData, samplesPerUnit, cache) {
     cache.sections = sections;
     cache.sectionResults = sectionResults;
 
-    return sectionResults.filter(pts => pts && pts.length >= 2);
+    const segments = [];
+    let currentPart = [];
+    const EPS = 1e-4;
+
+    for (const pts of sectionResults) {
+        if (!pts || pts.length < 2) {
+            if (currentPart.length >= 2) segments.push(currentPart);
+            currentPart = [];
+            continue;
+        }
+
+        if (currentPart.length === 0) {
+            currentPart = pts.slice();
+            continue;
+        }
+
+        const prevEnd = currentPart[currentPart.length - 1];
+        const newStart = pts[0];
+        const continuation = Math.abs(prevEnd[0] - newStart[0]) < EPS && 
+                             Math.abs(prevEnd[1] - newStart[1]) < EPS;
+
+        if (continuation) {
+            for (let j = 1; j < pts.length; j++) currentPart.push(pts[j]);
+        } else {
+            segments.push(currentPart);
+            currentPart = pts.slice();
+        }
+    }
+    if (currentPart.length >= 2) segments.push(currentPart);
+
+    return segments;
 }
 
 
