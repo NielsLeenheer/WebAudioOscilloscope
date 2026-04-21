@@ -21,6 +21,47 @@ import { resolveEnv } from './env.js';
 
 const DRAWABLE_SELECTOR = 'path, circle, ellipse, rect, polygon, polyline, line';
 
+// Parser selection for SVG injection.
+//   'html'  — permissive HTML parser (via <template>). Accepts missing xmlns,
+//             unclosed tags, unquoted attributes, etc. Matches how browsers
+//             handle SVG inside HTML documents elsewhere on the page.
+//   'xml'   — strict XML parser (DOMParser with 'image/svg+xml'). Rejects
+//             malformed input with a parsererror node; kept as a fallback.
+const SVG_PARSER = 'html';
+
+/**
+ * Parse an SVG markup string using the HTML parser (permissive).
+ * Returns the root <svg> element (detached from any document), or null.
+ */
+function parseSvgHTML(svgMarkup) {
+    const template = document.createElement('template');
+    template.innerHTML = svgMarkup;
+    const svg = template.content.querySelector('svg');
+    return svg || null;
+}
+
+/**
+ * Parse an SVG markup string using DOMParser (strict XML).
+ * Returns the imported <svg> element, or null on parse error.
+ */
+function parseSvgXML(svgMarkup) {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(svgMarkup, 'image/svg+xml');
+    const parseError = doc.querySelector('parsererror');
+    if (parseError) {
+        console.warn('SVG parse error:', parseError.textContent);
+        return null;
+    }
+    return document.importNode(doc.documentElement, true);
+}
+
+/**
+ * Parse an SVG markup string. Dispatches to the parser selected by SVG_PARSER.
+ */
+function parseSvgMarkup(svgMarkup) {
+    return SVG_PARSER === 'html' ? parseSvgHTML(svgMarkup) : parseSvgXML(svgMarkup);
+}
+
 /** Points per unit of path length in viewBox coordinates */
 const SAMPLES_PER_UNIT = 0.5;
 const MIN_SAMPLES = 10;
@@ -88,9 +129,10 @@ function cleanupScriptTimers() {
  * Re-execution is skipped when the concatenated script content hasn't
  * changed, unless `force` is true.
  */
-function executeScripts(svgElement, force = false) {
-    const scripts = svgElement.querySelectorAll('script');
-    if (scripts.length === 0) return;
+function executeScripts(svgElement, force = false, explicitScripts = null, explicitOnload = null) {
+    const scripts = explicitScripts ?? Array.from(svgElement.querySelectorAll('script'));
+    const onload = explicitOnload ?? svgElement.getAttribute('onload');
+    if (scripts.length === 0 && !onload) return;
 
     // Concatenate all scripts, stripping CDATA wrappers
     const rawContent = Array.from(scripts)
@@ -107,7 +149,6 @@ function executeScripts(svgElement, force = false) {
 
     // Append onload handler so it runs in the same scope as the scripts
     let code = rawContent;
-    const onload = svgElement.getAttribute('onload');
     if (onload) {
         code += `\n;${onload};`;
     }
@@ -1267,11 +1308,20 @@ export function parseSVGMarkupStatic(markup, samples, optimize = true, doubleDra
     // Resolve env(time-*) values before DOM insertion
     cleanedMarkup = resolveEnv(cleanedMarkup);
 
-    container.innerHTML = cleanedMarkup;
-    const svgElement = container.querySelector('svg');
+    const svgElement = parseSvgMarkup(cleanedMarkup);
     if (!svgElement) {
         throw new Error('No <svg> element found in markup');
     }
+
+    const hasScripts = svgElement.querySelectorAll('script').length > 0 || svgElement.hasAttribute('onload');
+
+    // Prevent scripts from executing globally when appended
+    const detachedScripts = Array.from(svgElement.querySelectorAll('script'));
+    for (const s of detachedScripts) s.remove();
+    if (svgElement.hasAttribute('onload')) svgElement.removeAttribute('onload');
+
+    container.innerHTML = '';
+    container.appendChild(svgElement);
 
     // Normalize SVG dimensions to match viewBox
     const viewBox = svgElement.getAttribute('viewBox');
@@ -1284,7 +1334,6 @@ export function parseSVGMarkupStatic(markup, samples, optimize = true, doubleDra
     }
 
     const elements = svgElement.querySelectorAll(DRAWABLE_SELECTOR);
-    const hasScripts = svgElement.querySelectorAll('script').length > 0;
     if (elements.length === 0 && !hasScripts) {
         throw new Error('No drawable shapes found in SVG');
     }
@@ -1441,11 +1490,19 @@ export function createContinuousSampler(markup, samples, fps, onFrame, isPlaying
     // Resolve env(time-*) values before DOM insertion
     cleanedMarkup = resolveEnv(cleanedMarkup);
 
-    container.innerHTML = cleanedMarkup;
-    const svgElement = container.querySelector('svg');
+    const svgElement = parseSvgMarkup(cleanedMarkup);
     if (!svgElement) {
         throw new Error('No <svg> element found in markup');
     }
+
+    // Detach scripts and onload BEFORE appendChild to prevent runaway global execution
+    const detachedScripts = Array.from(svgElement.querySelectorAll('script'));
+    for (const s of detachedScripts) s.remove();
+    const detachedOnload = svgElement.getAttribute('onload');
+    if (detachedOnload !== null) svgElement.removeAttribute('onload');
+
+    container.innerHTML = '';
+    container.appendChild(svgElement);
 
     // Normalize SVG dimensions to match viewBox
     const viewBox = svgElement.getAttribute('viewBox');
@@ -1458,10 +1515,12 @@ export function createContinuousSampler(markup, samples, fps, onFrame, isPlaying
     }
 
     // Execute scripts before querying elements — scripts may create them.
-    // Always force: innerHTML rebuilds the DOM, so script state is lost.
-    executeScripts(svgElement, true);
+    // Always force: innerHTML / appendChild rebuilds the DOM, so script state is lost.
+    if (detachedScripts.length > 0 || detachedOnload) {
+        executeScripts(svgElement, true, detachedScripts, detachedOnload);
+    }
 
-    const hasScripts = svgElement.querySelectorAll('script').length > 0;
+    const hasScripts = detachedScripts.length > 0 || detachedOnload !== null;
     const elements = svgElement.querySelectorAll(DRAWABLE_SELECTOR);
     if (hasScripts) {
         console.log('[svgSampler] Scripts executed, initial drawable elements:', elements.length);
