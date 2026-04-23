@@ -15,7 +15,8 @@
         extractPathPoints,
         parseSVGMarkupStatic,
         createContinuousSampler,
-        resetSVGContainer
+        resetSVGContainer,
+        focusSVGContainer
     } from '../../../utils/svgSampler.js';
     import RestartIcon from '../../../assets/icons/restart.svg?raw';
 
@@ -293,7 +294,14 @@
     <div class="sub-panel" class:active={activeSubView === 'code'}>
         <div class="svg-controls">
             <div class="header">
-                <Preview points={codePreviewPoints} width={150} height={150} />
+                <Preview 
+                    points={codePreviewPoints} 
+                    width={150} 
+                    height={150} 
+                    onclick={focusSVGContainer}
+                    style="cursor: pointer"
+                    title="Click to focus SVG to send keyboard events"
+                />
 
                 <div class="header-controls">
                     <select bind:value={selectedExample} onchange={handleSelectChange}>

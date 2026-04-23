@@ -8,7 +8,8 @@
         strokeColor = 'rgba(60, 60, 60, 0.7)',
         lineWidth = 1.5,
         marginLeft = 40,
-        marginBottom = 40
+        marginBottom = 40,
+        ...restProps
     } = $props();
 
     let canvas;
@@ -92,6 +93,7 @@
 </script>
 
 <canvas
+    {...restProps}
     bind:this={canvas}
     width={width}
     height={height}

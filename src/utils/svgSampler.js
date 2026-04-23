@@ -85,9 +85,23 @@ function getContainer() {
         svgContainer.style.opacity = '0';
         svgContainer.style.pointerEvents = 'none';
         svgContainer.style.zIndex = '-9999';
+        svgContainer.tabIndex = -1; // Allow programmatic focus
         document.body.appendChild(svgContainer);
+
+        // Prevent space bar from scrolling the page when focusing the SVG container.
+        svgContainer.addEventListener('keydown', (e) => {
+            if (e.code === 'Space' || e.key === ' ') {
+                e.preventDefault();
+            }
+        });
     }
     return svgContainer;
+}
+
+export function focusSVGContainer() {
+    if (svgContainer) {
+        svgContainer.focus();
+    }
 }
 
 // ---- Script Execution ----
