@@ -2,11 +2,80 @@
     import { onMount, onDestroy } from 'svelte';
 
     const CAMERA_KEY = 'webcam-device';
+    const ZOOM_KEY = 'webcam-zoom';
+    const PAN_X_KEY = 'webcam-pan-x';
+    const PAN_Y_KEY = 'webcam-pan-y';
+
+    const MIN_ZOOM = 1;
+    const MAX_ZOOM = 3;
+
+    function clamp(value, min, max) {
+        return Math.min(max, Math.max(min, value));
+    }
+
+    function readStoredNumber(key, fallback) {
+        const raw = localStorage.getItem(key);
+        if (raw === null) return fallback;
+        const parsed = Number.parseFloat(raw);
+        return Number.isFinite(parsed) ? parsed : fallback;
+    }
+
     let videoElement;
     let stream = null;
     let error = $state(null);
     let cameras = $state([]);
     let selectedDeviceId = $state(localStorage.getItem(CAMERA_KEY) || '');
+    let zoom = $state(clamp(readStoredNumber(ZOOM_KEY, 1), MIN_ZOOM, MAX_ZOOM));
+    let panX = $state(clamp(readStoredNumber(PAN_X_KEY, 0), -50, 50));
+    let panY = $state(clamp(readStoredNumber(PAN_Y_KEY, 0), -50, 50));
+    let isDragging = $state(false);
+    let dragPointerId = null;
+    let dragStartX = 0;
+    let dragStartY = 0;
+    let dragStartPanX = 0;
+    let dragStartPanY = 0;
+
+    $effect(() => {
+        localStorage.setItem(ZOOM_KEY, `${zoom}`);
+    });
+
+    $effect(() => {
+        localStorage.setItem(PAN_X_KEY, `${panX}`);
+    });
+
+    $effect(() => {
+        localStorage.setItem(PAN_Y_KEY, `${panY}`);
+    });
+
+    function startDrag(event) {
+        isDragging = true;
+        dragPointerId = event.pointerId;
+        dragStartX = event.clientX;
+        dragStartY = event.clientY;
+        dragStartPanX = panX;
+        dragStartPanY = panY;
+        event.currentTarget.setPointerCapture(event.pointerId);
+    }
+
+    function handleDrag(event) {
+        if (!isDragging || dragPointerId !== event.pointerId) return;
+
+        const deltaX = event.clientX - dragStartX;
+        const deltaY = event.clientY - dragStartY;
+        const dragSensitivity = 0.08;
+
+        panX = clamp(dragStartPanX - (deltaX * dragSensitivity), -50, 50);
+        panY = clamp(dragStartPanY - (deltaY * dragSensitivity), -50, 50);
+    }
+
+    function endDrag(event) {
+        if (dragPointerId !== event.pointerId) return;
+        isDragging = false;
+        dragPointerId = null;
+        if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+            event.currentTarget.releasePointerCapture(event.pointerId);
+        }
+    }
 
     async function enumerateCameras() {
         if (!navigator.mediaDevices?.enumerateDevices) return;
@@ -102,10 +171,18 @@
 <div class="webcam-container">
     <video
         bind:this={videoElement}
+        style={`object-position: ${50 + panX}% ${50 + panY}%; transform: scale(${zoom});`}
+        class:dragging={isDragging}
         autoplay
         playsinline
         muted
+        onpointerdown={startDrag}
+        onpointermove={handleDrag}
+        onpointerup={endDrag}
+        onpointercancel={endDrag}
     ></video>
+
+    <div class="top-fade" aria-hidden="true"></div>
 
     {#if cameras.length > 1}
         <select
@@ -120,6 +197,18 @@
             {/each}
         </select>
     {/if}
+
+    <input
+        class="zoom-slider"
+        type="range"
+        min={MIN_ZOOM}
+        max={MAX_ZOOM}
+        step="0.01"
+        value={zoom}
+        oninput={(e) => zoom = clamp(Number.parseFloat(e.target.value), MIN_ZOOM, MAX_ZOOM)}
+        aria-label="Zoom webcam"
+        title="Zoom"
+    />
 
     {#if error}
         <div class="message error">
@@ -145,6 +234,26 @@
         width: 100%;
         height: 100%;
         object-fit: cover;
+        transform-origin: center center;
+        cursor: grab;
+        touch-action: none;
+        user-select: none;
+        -webkit-user-drag: none;
+    }
+
+    video.dragging {
+        cursor: grabbing;
+    }
+
+    .top-fade {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 200px;
+        background: linear-gradient(to bottom, rgba(0, 0, 0, 0.95) 0%, rgba(0, 0, 0, 0) 100%);
+        pointer-events: none;
+        z-index: 2;
     }
 
     .camera-select {
@@ -152,18 +261,62 @@
         top: 12px;
         left: 12px;
         z-index: 10;
-        background: rgba(0, 0, 0, 0.2);
+        background-color: rgba(0, 0, 0, 0.2);
         color: #eee;
         backdrop-filter: blur(10px);
     }
 
     .camera-select:hover {
-        background: rgba(0, 0, 0, 0.5);
+        background-color: rgba(0, 0, 0, 0.5);
         color: #fff;
     }
 
     .camera-select:focus {
         outline: none;
+    }
+
+    .zoom-slider {
+        position: absolute;
+        top: 12px;
+        right: 12px;
+        z-index: 10;
+        width: 90px;
+        appearance: none;
+        -webkit-appearance: none;
+        height: 4px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.55);
+        filter: drop-shadow(0 0 8px rgba(0, 0, 0, 0.45));
+    }
+
+    .zoom-slider::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: #000;
+        border: 1px solid rgba(255, 255, 255, 0.7);
+    }
+
+    .zoom-slider::-moz-range-thumb {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: #000;
+        border: 1px solid rgba(255, 255, 255, 0.7);
+    }
+
+    .zoom-slider::-moz-range-track {
+        height: 4px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.55);
+    }
+
+    @media (max-width: 700px) {
+        .zoom-slider {
+            width: 84px;
+            right: 12px;
+        }
     }
 
     .message {
