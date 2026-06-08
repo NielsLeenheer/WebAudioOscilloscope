@@ -12,7 +12,28 @@ let settings = {
     renderFloorsCeilings: true,
     drawBorder: true,
     debugDisableDepthTest: false,  // When true, shows all edges without visibility testing
-    debugDisableBackfaceCull: false  // When true, skips back-face culling
+    debugDisableBackfaceCull: false,  // When true, skips back-face culling
+
+    // Depth-test tolerance: an edge sample is visible if its depth <=
+    // bufferDepth + depth*depthEpsilon + 1. Covers the small 1D-edge vs
+    // 2D-rasterised depth mismatch for coplanar surfaces. Too high and edges
+    // overshoot a few px past a corner before the occluder gets far enough in
+    // front; too low and near-coplanar edges get clipped. ~0.025 balances both.
+    depthEpsilon: 0.025,
+
+    // Drop interior visible runs shorter than this many samples (leak blips at
+    // occluder silhouettes). Runs that reach an edge endpoint are always kept.
+    minVisibleSamples: 3,
+
+    // Drop wall quads that sit at/below their own sector's floor or at/above
+    // its ceiling. Two-sided portals (steps, pillar risers, lifts) generate a
+    // quad for BOTH sidedefs; the higher sector's copy is an interior face
+    // buried in solid geometry — never a real visible surface. Back-face
+    // culling keeps whichever copy faces the camera, so on the *far* side of a
+    // riser it keeps the buried interior face, which then leaks short stubs
+    // through the depth buffer at shared corners. Culling these by sector
+    // height removes the leak at the source (and trims redundant geometry).
+    cullInteriorFaces: true
 };
 
 // Current depth buffer dimensions
@@ -41,6 +62,9 @@ const edgeX = new Float32Array(MAX_EDGES);
 const edgeDx = new Float32Array(MAX_EDGES);
 const edgeDepth = new Float32Array(MAX_EDGES);
 const edgeDDepth = new Float32Array(MAX_EDGES);
+
+// Reusable edge mask for back-facing wall silhouette extraction (4 quad edges)
+const backEdgeMask = [false, false, false, false];
 
 // Reusable result arrays (cleared each frame)
 let polygonPool = [];
@@ -165,6 +189,7 @@ export function renderScene3D(walls, camera, sectorPolygons = []) {
         // (unreliable normal/center when vertices are on both sides)
         const crossesNearPlane = !allInFront && !allBehind;
 
+        poly._backFacing = false;
         if (!crossesNearPlane && !settings.debugDisableBackfaceCull) {
             centerX /= vertCount;
             centerY /= vertCount;
@@ -188,7 +213,16 @@ export function renderScene3D(walls, camera, sectorPolygons = []) {
             }
 
             const dot = nx * (-centerX) + ny * (-centerY) + nz * (-centerZ);
-            if (dot <= 0) continue; // Back-facing
+            if (dot <= 0) {
+                // Back-facing. Floors/ceilings: cull outright (their hidden side
+                // is never a useful outline). Walls: keep, but only their
+                // silhouette horizontal edges are extracted later (eye-height
+                // rule) — a back wall's top is a visible outline when it's below
+                // eye level (you look down onto it) and its bottom when above.
+                // We don't rasterize it (it can't occlude anything in front).
+                if (poly.type !== 'wall') continue;
+                poly._backFacing = true;
+            }
         }
 
         // Clip to near plane and project
@@ -258,8 +292,12 @@ export function renderScene3D(walls, camera, sectorPolygons = []) {
 
         if (maxX < 0 || minX >= DEPTH_WIDTH || maxY < 0 || minY >= DEPTH_HEIGHT) continue;
 
-        // Rasterize to depth buffer
-        rasterizePolygonOptimized(screenVerts, screenCount, depthBuffer);
+        // Rasterize to depth buffer (back-facing walls are kept for silhouette
+        // edge extraction only — they must not write depth or they'd occlude the
+        // very front geometry that should hide them, and re-leak their own edges).
+        if (!poly._backFacing) {
+            rasterizePolygonOptimized(screenVerts, screenCount, depthBuffer);
+        }
 
         // Store for edge extraction
         poly._screenCount = screenCount;
@@ -272,11 +310,29 @@ export function renderScene3D(walls, camera, sectorPolygons = []) {
     }
     for (let p = 0; p < transformedPool.length; p++) {
         const poly = transformedPool[p];
-        // Skip edge extraction for floors/ceilings - they're only used for depth occlusion
-        // Their edges would incorrectly appear through floors above them due to depth-buffer limitations
+        // Floors/ceilings are rasterized for depth occlusion only — their edges
+        // are never drawn (they'd leak through floors above; room/platform
+        // outlines come from the walls' silhouette edges instead).
         if (poly.type === 'floor' || poly.type === 'ceiling') continue;
         debugCurrentPolyType = poly.type || 'unknown';
-        extractVisibleEdgesOptimized(poly._screenVerts, poly._screenCount, depthBuffer, visibleLinesPool);
+
+        if (poly._backFacing) {
+            // Back-facing wall: only its silhouette horizontal edges are real
+            // outlines, decided by eye height. A back wall never crosses the near
+            // plane (back-face test is skipped for those), so screenVerts are the
+            // 4 quad corners in order: 0-1 bottom, 1-2 / 3-0 vertical, 2-3 top.
+            if (poly._screenCount !== 4) continue;
+            const bottomZ = poly.vertices[0].z;
+            const topZ = poly.vertices[2].z;
+            backEdgeMask[0] = bottomZ >= camera.z;   // bottom edge: visible when above eye
+            backEdgeMask[1] = false;                 // vertical: interior to silhouette
+            backEdgeMask[2] = topZ <= camera.z;      // top edge: visible when below eye
+            backEdgeMask[3] = false;
+            if (!backEdgeMask[0] && !backEdgeMask[2]) continue;
+            extractVisibleEdgesOptimized(poly._screenVerts, poly._screenCount, depthBuffer, visibleLinesPool, backEdgeMask);
+        } else {
+            extractVisibleEdgesOptimized(poly._screenVerts, poly._screenCount, depthBuffer, visibleLinesPool, null);
+        }
     }
 
     // Add door chevron indicators
@@ -318,6 +374,23 @@ export function renderScene3D(walls, camera, sectorPolygons = []) {
     return visibleLinesPool;
 }
 
+// sectorIndex -> sector polygon (for floor/ceiling heights), cached against the
+// sectorPolygons array identity so it's rebuilt only when the map changes.
+let _sectorHeights = null;
+let _sectorHeightsSrc = null;
+function getSectorHeights(sectorPolygons) {
+    if (_sectorHeightsSrc === sectorPolygons) return _sectorHeights;
+    const m = new Map();
+    if (sectorPolygons) {
+        for (let i = 0; i < sectorPolygons.length; i++) {
+            m.set(sectorPolygons[i].sectorIndex, sectorPolygons[i]);
+        }
+    }
+    _sectorHeights = m;
+    _sectorHeightsSrc = sectorPolygons;
+    return m;
+}
+
 /**
  * Collect polygons with distance culling (optimized)
  */
@@ -326,6 +399,7 @@ function collectPolygonsOptimized(walls, sectorPolygons, camera, output, doorWal
     const camY = camera.y;
     const useDistanceCulling = settings.maxRenderDistance > 0;
     const maxDistSq = settings.maxRenderDistance * settings.maxRenderDistance;
+    const sectorHeights = settings.cullInteriorFaces ? getSectorHeights(sectorPolygons) : null;
 
     // Process walls
     for (let i = 0, len = walls.length; i < len; i++) {
@@ -337,6 +411,15 @@ function collectPolygonsOptimized(walls, sectorPolygons, camera, output, doorWal
             const dx = midX - camX;
             const dy = midY - camY;
             if (dx * dx + dy * dy > maxDistSq) continue;
+        }
+
+        // Skip interior faces: a quad buried at/below its sector's floor or
+        // at/above its ceiling is never a real visible surface (see
+        // settings.cullInteriorFaces). Removing it stops the far side of a
+        // two-sided riser from leaking stubs through the depth buffer.
+        if (sectorHeights) {
+            const s = sectorHeights.get(wall.sectorIndex);
+            if (s && (s.floorHeight >= wall.topHeight || s.ceilingHeight <= wall.bottomHeight)) continue;
         }
 
         // Track door walls for chevron rendering
@@ -524,6 +607,15 @@ let debugCurrentPolyType = '';
 let debugCameraInfo = null;
 
 /**
+ * Debug: the current frame's depth buffer (valid after renderScene3D). Returns
+ * the live Float32Array (depth = camera-space distance, Infinity where empty)
+ * plus its dimensions, for the overlay visualiser. Do not mutate.
+ */
+export function getDepthBuffer() {
+    return { buffer: depthBuffer, width: DEPTH_WIDTH, height: DEPTH_HEIGHT };
+}
+
+/**
  * Enable debug capture for next frame
  */
 export function triggerDebugCapture() {
@@ -601,8 +693,11 @@ function clipLineToScreen(x1, y1, x2, y2) {
 
 /**
  * Extract visible edges (optimized)
+ * @param {Array} [edgeMask] optional per-edge boolean array; when present, edge i
+ *   (verts[i]->verts[i+1]) is only processed if edgeMask[i] is truthy. Used to
+ *   extract just the silhouette horizontal edges of back-facing walls.
  */
-function extractVisibleEdgesOptimized(verts, vertCount, depthBuffer, output) {
+function extractVisibleEdgesOptimized(verts, vertCount, depthBuffer, output, edgeMask) {
     const invWidth = 2 / DEPTH_WIDTH;
     const invHeight = 2 / DEPTH_HEIGHT;
 
@@ -612,6 +707,7 @@ function extractVisibleEdgesOptimized(verts, vertCount, depthBuffer, output) {
         const MAX_DEBUG_EDGES = 2000;
         for (let i = 0; i < vertCount; i++) {
             if (output.length >= MAX_DEBUG_EDGES) return;
+            if (edgeMask && !edgeMask[i]) continue;
 
             const v1 = verts[i];
             const v2 = verts[(i + 1) % vertCount];
@@ -635,8 +731,16 @@ function extractVisibleEdgesOptimized(verts, vertCount, depthBuffer, output) {
     }
 
     for (let i = 0; i < vertCount; i++) {
-        const v1 = verts[i];
-        const v2 = verts[(i + 1) % vertCount];
+        if (edgeMask && !edgeMask[i]) continue;
+        let v1 = verts[i];
+        let v2 = verts[(i + 1) % vertCount];
+
+        // Orient far-vertex-first. A vertex clipped to the near plane has tiny
+        // depth and projects to a huge off-screen coordinate; processing it
+        // first makes screen-clipping + the 1/depth interpolation degenerate
+        // (the whole on-screen span collapses to ~nearPlane depth). Starting
+        // from the stable far vertex keeps per-sample depth correct.
+        if (v1.depth < v2.depth) { const tmp = v1; v1 = v2; v2 = tmp; }
 
         // Clip edge to screen bounds first
         const clipped = clipLineToScreen(v1.screenX, v1.screenY, v2.screenX, v2.screenY);
@@ -659,18 +763,12 @@ function extractVisibleEdgesOptimized(verts, vertCount, depthBuffer, output) {
         const clipDepth1 = 1 / clipW1;
         const clipDepth2 = 1 / clipW2;
 
-        // Detect edges with near-plane clipped vertices
-        const minDepth = Math.min(clipDepth1, clipDepth2);
-        const maxDepth = Math.max(clipDepth1, clipDepth2);
-
         // Skip "clipping cap" edges - both vertices at near plane means this edge
         // is an artifact of near-plane clipping, not real geometry
         const bothAtNearPlane = clipDepth1 < 1.0 && clipDepth2 < 1.0;
         if (bothAtNearPlane) continue;
 
-        const hasNearPlaneVertex = minDepth < 1.0;
-
-        const isCloseEdge = minDepth < 100;
+        const isCloseEdge = Math.min(clipDepth1, clipDepth2) < 100;
         const shouldDebugLog = debugCaptureEnabled && isCloseEdge;
 
         if (length < 1) {
@@ -716,15 +814,9 @@ function extractVisibleEdgesOptimized(verts, vertCount, depthBuffer, output) {
             const w = clipW1 + t * dW;
             const depth = 1 / w;
 
-            let visible;
-            if (hasNearPlaneVertex) {
-                // For edges with a near-plane clipped vertex, use the far vertex depth for visibility.
-                // The interpolated depth near the clipped end is an artifact (perspective-correct
-                // interpolation keeps it tiny), so we use maxDepth which represents the real geometry.
-                visible = isPointVisibleNearPlane(x, y, maxDepth, depthBuffer);
-            } else {
-                visible = isPointVisibleFast(x, y, depth, depthBuffer);
-            }
+            // Per-sample perspective-correct depth (stable now that edges are
+            // oriented far-vertex-first), tested against the depth buffer.
+            const visible = isPointVisibleFast(x, y, depth, depthBuffer);
             visibilityBuffer[s] = visible ? 1 : 0;
 
             // Collect debug data
@@ -825,6 +917,29 @@ function extractVisibleEdgesOptimized(verts, vertCount, depthBuffer, output) {
             }
         }
 
+        // Symmetric hysteresis: drop short *interior* visible runs (flanked by
+        // occlusion on both sides). Those are isolated leak blips — a few samples
+        // that pass the depth test at an occluder's silhouette while the rest of
+        // the edge is hidden. Genuine partial edges run out to an endpoint, so a
+        // run touching sample 0 or numSamples-1 is kept. minVisibleSamples sets
+        // the threshold (0/1 disables; the single-sample case above still runs).
+        const minVis = settings.minVisibleSamples | 0;
+        if (minVis > 1) {
+            let v = 0;
+            while (v < numSamples) {
+                if (smoothedBuffer[v]) {
+                    const runStart = v;
+                    while (v < numSamples && smoothedBuffer[v]) v++;
+                    const interior = runStart > 0 && v < numSamples;
+                    if (interior && v - runStart < minVis) {
+                        for (let j = runStart; j < v; j++) smoothedBuffer[j] = 0;
+                    }
+                } else {
+                    v++;
+                }
+            }
+        }
+
         // Extract segments
         let segStart = -1;
         for (let s = 0; s < numSamples; s++) {
@@ -852,120 +967,52 @@ function extractVisibleEdgesOptimized(verts, vertCount, depthBuffer, output) {
 }
 
 /**
- * Fast point visibility check (inlined math)
- * Checks for nearby occluders (narrow pillars etc) that might be missed by point sampling
+ * Point visibility check against the depth buffer.
+ *
+ * Visible iff the edge sample is at or in front of the rasterised surface at its
+ * position. The buffer is sampled *bilinearly*: at distance the depth gradient
+ * across a pixel is steep, so comparing an edge's exact sub-pixel position to a
+ * single rounded buffer cell made the 1D-edge vs 2D-rasterised depth mismatch
+ * oscillate around the threshold and break distant coplanar lines into dashes.
+ * Bilinear matches the surface depth at the exact position, so a tight epsilon
+ * holds without dashing. Cells with no geometry (Infinity) fall back to nearest.
+ * `epsilon` (settings.depthEpsilon) still covers residual coplanar mismatch; a
+ * genuine occluder sits far closer so it culls.
  */
 function isPointVisibleFast(x, y, depth, depthBuffer) {
     if (x < 0 || x >= DEPTH_WIDTH || y < 0 || y >= DEPTH_HEIGHT) return false;
 
-    const ix = (x + 0.5) | 0;
-    const iy = (y + 0.5) | 0;
-    const clampedX = ix < 0 ? 0 : (ix >= DEPTH_WIDTH ? DEPTH_WIDTH - 1 : ix);
-    const clampedY = iy < 0 ? 0 : (iy >= DEPTH_HEIGHT ? DEPTH_HEIGHT - 1 : iy);
+    // Bilinear sample of the buffer at the exact (x, y); pixel centres at integers.
+    let x0 = Math.floor(x), y0 = Math.floor(y);
+    const tx = x - x0, ty = y - y0;
+    if (x0 < 0) x0 = 0; else if (x0 > DEPTH_WIDTH - 2) x0 = DEPTH_WIDTH - 2;
+    if (y0 < 0) y0 = 0; else if (y0 > DEPTH_HEIGHT - 2) y0 = DEPTH_HEIGHT - 2;
+    const i00 = y0 * DEPTH_WIDTH + x0;
+    const d00 = depthBuffer[i00], d10 = depthBuffer[i00 + 1];
+    const d01 = depthBuffer[i00 + DEPTH_WIDTH], d11 = depthBuffer[i00 + DEPTH_WIDTH + 1];
 
-    const baseIdx = clampedY * DEPTH_WIDTH;
-    const bufferDepth = depthBuffer[baseIdx + clampedX];
+    let bufferDepth;
+    if (d00 === Infinity || d10 === Infinity || d01 === Infinity || d11 === Infinity) {
+        // Near a geometry silhouette — bilinear would blend in the empty cell.
+        // Fall back to the nearest cell.
+        const ix = (x + 0.5) | 0, iy = (y + 0.5) | 0;
+        const cx = ix < 0 ? 0 : (ix >= DEPTH_WIDTH ? DEPTH_WIDTH - 1 : ix);
+        const cy = iy < 0 ? 0 : (iy >= DEPTH_HEIGHT ? DEPTH_HEIGHT - 1 : iy);
+        bufferDepth = depthBuffer[cy * DEPTH_WIDTH + cx];
+    } else {
+        const a = d00 + (d10 - d00) * tx;
+        const b = d01 + (d11 - d01) * tx;
+        bufferDepth = a + (b - a) * ty;
+    }
 
-    // Epsilon for depth comparison - needs to handle:
-    // 1. Z-fighting at polygon boundaries
-    // 2. Interpolation mismatch between edge depth (1D) and buffer depth (2D rasterization)
-    // The 2D vs 1D interpolation can cause ~5-8% depth differences for the same surface
-    const epsilon = depth * 0.08 + 1.0;
-
-    // Near-plane clipping can create edges with interpolated depths very close to
-    // the near plane. Only reject samples extremely close to camera where artifacts occur.
-    // Threshold of 3.0 catches true near-plane clipping artifacts without rejecting
-    // legitimate close walls.
+    // Near-plane clipping artifact: an edge interpolated extremely close to the
+    // camera while the buffer is far behind — reject only right at the camera.
     if (depth < 3.0 && bufferDepth > depth * 5.0) {
-        return false; // Near-plane clipping artifact
-    }
-
-    // Threshold for detecting occluders - something significantly closer
-    const occluderThreshold = depth * 0.8;
-
-    // Check if there's an occluder at the exact pixel
-    if (bufferDepth < occluderThreshold) {
         return false;
     }
 
-    // Check a wider area for occluders (2 pixels each direction)
-    // This catches narrow pillars that point sampling might straddle
-    const searchRadius = 2;
-    const xMin = Math.max(0, clampedX - searchRadius);
-    const xMax = Math.min(DEPTH_WIDTH - 1, clampedX + searchRadius);
-
-    for (let sx = xMin; sx <= xMax; sx++) {
-        if (depthBuffer[baseIdx + sx] < occluderThreshold) {
-            return false; // Found an occluder nearby
-        }
-    }
-
-    // Check if point is in front of buffer (visible)
-    if (depth <= bufferDepth + epsilon) {
-        return true;
-    }
-
-    // If exact pixel fails, check immediate neighbors for polygon boundary seams
-    // (only if no occluder was found above)
-    if (clampedX > 0 && depth <= depthBuffer[baseIdx + clampedX - 1] + epsilon) return true;
-    if (clampedX < DEPTH_WIDTH - 1 && depth <= depthBuffer[baseIdx + clampedX + 1] + epsilon) return true;
-
-    return false;
-}
-
-/**
- * Visibility check for near-plane clipped edges
- * Uses the far vertex depth since interpolated depths near the clipped end are artifacts.
- *
- * The challenge: near the clipping boundary, walls and floors can overlap in screen space
- * at similar depths. But columns (walls) that are genuinely in front have much smaller depths.
- *
- * Strategy:
- * - Use farDepth for occluder threshold: columns at <50% of farDepth are definite occluders
- * - Use generous epsilon for visibility: floor/ceiling depths similar to farDepth should pass
- */
-function isPointVisibleNearPlane(x, y, farDepth, depthBuffer) {
-    if (x < 0 || x >= DEPTH_WIDTH || y < 0 || y >= DEPTH_HEIGHT) return false;
-
-    const ix = (x + 0.5) | 0;
-    const iy = (y + 0.5) | 0;
-    const clampedX = ix < 0 ? 0 : (ix >= DEPTH_WIDTH ? DEPTH_WIDTH - 1 : ix);
-    const clampedY = iy < 0 ? 0 : (iy >= DEPTH_HEIGHT ? DEPTH_HEIGHT - 1 : iy);
-
-    const baseIdx = clampedY * DEPTH_WIDTH;
-    const bufferDepth = depthBuffer[baseIdx + clampedX];
-
-    // Occluder threshold: if something is at less than 50% of farDepth, it's a column/wall in front
-    const occluderThreshold = farDepth * 0.5;
-
-    // Check for definite occluders (columns, walls clearly in front)
-    if (bufferDepth < occluderThreshold) {
-        return false;
-    }
-
-    // Also check nearby pixels for occluders (catch narrow columns)
-    const searchRadius = 2;
-    const xMin = Math.max(0, clampedX - searchRadius);
-    const xMax = Math.min(DEPTH_WIDTH - 1, clampedX + searchRadius);
-    for (let sx = xMin; sx <= xMax; sx++) {
-        if (depthBuffer[baseIdx + sx] < occluderThreshold) {
-            return false;
-        }
-    }
-
-    // Generous epsilon for floor/ceiling overlap at frustum boundary
-    // Floors at 50-80% of farDepth should not occlude the wall edge
-    const epsilon = farDepth * 0.4 + 2.0;
-
-    if (farDepth <= bufferDepth + epsilon) {
-        return true;
-    }
-
-    // Check immediate neighbors for polygon boundary seams
-    if (clampedX > 0 && farDepth <= depthBuffer[baseIdx + clampedX - 1] + epsilon) return true;
-    if (clampedX < DEPTH_WIDTH - 1 && farDepth <= depthBuffer[baseIdx + clampedX + 1] + epsilon) return true;
-
-    return false;
+    const epsilon = depth * settings.depthEpsilon + 1.0;
+    return depth <= bufferDepth + epsilon;
 }
 
 /**
@@ -1229,5 +1276,265 @@ export function optimizeLineOrder(lines) {
         }
     }
 
+    return result;
+}
+
+/**
+ * Drop segments shorter than `minLength` (screen-space, NDC). Run before snap so
+ * tiny distant slivers / leftover stubs never feed into snap or merge (where
+ * they could anchor or extend a neighbour). Endpoint depth tags are preserved.
+ *
+ * @param {Array<{start:[number,number], end:[number,number]}>} lines
+ * @param {number} minLength  Minimum segment length in NDC to keep.
+ */
+export function dropSmallLines(lines, minLength = 0.01) {
+    if (!(minLength > 0)) return lines.slice();
+    const min2 = minLength * minLength;
+    const result = [];
+    for (let i = 0, len = lines.length; i < len; i++) {
+        const l = lines[i];
+        const dx = l.end[0] - l.start[0], dy = l.end[1] - l.start[1];
+        if (dx * dx + dy * dy >= min2) result.push(l);
+    }
+    return result;
+}
+
+/**
+ * Snap line endpoints to a uniform grid, then drop degenerate and duplicate
+ * segments (screen-space, NDC). Unlike mergeCollinearLines this never moves a
+ * line onto another line's axis, so shared endpoints stay shared (junctions
+ * remain connected) and nothing shifts into/out of occlusion. Two effects:
+ *   - near-coincident segments (stacked corner edges, two-sided coincident
+ *     walls) snap identical and dedup to one;
+ *   - any segment shorter than a grid cell collapses to a point and is dropped,
+ *     which clears sub-grid leak stubs.
+ * Endpoints are quantised to integer grid cells so the dedup key is exact.
+ *
+ * @param {Array<{start:[number,number], end:[number,number]}>} lines
+ * @param {number} gridSize  Grid cell size in NDC (e.g. 0.01 ≈ a 200×200 grid).
+ */
+export function snapLinesToGrid(lines, gridSize = 0.01) {
+    if (!(gridSize > 0)) return lines.slice();
+    const inv = 1 / gridSize;
+    const seen = new Set();
+    const result = [];
+    for (let i = 0, len = lines.length; i < len; i++) {
+        const ln = lines[i];
+        const ix1 = Math.round(ln.start[0] * inv), iy1 = Math.round(ln.start[1] * inv);
+        const ix2 = Math.round(ln.end[0] * inv), iy2 = Math.round(ln.end[1] * inv);
+        if (ix1 === ix2 && iy1 === iy2) continue; // collapsed to a point
+        const swap = ix1 > ix2 || (ix1 === ix2 && iy1 > iy2);
+        const key = swap ? `${ix2},${iy2},${ix1},${iy1}` : `${ix1},${iy1},${ix2},${iy2}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        result.push({ start: [ix1 * gridSize, iy1 * gridSize], end: [ix2 * gridSize, iy2 * gridSize] });
+    }
+    return result;
+}
+
+/**
+ * Merge collinear / overlapping line segments (screen-space, NDC).
+ *
+ * The scene emits one quad per wall, so the same screen line is drawn many
+ * times: vertical edges stack 3-4 deep where walls share a corner (same
+ * column, different heights), and a long wall split into linedefs becomes a
+ * run of short collinear segments. Exact-endpoint dedup misses all of these
+ * because the endpoints differ. This pass instead groups segments that lie on
+ * the same *infinite line* (within an angle + perpendicular-distance
+ * tolerance) and merges those whose 1D projections overlap or sit within a
+ * small gap — collapsing the stacks and joining the runs into single strokes.
+ * Far-apart collinear segments separated by more than `gapTol` (e.g. a wall
+ * occluded by a pillar) stay split, so we don't bridge across occluders.
+ *
+ * Output segments lie on the group's *reference* line — the longest member,
+ * whose direction is the most reliable (most pixels, least angular quantisation)
+ * and which usually sits nearest the camera. Shorter members only extend the
+ * run; they don't pull the angle, so merged strokes don't wiggle frame to frame
+ * the way chaining mismatched endpoints did. Pure function on 2D line segments —
+ * directly portable to the WebAudioOscilloscope renderer.
+ *
+ * @param {Array<{start:[number,number], end:[number,number]}>} lines
+ * @param {object} [options]
+ * @param {number} [options.angleTol=0.035]  Max orientation difference (radians) to treat as one line.
+ * @param {number} [options.offsetTol=0.012] Max perpendicular distance (NDC) to treat as the same line.
+ * @param {number} [options.gapTol=0.02]     Max along-line gap (NDC) still bridged when merging.
+ */
+export function mergeCollinearLines(lines, options = {}) {
+    const angleTol = options.angleTol ?? 0.035;
+    const offsetTol = options.offsetTol ?? 0.012;
+    const gapTol = options.gapTol ?? 0.02;
+
+    const count = lines.length;
+    if (count < 2) return lines.slice();
+
+    const sinTol = Math.sin(angleTol);
+    // Angle buckets across the undirected range [0, PI). Used only to prune
+    // candidates; the cross-product test below is the source of truth, so a
+    // missed bucket only risks leaving a duplicate, never a wrong merge.
+    const N = Math.max(1, Math.round(Math.PI / angleTol));
+    const dA = Math.PI / N;
+
+    // bucketIndex -> array of groups. A group is one infinite line plus the
+    // member segments assigned to it.
+    const buckets = new Map();
+
+    for (let i = 0; i < count; i++) {
+        const ln = lines[i];
+        const sx = ln.start[0], sy = ln.start[1];
+        const ex = ln.end[0], ey = ln.end[1];
+        let dx = ex - sx, dy = ey - sy;
+        const len = Math.sqrt(dx * dx + dy * dy);
+        if (len < 1e-9) continue; // degenerate point — drop
+        dx /= len; dy /= len;
+
+        // Undirected orientation in [0, PI). atan2 ∈ (-PI, PI]; fold to [0, PI).
+        let a = Math.atan2(dy, dx);
+        if (a < 0) a += Math.PI;
+        if (a >= Math.PI) a -= Math.PI;
+        const ab = Math.round(a / dA) % N;
+
+        // Look for an existing collinear group in this and the two modular-
+        // adjacent buckets (covers the 0≡PI wrap for near-horizontal lines).
+        let target = null;
+        for (let k = -1; k <= 1 && !target; k++) {
+            const nb = ((ab + k) % N + N) % N;
+            const arr = buckets.get(nb);
+            if (!arr) continue;
+            for (let g = 0; g < arr.length; g++) {
+                const grp = arr[g];
+                // Parallel? cross of unit dirs ≈ sin(angle between); sign-
+                // agnostic so near-antiparallel (wrap) directions also pass.
+                const cross = grp.dx * dy - grp.dy * dx;
+                if (cross > sinTol || cross < -sinTol) continue;
+                // Same line? perpendicular distance of this start to the group
+                // line (through grp.px,py with normal (-grp.dy, grp.dx)).
+                const perp = (sx - grp.px) * -grp.dy + (sy - grp.py) * grp.dx;
+                if (perp > offsetTol || perp < -offsetTol) continue;
+                target = grp;
+                break;
+            }
+        }
+
+        if (!target) {
+            target = { dx, dy, px: sx, py: sy, segs: [] };
+            let arr = buckets.get(ab);
+            if (!arr) { arr = []; buckets.set(ab, arr); }
+            arr.push(target);
+        }
+
+        target.segs.push({ sx, sy, ex, ey, len });
+    }
+
+    // Emit one or more segments per group, all lying on the reference line.
+    const result = [];
+    const parts = []; // scratch interval list, reused per group
+    for (const arr of buckets.values()) {
+        for (let g = 0; g < arr.length; g++) {
+            const segs = arr[g].segs;
+            if (segs.length === 1) {
+                const s = segs[0];
+                result.push({ start: [s.sx, s.sy], end: [s.ex, s.ey] });
+                continue;
+            }
+
+            // Reference = longest member; it sets the line's angle and position.
+            let ref = segs[0];
+            for (let s = 1; s < segs.length; s++) if (segs[s].len > ref.len) ref = segs[s];
+            const invLen = 1 / ref.len;
+            const rdx = (ref.ex - ref.sx) * invLen;
+            const rdy = (ref.ey - ref.sy) * invLen;
+            const rpx = ref.sx, rpy = ref.sy;
+
+            // Project every endpoint onto the reference line → 1D intervals.
+            parts.length = 0;
+            for (let s = 0; s < segs.length; s++) {
+                const seg = segs[s];
+                const t1 = (seg.sx - rpx) * rdx + (seg.sy - rpy) * rdy;
+                const t2 = (seg.ex - rpx) * rdx + (seg.ey - rpy) * rdy;
+                parts.push(t1 <= t2 ? t1 : t2, t1 <= t2 ? t2 : t1);
+            }
+            // Sort intervals by lo (pairs in parts: [lo,hi, lo,hi, ...]).
+            const pairs = [];
+            for (let p = 0; p < parts.length; p += 2) pairs.push([parts[p], parts[p + 1]]);
+            pairs.sort((p, q) => p[0] - q[0]);
+
+            let lo = pairs[0][0], hi = pairs[0][1];
+            for (let p = 1; p < pairs.length; p++) {
+                if (pairs[p][0] <= hi + gapTol) {
+                    if (pairs[p][1] > hi) hi = pairs[p][1];
+                } else {
+                    result.push({ start: [rpx + lo * rdx, rpy + lo * rdy], end: [rpx + hi * rdx, rpy + hi * rdy] });
+                    lo = pairs[p][0]; hi = pairs[p][1];
+                }
+            }
+            result.push({ start: [rpx + lo * rdx, rpy + lo * rdy], end: [rpx + hi * rdx, rpy + hi * rdy] });
+        }
+    }
+
+    return result;
+}
+
+/**
+ * Drop near-parallel duplicate lines (screen-space, NDC). When a shorter line
+ * runs nearly parallel to a longer one, within `perpTol` perpendicular distance,
+ * and is mostly overlapped by it, the shorter is dropped — the longer is left
+ * exactly in place (no moving, so no jitter). The perpendicular test is in
+ * screen space, so it's naturally distance-dependent: the front/back edges of a
+ * recessed opening (window/door frame) sit far apart on screen up close (both
+ * kept) and collapse onto each other in the distance (one dropped), thinning
+ * far-away clutter without touching near detail.
+ *
+ * @param {Array<{start:[number,number], end:[number,number]}>} lines
+ * @param {object} [options]
+ * @param {number} [options.angleTol=0.06]    Max orientation difference (radians) to treat as parallel.
+ * @param {number} [options.perpTol=0.02]     Max perpendicular distance (NDC) to drop a duplicate.
+ * @param {number} [options.overlapFrac=0.5]  Min fraction of the shorter line overlapped by the longer.
+ */
+export function dropParallelDuplicates(lines, options = {}) {
+    const angleTol = options.angleTol ?? 0.06;
+    const perpTol = options.perpTol ?? 0.02;
+    const overlapFrac = options.overlapFrac ?? 0.5;
+    const n = lines.length;
+    if (n < 2) return lines.slice();
+
+    const sinTol = Math.sin(angleTol);
+    const dirX = new Float64Array(n), dirY = new Float64Array(n), len = new Float64Array(n);
+    for (let i = 0; i < n; i++) {
+        const ln = lines[i];
+        let dx = ln.end[0] - ln.start[0], dy = ln.end[1] - ln.start[1];
+        const l = Math.sqrt(dx * dx + dy * dy) || 1e-9;
+        dirX[i] = dx / l; dirY[i] = dy / l; len[i] = l;
+    }
+    // Process longest first so shorter near-parallel neighbours are dropped onto it.
+    const order = Array.from({ length: n }, (_, i) => i).sort((a, b) => len[b] - len[a]);
+    const dropped = new Uint8Array(n);
+
+    for (let oi = 0; oi < n; oi++) {
+        const i = order[oi];
+        if (dropped[i]) continue;
+        const A = lines[i], ax = dirX[i], ay = dirY[i];
+        const aT1 = A.start[0] * ax + A.start[1] * ay, aT2 = A.end[0] * ax + A.end[1] * ay;
+        const aLo = Math.min(aT1, aT2), aHi = Math.max(aT1, aT2);
+        for (let oj = oi + 1; oj < n; oj++) {
+            const j = order[oj];
+            if (dropped[j]) continue;
+            // Parallel?
+            const cross = ax * dirY[j] - ay * dirX[j];
+            if (cross > sinTol || cross < -sinTol) continue;
+            // Perpendicular distance of j's midpoint to i's infinite line.
+            const B = lines[j];
+            const mx = (B.start[0] + B.end[0]) * 0.5, my = (B.start[1] + B.end[1]) * 0.5;
+            const perp = (mx - A.start[0]) * -ay + (my - A.start[1]) * ax;
+            if (perp > perpTol || perp < -perpTol) continue;
+            // Mostly overlapped (projected onto i's direction)?
+            const bT1 = B.start[0] * ax + B.start[1] * ay, bT2 = B.end[0] * ax + B.end[1] * ay;
+            const bLo = Math.min(bT1, bT2), bHi = Math.max(bT1, bT2);
+            const ov = Math.min(aHi, bHi) - Math.max(aLo, bLo);
+            if (ov > 0 && ov >= overlapFrac * (bHi - bLo)) dropped[j] = 1;
+        }
+    }
+
+    const result = [];
+    for (let i = 0; i < n; i++) if (!dropped[i]) result.push(lines[i]);
     return result;
 }

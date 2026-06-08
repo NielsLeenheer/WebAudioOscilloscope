@@ -253,6 +253,9 @@
     let debugDisableDedupe = $state(false);
     let debugDisableOptimize = $state(false);
     let dedupeThreshold = $state(25);  // 25 = 0.040 unit tolerance
+    // Multi-pass line-reduction pipeline (snap/merge/dropParallel). When on it
+    // supersedes the legacy dedupe; turn off to A/B the old behavior on the laser.
+    let lineReductionEnabled = $state(true);
 
     function updateRendererSettings() {
         if (doomRenderer && doomRenderer.setRendererSettings) {
@@ -296,7 +299,8 @@
             doomRenderer.setOptions({
                 deduplicateLines: !debugDisableDedupe,
                 optimizeOrder: !debugDisableOptimize,
-                dedupeThreshold
+                dedupeThreshold,
+                lineReduction: { enabled: lineReductionEnabled }
             });
         }
     });
@@ -397,23 +401,30 @@
                     <span class="hint">Steps up/down</span>
                 </label>
                 <label class="checkbox-row">
-                    <input type="checkbox" bind:checked={debugDisableDedupe} />
-                    <span>Disable line deduplication</span>
-                    <span class="hint">Show duplicate edges</span>
+                    <input type="checkbox" bind:checked={lineReductionEnabled} />
+                    <span>Line reduction pipeline</span>
+                    <span class="hint">snap + merge + drop parallel</span>
                 </label>
-                {#if !debugDisableDedupe}
-                    <div class="slider-row">
-                        <span class="slider-label">Dedupe threshold</span>
-                        <input
-                            type="range"
-                            min="1"
-                            max="1000"
-                            step="1"
-                            bind:value={dedupeThreshold}
-                        />
-                        <span class="slider-value">{(1 / dedupeThreshold).toFixed(3)}</span>
-                        <span class="hint">Tolerance (lower = stricter)</span>
-                    </div>
+                {#if !lineReductionEnabled}
+                    <label class="checkbox-row">
+                        <input type="checkbox" bind:checked={debugDisableDedupe} />
+                        <span>Disable line deduplication</span>
+                        <span class="hint">Legacy dedupe fallback</span>
+                    </label>
+                    {#if !debugDisableDedupe}
+                        <div class="slider-row">
+                            <span class="slider-label">Dedupe threshold</span>
+                            <input
+                                type="range"
+                                min="1"
+                                max="1000"
+                                step="1"
+                                bind:value={dedupeThreshold}
+                            />
+                            <span class="slider-value">{(1 / dedupeThreshold).toFixed(3)}</span>
+                            <span class="hint">Tolerance (lower = stricter)</span>
+                        </div>
+                    {/if}
                 {/if}
                 <label class="checkbox-row">
                     <input type="checkbox" bind:checked={debugDisableOptimize} />

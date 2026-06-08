@@ -63,6 +63,18 @@ export async function createDoomRenderer(mapName = 'E1M1') {
     let optimizeOrder = true;
     let deduplicateLines = true;
     let dedupeThreshold = 25;  // Rounding factor for deduplication (25 = 0.040 tolerance)
+    // Multi-pass line-reduction pipeline (ported from cssDOOM). When enabled it
+    // replaces the legacy deduplicateLines pass in the worker. See doom-worker.js.
+    let lineReduction = {
+        enabled: true,
+        dropSmall: true,
+        snap: true,
+        merge: true,
+        dropParallel: true,
+        gridSize: 0.005,
+        dropPerpTol: 0.02,
+        minLineLength: 0.03
+    };
 
     // Worker state
     let worker = null;
@@ -86,7 +98,7 @@ export async function createDoomRenderer(mapName = 'E1M1') {
                 // Send initial settings
                 worker.postMessage({
                     type: 'setSettings',
-                    payload: { pointDensity, optimizeOrder, deduplicateLines, dedupeThreshold }
+                    payload: { pointDensity, optimizeOrder, deduplicateLines, dedupeThreshold, lineReduction }
                 });
                 // Send initial map data
                 sendMapToWorker();
@@ -279,6 +291,17 @@ export async function createDoomRenderer(mapName = 'E1M1') {
                     worker.postMessage({
                         type: 'setSettings',
                         payload: { dedupeThreshold }
+                    });
+                }
+            }
+            if (options.lineReduction !== undefined) {
+                // Partial-merge so callers can toggle a single pass without
+                // resending the whole config.
+                Object.assign(lineReduction, options.lineReduction);
+                if (worker && workerReady) {
+                    worker.postMessage({
+                        type: 'setSettings',
+                        payload: { lineReduction: options.lineReduction }
                     });
                 }
             }
