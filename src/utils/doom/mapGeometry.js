@@ -3,6 +3,10 @@
  * Converts raw WAD data into renderable wall segments
  */
 
+// Sector ceiling flat that marks open sky. Upper walls bordering a sky ceiling
+// are not drawn (the original "sky" special texture).
+const SKY_FLAT = 'F_SKY1';
+
 /**
  * Process map data into wall segments
  * @param {Array} vertices - Parsed vertices
@@ -120,32 +124,43 @@ export function processMap(vertices, linedefs, sidedefs, sectors, things) {
             const lowerCeiling = Math.min(frontSector.ceilingHeight, backSector.ceilingHeight);
             const upperCeiling = Math.max(frontSector.ceilingHeight, backSector.ceilingHeight);
             if (upperCeiling > lowerCeiling) {
-                // Create wall facing front sector
-                walls.push({
-                    start: { x: start.x, y: start.y },
-                    end: { x: end.x, y: end.y },
-                    bottomHeight: lowerCeiling,
-                    topHeight: upperCeiling,
-                    isSolid: false,
-                    isDoor,
-                    isUpperWall: true,
-                    behindFloorHeight: backSector.floorHeight,
-                    behindCeilingHeight: backSector.ceilingHeight,
-                    linedefIndex: i
-                });
-                // Create wall facing back sector (reversed vertices)
-                walls.push({
-                    start: { x: end.x, y: end.y },
-                    end: { x: start.x, y: start.y },
-                    bottomHeight: lowerCeiling,
-                    topHeight: upperCeiling,
-                    isSolid: false,
-                    isDoor,
-                    isUpperWall: true,
-                    behindFloorHeight: frontSector.floorHeight,
-                    behindCeilingHeight: frontSector.ceilingHeight,
-                    linedefIndex: i
-                });
+                // Sky rule (matches the original game): when the sector behind an
+                // upper-wall face has a sky ceiling, there is no solid surface
+                // there - you look out at open sky - so that face is not drawn.
+                // Sky-to-sky skips both faces, letting outdoor areas at different
+                // sky heights connect seamlessly instead of showing a phantom band.
+                const frontSky = frontSector.ceilingTexture === SKY_FLAT;
+                const backSky = backSector.ceilingTexture === SKY_FLAT;
+                // Create wall facing front sector (behind = back sector)
+                if (!backSky) {
+                    walls.push({
+                        start: { x: start.x, y: start.y },
+                        end: { x: end.x, y: end.y },
+                        bottomHeight: lowerCeiling,
+                        topHeight: upperCeiling,
+                        isSolid: false,
+                        isDoor,
+                        isUpperWall: true,
+                        behindFloorHeight: backSector.floorHeight,
+                        behindCeilingHeight: backSector.ceilingHeight,
+                        linedefIndex: i
+                    });
+                }
+                // Create wall facing back sector (behind = front sector, reversed)
+                if (!frontSky) {
+                    walls.push({
+                        start: { x: end.x, y: end.y },
+                        end: { x: start.x, y: start.y },
+                        bottomHeight: lowerCeiling,
+                        topHeight: upperCeiling,
+                        isSolid: false,
+                        isDoor,
+                        isUpperWall: true,
+                        behindFloorHeight: frontSector.floorHeight,
+                        behindCeilingHeight: frontSector.ceilingHeight,
+                        linedefIndex: i
+                    });
+                }
             }
         }
     }
