@@ -40,6 +40,13 @@ let settings = {
 let DEPTH_WIDTH = 640;
 let DEPTH_HEIGHT = 400;
 
+// Projection aspect (horizontal-scale / vertical-scale). The laser output is a
+// square 1:1 field, so we project with aspect 1 to keep world geometry
+// undistorted: horizontal and vertical share the camera FOV. Tying this to the
+// non-square depth-buffer dims (640x400 = 1.6) stretched everything vertically;
+// aspect 1 instead shows a wider vertical view (90deg V to match 90deg H).
+const PROJECTION_ASPECT = 1.0;
+
 // Reusable buffers
 let depthBuffer = null;
 let lastDepthSize = 0;
@@ -119,7 +126,7 @@ export function renderScene3D(walls, camera, sectorPolygons = []) {
     const cos = Math.cos(-camera.angle);
     const sin = Math.sin(-camera.angle);
     const fovScale = Math.tan(camera.fov / 2);
-    const aspect = DEPTH_WIDTH / DEPTH_HEIGHT;
+    const aspect = PROJECTION_ASPECT;
     const nearPlane = camera.nearPlane;
     const camX = camera.x;
     const camY = camera.y;
@@ -1023,7 +1030,7 @@ function addDoorChevrons(doorWalls, camera, depthBuffer, output) {
     const cos = Math.cos(-camera.angle);
     const sin = Math.sin(-camera.angle);
     const fovScale = Math.tan(camera.fov / 2);
-    const aspect = DEPTH_WIDTH / DEPTH_HEIGHT;
+    const aspect = PROJECTION_ASPECT;
     const nearPlane = camera.nearPlane;
     const invWidth = 2 / DEPTH_WIDTH;
     const invHeight = 2 / DEPTH_HEIGHT;

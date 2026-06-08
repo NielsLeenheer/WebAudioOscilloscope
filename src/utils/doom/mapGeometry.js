@@ -357,7 +357,10 @@ function findPlayerStart(things) {
         return {
             x: playerThing.x,
             y: playerThing.y,
-            angle: playerThing.angle * Math.PI / 180  // Convert to radians
+            // DOOM thing angle 0 faces East (+X); our camera faces +Y at angle 0
+            // (facing = -sin, cos). Subtract 90deg so the spawn orientation
+            // matches the original game (a 90deg clockwise turn in our camera).
+            angle: playerThing.angle * Math.PI / 180 - Math.PI / 2  // Convert to radians, DOOM->camera convention
         };
     }
 
