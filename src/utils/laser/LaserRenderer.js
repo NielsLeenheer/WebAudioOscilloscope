@@ -748,6 +748,13 @@ export class LaserRenderer {
         }
         this._readyWarned = false;
 
+        // Remember the most recent frame. Generator sources emit a frame only
+        // when it changes, so a static image (e.g. the idle Dino, a still SVG)
+        // is sent just once. If the DAC happens to be busy at that moment we'd
+        // otherwise drop it and never show it; instead we retry the retained
+        // frame below until it lands.
+        this._latestParams = params;
+
         const { points, speeds, velocityDimming, basePower } = params;
 
         // Empty input (e.g. all SVG elements off-screen or hidden): park the
@@ -774,6 +781,10 @@ export class LaserRenderer {
             if (status !== 1) { // HELIOS_SUCCESS = 1 means ready
                 this.framesSkippedThisSecond++;
                 this.isSending = false;  // IMPORTANT: reset flag on early return
+                // DAC is mid-playback. Don't drop the frame — retry shortly with
+                // whatever the latest frame is by then. Continuous sources just
+                // overwrite _latestParams; one-shot frames get another chance.
+                this._scheduleResend();
                 return;
             }
 
@@ -845,7 +856,12 @@ export class LaserRenderer {
             // A real frame is now on the DAC, so the next empty frame should
             // clear it again immediately rather than waiting for the keepalive.
             this._sentBlank = false;
-            
+            // Frame landed — cancel any pending retry.
+            if (this._resendTimer) {
+                clearTimeout(this._resendTimer);
+                this._resendTimer = null;
+            }
+
             // Log stats every second
             if (now - this.lastStatsTime > 1000) {
                 console.log(`[Laser] FPS: ${this.framesSentThisSecond}, skipped: ${this.framesSkippedThisSecond}, points: ${finalPoints.length}`);
@@ -859,6 +875,23 @@ export class LaserRenderer {
         } finally {
             this.isSending = false;
         }
+    }
+
+    /**
+     * Schedule a short retry of the most recent frame. Used when the DAC was
+     * busy: a single pending retry re-sends `_latestParams` once the device is
+     * free, so one-shot frames (static generator images) aren't lost. Continuous
+     * sources overwrite `_latestParams` in the meantime, so the retry always
+     * targets the freshest frame.
+     */
+    _scheduleResend() {
+        if (this._resendTimer) return;
+        this._resendTimer = setTimeout(() => {
+            this._resendTimer = null;
+            if (this.isReady() && !this.isSending && this._latestParams) {
+                this.renderTrace(this._latestParams);
+            }
+        }, 20);
     }
 
     /**
