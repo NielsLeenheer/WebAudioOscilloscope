@@ -66,6 +66,12 @@
     let blankingPoints = $state(15);
     let blankingDwell = $state(5);
     let cornerDwell = $state(3);
+    let anchorDwell = $state(2);
+    let cornerMode = $state('binary');     // 'off' | 'binary' | 'weighted'
+    let velocityCap = $state(false);
+    let maxStepDac = $state(400);
+    let cornerBias = $state(3);
+    let cornerSharpness = $state(1);
 
     // Calibration: intuitive parameters (center = no transform)
     let calRotate = $state(0);      // degrees, center=0
@@ -214,6 +220,7 @@
                 pps, targetFps, intensity, colorR, colorG, colorB,
                 invertX, invertY, swapXY,
                 blankingPoints, blankingDwell, cornerDwell,
+                anchorDwell, cornerMode, velocityCap, maxStepDac, cornerBias, cornerSharpness,
                 calRotate, calScale, calTopBottom, calLeftRight,
                 pincushionH, pincushionV,
                 offsetX, offsetY,
@@ -238,6 +245,12 @@
             blankingPoints = saved.blankingPoints ?? blankingPoints;
             blankingDwell = saved.blankingDwell ?? blankingDwell;
             cornerDwell = saved.cornerDwell ?? cornerDwell;
+            anchorDwell = saved.anchorDwell ?? anchorDwell;
+            cornerMode = saved.cornerMode ?? cornerMode;
+            velocityCap = saved.velocityCap ?? velocityCap;
+            maxStepDac = saved.maxStepDac ?? maxStepDac;
+            cornerBias = saved.cornerBias ?? cornerBias;
+            cornerSharpness = saved.cornerSharpness ?? cornerSharpness;
             calRotate = saved.calRotate ?? calRotate;
             calScale = saved.calScale ?? calScale;
             calTopBottom = saved.calTopBottom ?? calTopBottom;
@@ -278,6 +291,12 @@
                     blankingPoints = s.blankingPoints;
                     blankingDwell = s.blankingDwell;
                     cornerDwell = s.cornerDwell;
+                    anchorDwell = s.anchorDwell ?? anchorDwell;
+                    cornerMode = s.cornerMode ?? cornerMode;
+                    velocityCap = s.velocityCap ?? velocityCap;
+                    maxStepDac = s.maxStepDac ?? maxStepDac;
+                    cornerBias = s.cornerBias ?? cornerBias;
+                    cornerSharpness = s.cornerSharpness ?? cornerSharpness;
                     pincushionH = s.pincushionH || 0;
                     pincushionV = s.pincushionV || 0;
                     offsetX = s.offsetX || 0;
@@ -299,7 +318,8 @@
             pps, targetFps, intensity,
             color: { r: colorR, g: colorG, b: colorB },
             invertX, invertY, swapXY, safetyBorder, pincushionH, pincushionV, offsetX, offsetY,
-            blankingPoints, blankingDwell, cornerDwell
+            blankingPoints, blankingDwell, cornerDwell,
+            anchorDwell, cornerMode, velocityCap, maxStepDac, cornerBias, cornerSharpness
         });
         saveToStorage();
     }
@@ -530,6 +550,59 @@
                 <label class="checkbox"><input type="checkbox" bind:checked={swapXY} onchange={applySettings} /> Swap</label>
             </div>
         </div>
+        {/if}
+
+        <div class="mode-separator"></div>
+
+        <ToggleSwitch checked={showSection === 'galvo'} label="Galvo" onchange={() => toggleSection('galvo')} />
+
+        {#if showSection === 'galvo'}
+        <div class="slider-control mode-control">
+            <label>Corners</label>
+            <div class="mode-selector">
+                <button class="channel-btn" class:active={cornerMode === 'off'} onclick={() => { cornerMode = 'off'; applySettings(); }}>OFF</button>
+                <button class="channel-btn" class:active={cornerMode === 'binary'} onclick={() => { cornerMode = 'binary'; applySettings(); }}>BIN</button>
+                <button class="channel-btn" class:active={cornerMode === 'weighted'} onclick={() => { cornerMode = 'weighted'; applySettings(); }}>WGHT</button>
+            </div>
+        </div>
+
+        <div class="slider-control">
+            <label class="clickable" onclick={() => { cornerDwell = 3; applySettings(); }}>Corner dwell</label>
+            <input type="range" min="0" max="10" step="1" bind:value={cornerDwell} oninput={applySettings} />
+            <span class="value">{cornerDwell}</span>
+        </div>
+
+        <div class="slider-control">
+            <label class="clickable" onclick={() => { anchorDwell = 2; applySettings(); }}>Anchor dwell</label>
+            <input type="range" min="0" max="10" step="1" bind:value={anchorDwell} oninput={applySettings} />
+            <span class="value">{anchorDwell}</span>
+        </div>
+
+        <div class="slider-control">
+            <label class="clickable" onclick={() => { cornerBias = 3; applySettings(); }}>Corner bias</label>
+            <input type="range" min="0" max="10" step="0.5" bind:value={cornerBias} oninput={applySettings} />
+            <span class="value">{cornerBias}</span>
+        </div>
+
+        <div class="slider-control">
+            <label class="clickable" onclick={() => { cornerSharpness = 1; applySettings(); }}>Sharpness</label>
+            <input type="range" min="1" max="4" step="0.5" bind:value={cornerSharpness} oninput={applySettings} />
+            <span class="value">{cornerSharpness}</span>
+        </div>
+
+        <div class="slider-control flip-control">
+            <div class="flip-options">
+                <label class="checkbox"><input type="checkbox" bind:checked={velocityCap} onchange={applySettings} /> Velocity cap</label>
+            </div>
+        </div>
+
+        {#if velocityCap}
+        <div class="slider-control">
+            <label class="clickable" onclick={() => { maxStepDac = 400; applySettings(); }}>Max step</label>
+            <input type="range" min="50" max="1000" step="10" bind:value={maxStepDac} oninput={applySettings} />
+            <span class="value">{maxStepDac}</span>
+        </div>
+        {/if}
         {/if}
 
         <div class="mode-separator"></div>

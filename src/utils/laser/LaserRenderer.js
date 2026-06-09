@@ -136,13 +136,14 @@ export class LaserRenderer {
         
         // Laser output settings
         this.settings = {
-            pps: 30000,              // Points per second
-            targetFps: 30,            // Target frame rate for point budget
+            pps: 40000,              // Points per second
+            targetFps: 25,            // Target frame rate for point budget
             intensity: 1.0,           // Overall intensity (0-1)
             color: { r: 0, g: 255, b: 0 }, // Default green
-            blankingPoints: 15,       // Number of blanking points between segments
+            blankingPoints: 15,       // Max blanking travel points for long hops (scaled down for short hops)
             blankingDwell: 5,         // Dwell points at start/end of blanking (galvo settle)
             cornerDwell: 3,           // Extra points at corners for sharpness
+            anchorDwell: 2,           // Dwell points anchoring a segment start/end after blanking
             invertX: true,            // Flip X axis (adjust for projector orientation)
             invertY: true,            // Flip Y axis (adjust for projector orientation)
             swapXY: false,
@@ -151,7 +152,27 @@ export class LaserRenderer {
             pincushionV: 0.0,         // Vertical pincushion correction
             offsetX: 0.0,             // Horizontal position shift
             offsetY: 0.0,             // Vertical position shift
-            velocityDimming: 0.5      // How much velocity affects brightness
+            velocityDimming: 0.5,     // How much velocity affects brightness
+            // Galvo compensation techniques (all independently toggleable).
+            //   cornerMode: how to handle sharp corners.
+            //     'off'      — no extra dwell; fastest but rounded corners
+            //     'binary'   — dwell `cornerDwell` samples when angle > 45°
+            //     'weighted' — dwell scales continuously with angle sharpness
+            //   velocityCap: split edges that exceed maxStepDac DAC units so
+            //     the galvo's slew rate is never exceeded.
+            cornerMode: 'binary',
+            velocityCap: false,
+            maxStepDac: 400,
+            // Resampling-time corner bias. Controls how strongly sharp corners
+            // attract sample points away from straight runs during the resample
+            // step — independent of the DAC-level `cornerDwell`.
+            //   cornerBias: weight multiplier for corner attraction (0 = pure
+            //     arc-length sampling; higher concentrates budget at corners).
+            //   cornerSharpness: exponent on the sharpness metric sin²(θ/2). At 1
+            //     it's linear; at 2+ only sharp corners matter, shallow bends are
+            //     treated like straight runs.
+            cornerBias: 3,
+            cornerSharpness: 1
         };
 
         // State
@@ -167,6 +188,19 @@ export class LaserRenderer {
             inputPoints: 0,
             actualPps: 0
         };
+
+        // Where the galvo ends up after the most recently sent frame (DAC
+        // coordinates). Used to prepend blanking travel when the next frame
+        // starts somewhere else, avoiding stray lit strokes between frames.
+        // Initialized to the DAC center where a fresh device parks the mirror.
+        this._lastFrameEndpoint = { x: 2048, y: 2048 };
+        // Virtual-space position the galvo is at when the next frame starts
+        // drawing — used by the nearest-neighbor segment reorder to pick the
+        // starting segment closest to the current beam position.
+        this._lastVirtualStartPoint = { x: 0, y: 0 };
+        // Cached blanking/dwell overhead from the previous frame, so the point
+        // budget can be estimated in a single pass instead of two.
+        this._lastOverhead = 0;
     }
 
     /**
@@ -318,33 +352,75 @@ export class LaserRenderer {
 
     /**
      * Generate blanking points to travel from one position to another.
-     * Includes dwell at start (turn off) and end (settle before turning on).
+     *
+     * Travel-point count and dwell scale down for short hops (e.g. jump-detected
+     * sub-segment breaks), so per-break overhead doesn't dominate the budget.
+     *
+     * The travel itself uses an accel-then-decel velocity profile: all available
+     * samples are spent ramping velocity up from rest over a fixed physical
+     * distance at the start and ramping back down to rest over the same distance
+     * at the end. The cruise region between them gets no samples — the galvo is
+     * already moving at peak velocity and drifts across it in a single DAC sample
+     * period. This matches galvo physics far better than uniform (constant
+     * velocity) spacing, which forces instant start/stop and causes overshoot
+     * and ringing tails at segment starts.
      */
     generateBlanking(fromX, fromY, toX, toY) {
         const points = [];
-        const count = this.settings.blankingPoints;
-        const dwell = this.settings.blankingDwell;
-        
-        // Brief turn-off dwell at start (let laser modulator fully blank
-        // before galvos start moving — prevents stray light during travel)
-        const turnOffDwell = Math.max(2, Math.floor(dwell / 2));
+        const dx = toX - fromX;
+        const dy = toY - fromY;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+
+        const maxCount = this.settings.blankingPoints;
+        const fullDwell = this.settings.blankingDwell;
+
+        const count = dist < 400
+            ? Math.max(1, Math.round(dist / 100))
+            : Math.max(0, maxCount);
+        const shortHop = dist < 200;
+        // Dwell can be 0 — the user is telling us not to pad before/after blanking
+        // travel. For short hops we still force 1 so the laser has a beat to turn
+        // off and arrive.
+        const turnOffDwell = shortHop ? 1 : Math.max(0, Math.floor(fullDwell / 2));
+        const endDwell = shortHop ? 1 : Math.max(0, fullDwell);
+
+        // Turn-off dwell: let the modulator fully blank before the galvo moves.
         for (let i = 0; i < turnOffDwell; i++) {
             points.push(HeliosPoint.blank(fromX, fromY));
         }
-        
-        // Travel from start to end with laser off
-        for (let i = 0; i <= count; i++) {
-            const t = i / count;
-            const x = fromX + (toX - fromX) * t;
-            const y = fromY + (toY - fromY) * t;
-            points.push(HeliosPoint.blank(x, y));
+
+        // Skip the interpolation loop entirely when count=0 (user explicitly
+        // opted out of blanking travel) — t = i/0 would otherwise be NaN.
+        if (count > 0) {
+            const ACCEL_DIST = 250;
+            const easeFrac = Math.min(0.5, ACCEL_DIST / Math.max(dist, 1));
+
+            const nTotal = count + 1;
+            const nAccel = Math.ceil(nTotal / 2);
+            const nDecel = nTotal - nAccel;
+
+            for (let i = 0; i < nAccel; i++) {
+                const tLocal = nAccel > 1 ? i / (nAccel - 1) : 0;
+                // Quadratic position with zero starting velocity — position grows
+                // like tLocal² up to easeFrac by the end of the ramp.
+                const s = easeFrac * tLocal * tLocal;
+                points.push(HeliosPoint.blank(fromX + dx * s, fromY + dy * s));
+            }
+            for (let j = 0; j < nDecel; j++) {
+                const tLocal = nDecel > 1 ? j / (nDecel - 1) : 1;
+                // Mirror of the accel ramp: starts at 1 − easeFrac, decelerates
+                // to 1 with zero ending velocity.
+                const u = 1 - tLocal;
+                const s = 1 - easeFrac * u * u;
+                points.push(HeliosPoint.blank(fromX + dx * s, fromY + dy * s));
+            }
         }
-        
-        // Dwell at destination with laser off (let galvos settle before turning on)
-        for (let i = 0; i < dwell; i++) {
+
+        // Dwell at destination so the galvo settles before the laser turns on.
+        for (let i = 0; i < endDwell; i++) {
             points.push(HeliosPoint.blank(toX, toY));
         }
-        
+
         return points;
     }
 
@@ -360,31 +436,57 @@ export class LaserRenderer {
 
         const {
             velocityDimming = this.settings.velocityDimming,
-            basePower = 1.0
+            basePower = 1.0,
+            startFromPoint = null
         } = params;
 
         const laserPoints = [];
         const { color, intensity, cornerDwell } = this.settings;
-        
+        const cornerMode = this.settings.cornerMode || 'binary';
+        const anchorDwell = this.settings.anchorDwell ?? 2;
+
         let prevLaserPoint = null;
         let prevVirtual = null;
         let lastWasBlank = true;
+        let lastBlankWasShort = false;
+
+        // If the previous frame left the galvo somewhere other than this frame's
+        // first drawing position, prepend blanking travel so the mirror moves
+        // with the laser off (no stray lit stroke between frames). The closing
+        // blanking at the end of the frame loops back to laserPoints[0] — which,
+        // after the prepend, is this travel's start — so re-plays of the looped
+        // frame stay in sync with the mirror position.
+        if (startFromPoint && points.length > 0) {
+            const firstCoords = this.virtualToLaser(points[0].x, points[0].y);
+            if (startFromPoint.x !== firstCoords.x || startFromPoint.y !== firstCoords.y) {
+                const travel = this.generateBlanking(
+                    startFromPoint.x, startFromPoint.y,
+                    firstCoords.x, firstCoords.y
+                );
+                laserPoints.push(...travel);
+                prevLaserPoint = travel[travel.length - 1] || null;
+                prevVirtual = { x: points[0].x, y: points[0].y };
+                lastWasBlank = true;
+            }
+        }
 
         for (let i = 0; i < points.length; i++) {
             const pt = points[i];
-            const speed = speeds ? speeds[i] : 0;
-            
+            // Speed is folded onto each point upstream (so it survives reorder /
+            // resample); fall back to the parallel speeds array for callers that
+            // still pass one (e.g. the test pattern passes null → speed 0).
+            const speed = pt.speed !== undefined ? pt.speed : (speeds ? speeds[i] : 0);
+
             // Convert coordinates
             const laserCoords = this.virtualToLaser(pt.x, pt.y);
-            
-            // Calculate intensity based on speed
-            // Slower = brighter (more energy per point)
+
+            // Calculate intensity based on speed (slower = brighter)
             const speedFactor = 1 - Math.min(speed * velocityDimming, 0.9);
             const pointIntensity = intensity * basePower * speedFactor * 255;
-            
+
             // Check for discontinuity: explicit segment break, first point, or large jump
             let needsBlanking = pt.segmentStart || i === 0;
-            
+
             // Detect large jumps within a continuous trace (galvos can't keep up)
             if (!needsBlanking && prevVirtual) {
                 const dx = pt.x - prevVirtual.x;
@@ -394,32 +496,40 @@ export class LaserRenderer {
                     needsBlanking = true;
                 }
             }
-            
+
             if (needsBlanking && prevLaserPoint && !lastWasBlank) {
-                // Anchor dwell: repeat last visible point to solidify segment end
-                for (let d = 0; d < cornerDwell; d++) {
+                // Short hops (e.g. jump-detected sub-segment breaks) barely move
+                // the galvo, so the anchor dwell can shrink to a single point.
+                const hopDx = laserCoords.x - prevLaserPoint.x;
+                const hopDy = laserCoords.y - prevLaserPoint.y;
+                const shortHop = Math.sqrt(hopDx * hopDx + hopDy * hopDy) < 200;
+
+                const anchorCount = shortHop ? 1 : anchorDwell;
+                for (let d = 0; d < anchorCount; d++) {
                     laserPoints.push(prevLaserPoint);
                 }
-                // Add blanking to travel to new position
+                // Blanking travel to the new position
                 const blanking = this.generateBlanking(
                     prevLaserPoint.x, prevLaserPoint.y,
                     laserCoords.x, laserCoords.y
                 );
                 laserPoints.push(...blanking);
                 lastWasBlank = true;
+                lastBlankWasShort = shortHop;
             }
 
-            // Calculate corner angle for dwell points
-            let isCorner = false;
+            // Corner detection — angle between incoming and outgoing edges.
+            let cornerAngle = 0;
             if (i > 0 && i < points.length - 1 && !lastWasBlank) {
                 const prev = points[i - 1];
                 const next = points[i + 1];
-                const angle = Math.abs(
+                const raw = Math.abs(
                     Math.atan2(next.y - pt.y, next.x - pt.x) -
                     Math.atan2(pt.y - prev.y, pt.x - prev.x)
                 );
-                isCorner = angle > Math.PI / 4; // More than 45 degrees
+                cornerAngle = Math.min(raw, Math.PI);
             }
+            const isCorner = cornerMode !== 'off' && cornerAngle > Math.PI / 4;
 
             // Create the point (use per-point color if available, else global color)
             const ptColor = pt.r !== undefined ? pt : color;
@@ -432,9 +542,24 @@ export class LaserRenderer {
                 Math.round(pointIntensity)
             );
 
-            // After blanking, add turn-on dwell to anchor segment start
-            // At corners, add extra dwell for sharpness
-            const dwellCount = lastWasBlank ? Math.max(cornerDwell, this.settings.blankingDwell) : (isCorner ? cornerDwell : 1);
+            // Dwell after the point. After blanking: anchor dwell so the galvo
+            // settles before the laser lights. At corners: extra dwell for
+            // sharpness, either binary (>45°) or continuously weighted.
+            let dwellCount;
+            if (lastWasBlank) {
+                dwellCount = lastBlankWasShort ? 1 : anchorDwell;
+            } else if (cornerMode === 'weighted') {
+                // sin²(θ/2) = (1 − cos θ) / 2: 0 for straight, 1 for reversal.
+                const weight = (1 - Math.cos(cornerAngle)) / 2;
+                dwellCount = Math.max(1, Math.round(cornerDwell * weight));
+            } else if (cornerMode === 'binary') {
+                dwellCount = isCorner ? cornerDwell : 1;
+            } else {
+                dwellCount = 1;
+            }
+            // Always emit at least one drawing sample (cornerDwell=0 is legal for
+            // dwell purposes but must not drop the drawing point itself).
+            dwellCount = Math.max(1, dwellCount);
             for (let d = 0; d < dwellCount; d++) {
                 laserPoints.push(laserPoint);
             }
@@ -446,8 +571,7 @@ export class LaserRenderer {
 
         // Close the frame: anchor last point, then blank back to first point
         if (laserPoints.length > 0 && prevLaserPoint) {
-            // Anchor dwell at end of last segment
-            for (let d = 0; d < cornerDwell; d++) {
+            for (let d = 0; d < anchorDwell; d++) {
                 laserPoints.push(prevLaserPoint);
             }
             const firstPoint = laserPoints[0];
@@ -459,6 +583,103 @@ export class LaserRenderer {
         }
 
         return laserPoints;
+    }
+
+    /**
+     * Greedy nearest-neighbor reordering of the segments in `points`, using
+     * `startPoint` (virtual space) as the starting beam position. At each step
+     * we pick the unvisited segment whose nearer endpoint is closest to the
+     * current beam position; if that endpoint is the segment's tail we reverse
+     * it so the path joins cleanly. Minimizes inter-segment blanking travel.
+     *
+     * Segments are split on segmentStart markers only, so a single continuous
+     * trace (one implicit segment) is returned unchanged.
+     */
+    _reorderByBeamPosition(points, startPoint) {
+        if (points.length < 2) return points;
+
+        // Split the flat point array into segments by segmentStart markers.
+        const segments = [];
+        let current = null;
+        for (const pt of points) {
+            if (pt.segmentStart || current === null) {
+                if (current && current.length >= 2) segments.push(current);
+                current = [];
+            }
+            current.push(pt);
+        }
+        if (current && current.length >= 2) segments.push(current);
+        if (segments.length <= 1) return points;
+
+        const ordered = [];
+        const remaining = segments.slice();
+        let curX = startPoint?.x ?? 0;
+        let curY = startPoint?.y ?? 0;
+
+        while (remaining.length > 0) {
+            let bestIdx = 0;
+            let bestDist = Infinity;
+            let bestReverse = false;
+            for (let i = 0; i < remaining.length; i++) {
+                const seg = remaining[i];
+                const head = seg[0];
+                const tail = seg[seg.length - 1];
+                const dHead = (head.x - curX) ** 2 + (head.y - curY) ** 2;
+                const dTail = (tail.x - curX) ** 2 + (tail.y - curY) ** 2;
+                if (dHead < bestDist) { bestDist = dHead; bestIdx = i; bestReverse = false; }
+                if (dTail < bestDist) { bestDist = dTail; bestIdx = i; bestReverse = true; }
+            }
+            let picked = remaining.splice(bestIdx, 1)[0];
+            if (bestReverse) picked = picked.slice().reverse();
+            ordered.push(picked);
+            const last = picked[picked.length - 1];
+            curX = last.x;
+            curY = last.y;
+        }
+
+        // Flatten back to a single point array with segmentStart markers on the
+        // first point of each segment.
+        const result = [];
+        for (const seg of ordered) {
+            for (let i = 0; i < seg.length; i++) {
+                result.push({ ...seg[i], segmentStart: i === 0 });
+            }
+        }
+        return result;
+    }
+
+    /**
+     * Velocity cap: if two consecutive laser points are farther apart than
+     * `maxStepDac` DAC units, insert evenly-spaced intermediate points between
+     * them so the galvo's slew rate is never exceeded. Intermediate points
+     * inherit the colour/intensity of the destination point.
+     */
+    _applyVelocityCap(laserPoints) {
+        if (!this.settings.velocityCap || laserPoints.length < 2) return laserPoints;
+        const maxStep = Math.max(50, this.settings.maxStepDac || 400);
+
+        const result = [laserPoints[0]];
+        for (let i = 1; i < laserPoints.length; i++) {
+            const prev = laserPoints[i - 1];
+            const cur = laserPoints[i];
+            const dx = cur.x - prev.x;
+            const dy = cur.y - prev.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+
+            if (dist > maxStep) {
+                const steps = Math.ceil(dist / maxStep);
+                for (let s = 1; s < steps; s++) {
+                    const t = s / steps;
+                    result.push(new HeliosPoint(
+                        prev.x + dx * t,
+                        prev.y + dy * t,
+                        cur.r, cur.g, cur.b, cur.i
+                    ));
+                }
+            }
+            result.push(cur);
+        }
+        return result;
     }
 
     /**
@@ -509,19 +730,34 @@ export class LaserRenderer {
             const targetPoints = Math.min(Math.floor(this.settings.pps / targetFps), maxPoints);
             this.stats.inputPoints = points.length;
 
-            // Estimate overhead: blanking + dwell per segment adds ~30-50 points
-            // Reserve budget for that so drawing points + overhead ≈ targetPoints
-            const segments = this._countSegments(points);
-            const overheadPerSegment = this.settings.blankingPoints + this.settings.blankingDwell * 2 + this.settings.cornerDwell * 2;
-            const estimatedOverhead = segments * overheadPerSegment;
-            const drawingBudget = Math.max(20, targetPoints - estimatedOverhead);
+            // Fold per-point speed onto each point so velocity dimming survives
+            // the reorder + resample steps below (which would otherwise break the
+            // alignment of a parallel speeds array).
+            const tagged = points.map((p, i) => (
+                speeds ? { ...p, speed: speeds[i] } : p
+            ));
 
-            const resampledPoints = this.resampleInputPoints(points, drawingBudget);
+            // Second-pass beam-travel optimization: reorder the segments using
+            // nearest-neighbor from the current beam position to minimize
+            // inter-segment blanking travel. No-op for a single continuous trace.
+            const reordered = this._reorderByBeamPosition(tagged, this._lastVirtualStartPoint);
+            if (reordered.length > 0) {
+                this._lastVirtualStartPoint = { x: reordered[0].x, y: reordered[0].y };
+            }
 
-            // Convert resampled points to laser points (adds dwell, blanking)
-            const laserPoints = this.convertTraceToLaserPoints(resampledPoints, speeds, {
+            // Single-pass budget estimate using the overhead measured last frame,
+            // avoiding a costly two-pass convert just to count blanking/dwell.
+            const drawingBudget = Math.max(20, Math.floor((targetPoints - this._lastOverhead) * 0.98));
+
+            const resampledPoints = this.resampleInputPoints(reordered, drawingBudget);
+
+            // Convert resampled points to laser points (adds dwell, blanking).
+            // startFromPoint prepends blanking travel from where the previous
+            // frame left the galvo, avoiding stray lit strokes between frames.
+            const laserPoints = this.convertTraceToLaserPoints(resampledPoints, null, {
                 velocityDimming,
-                basePower
+                basePower,
+                startFromPoint: this._lastFrameEndpoint
             });
 
             if (laserPoints.length === 0) {
@@ -529,9 +765,19 @@ export class LaserRenderer {
                 return;
             }
 
-            const finalPoints = laserPoints.length > maxPoints
-                ? laserPoints.slice(0, maxPoints)
-                : laserPoints;
+            // Galvo slew-rate cap: split any DAC step larger than maxStepDac into
+            // intermediate points so the mirror is never commanded past its limit.
+            const cappedPoints = this._applyVelocityCap(laserPoints);
+
+            const finalPoints = cappedPoints.length > maxPoints
+                ? cappedPoints.slice(0, maxPoints)
+                : cappedPoints;
+
+            // Remember where this frame leaves the galvo, and cache the actual
+            // blanking/dwell overhead for next frame's budget estimate.
+            const tail = finalPoints[finalPoints.length - 1];
+            if (tail) this._lastFrameEndpoint = { x: tail.x, y: tail.y };
+            this._lastOverhead = finalPoints.length - resampledPoints.length;
 
             // Store for statistics
             this.lastFrame = finalPoints;
@@ -621,22 +867,37 @@ export class LaserRenderer {
             const segLen = seg.end - seg.start + 1;
             const segBudget = Math.max(2, Math.round(targetCount * seg.weight / totalWeight));
 
-            if (segLen <= 2 || segBudget >= segLen) {
-                // Keep all points (or too few to resample)
+            if (segLen <= 2) {
+                // Too few points to resample — keep all.
                 for (let i = seg.start; i <= seg.end; i++) {
                     const pt = { ...points[i] };
                     if (i === seg.start && result.length > 0) pt.segmentStart = true;
                     result.push(pt);
                 }
             } else {
-                // Build cumulative weight table for this segment
+                // Each edge stores the corner weights at both its endpoints so
+                // the sampling loop can split the edge into a depart half
+                // (cluster near the start vertex, if it's a corner) and an
+                // approach half (cluster near the end vertex, if it's a corner).
+                // A vertex's corner weight is split half/half between its
+                // incoming and outgoing edge, so each corner still contributes
+                // the same total weight but the sample budget it attracts spreads
+                // physically across both adjacent edges near the vertex — samples
+                // cluster *against* the corner without stacking *on* it.
+                const edgeLens = [];
+                const startCws = [];
+                const endCws = [];
                 const cumWeight = [0];
                 for (let i = seg.start; i < seg.end; i++) {
                     const dx = points[i + 1].x - points[i].x;
                     const dy = points[i + 1].y - points[i].y;
                     const edgeLen = Math.sqrt(dx * dx + dy * dy);
-                    const cornerW = this._inputCornerWeight(points, i + 1, seg.start, seg.end);
-                    cumWeight.push(cumWeight[cumWeight.length - 1] + edgeLen + cornerW);
+                    const startCw = this._inputCornerWeight(points, i, seg.start, seg.end);
+                    const endCw = this._inputCornerWeight(points, i + 1, seg.start, seg.end);
+                    edgeLens.push(edgeLen);
+                    startCws.push(startCw);
+                    endCws.push(endCw);
+                    cumWeight.push(cumWeight[cumWeight.length - 1] + edgeLen + (startCw + endCw) / 2);
                 }
                 const totalW = cumWeight[cumWeight.length - 1];
 
@@ -660,27 +921,52 @@ export class LaserRenderer {
                         else hi = mid;
                     }
 
+                    const relW = targetW - cumWeight[lo];
+                    const el = edgeLens[lo];
+                    const startCw = startCws[lo];
+                    const endCw = endCws[lo];
+                    const a = points[seg.start + lo];
+                    const b = points[Math.min(seg.start + lo + 1, seg.end)];
+
+                    // Split the edge into a depart half and an approach half at
+                    // physical frac = 0.5. Each half's weight = half the physical
+                    // edge length plus half the adjacent corner weight. Inside a
+                    // half, a quadratic curve maps uniform weight progress to
+                    // physical frac so samples cluster against the corner.
+                    const departHalfW = el / 2 + startCw / 2;
+                    const approachHalfW = el / 2 + endCw / 2;
+                    let frac;
+                    if (el <= 0) {
+                        frac = 0;
+                    } else if (relW <= departHalfW) {
+                        const u = departHalfW > 0 ? relW / departHalfW : 0;
+                        const h = startCw > 0 ? u * u : u;
+                        frac = 0.5 * h;
+                    } else {
+                        const u = approachHalfW > 0 ? (relW - departHalfW) / approachHalfW : 1;
+                        const h = endCw > 0 ? 1 - (1 - u) * (1 - u) : u;
+                        frac = 0.5 + 0.5 * h;
+                    }
+
                     let pt;
                     if (isUpsampling) {
                         // Interpolate between source points
-                        const edgeW = cumWeight[lo + 1] - cumWeight[lo];
-                        const frac = edgeW > 0 ? (targetW - cumWeight[lo]) / edgeW : 0;
-                        const a = points[seg.start + lo];
-                        const b = points[Math.min(seg.start + lo + 1, seg.end)];
                         pt = {
                             x: a.x + (b.x - a.x) * frac,
                             y: a.y + (b.y - a.y) * frac,
                         };
                         // Preserve per-point color from nearest source
                         if (a.r !== undefined) {
-                            pt.r = Math.round(a.r + (b.r - a.r) * frac);
-                            pt.g = Math.round(a.g + (b.g - a.g) * frac);
-                            pt.b = Math.round(a.b + (b.b - a.b) * frac);
+                            pt.r = Math.round(a.r + ((b.r || 0) - a.r) * frac);
+                            pt.g = Math.round(a.g + ((b.g || 0) - a.g) * frac);
+                            pt.b = Math.round(a.b + ((b.b || 0) - a.b) * frac);
+                        }
+                        // Preserve velocity-dimming speed across interpolation.
+                        if (a.speed !== undefined) {
+                            pt.speed = a.speed + ((b.speed ?? a.speed) - a.speed) * frac;
                         }
                     } else {
                         // Downsample: snap to nearest source point
-                        const edgeW = cumWeight[lo + 1] - cumWeight[lo];
-                        const frac = edgeW > 0 ? (targetW - cumWeight[lo]) / edgeW : 0;
                         const idx = frac < 0.5 ? seg.start + lo : Math.min(seg.start + lo + 1, seg.end);
                         pt = { ...points[idx] };
                     }
@@ -709,7 +995,13 @@ export class LaserRenderer {
         const cosAngle = dot / (magA * magB);
         const sharpness = Math.max(0, (1 - cosAngle) / 2);
         const avgEdge = (magA + magB) / 2;
-        return sharpness * avgEdge * (this.settings.cornerDwell || 3);
+        const bias = this.settings.cornerBias ?? 3;
+        const power = this.settings.cornerSharpness ?? 1;
+        // cornerSharpness raises the per-point sharpness to a power: at power=1
+        // any bend contributes (linear); at power=2+ only pronounced corners
+        // dominate the weight, so shallow bends are treated like straight runs.
+        const weightedSharpness = power === 1 ? sharpness : Math.pow(sharpness, power);
+        return weightedSharpness * avgEdge * bias;
     }
 
     /**
