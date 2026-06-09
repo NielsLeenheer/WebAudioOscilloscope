@@ -29,7 +29,7 @@
     // Frame processing settings
     let resampleMode = $state('proportional');
     let optimizeOrder = $state(true);
-    let trackBeamPosition = $state(true);
+    let trackBeamPosition = $state(false);
 
     // Output settings that also need to reach the frame processor
     let frequency = $state(100);
