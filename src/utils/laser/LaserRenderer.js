@@ -698,8 +698,12 @@ export class LaserRenderer {
         this._readyWarned = false;
 
         const { points, speeds, velocityDimming, basePower } = params;
-        
+
+        // Empty input (e.g. all SVG elements off-screen or hidden): park the
+        // galvo with a blank frame so the projector clears, instead of looping
+        // the last non-empty frame forever.
         if (!points || points.length < 2) {
+            await this._parkBlank();
             return;
         }
 
@@ -787,6 +791,9 @@ export class LaserRenderer {
             // Send to device
             await this.device.sendFrame(finalPoints, this.settings.pps);
             this.framesSentThisSecond++;
+            // A real frame is now on the DAC, so the next empty frame should
+            // clear it again immediately rather than waiting for the keepalive.
+            this._sentBlank = false;
             
             // Log stats every second
             if (now - this.lastStatsTime > 1000) {
@@ -804,20 +811,56 @@ export class LaserRenderer {
     }
 
     /**
-     * Count the number of segments in input points (for overhead estimation).
+     * Send a blank frame to park the galvo at center when there's nothing to
+     * draw. Without this the DAC loops the last non-empty frame indefinitely,
+     * so hiding/removing all content would leave a frozen image on the wall.
+     *
+     * Sending one blank frame is enough to clear the display (the DAC then loops
+     * the blank harmlessly); a periodic re-send keeps bulk traffic alive so a
+     * wedged device surfaces as an error rather than a silent freeze. Rate-limited
+     * so we don't churn the DAC on every rAF tick while idle.
      */
-    _countSegments(points) {
-        let count = 1;
-        for (let i = 1; i < points.length; i++) {
-            if (points[i].segmentStart) count++;
-            else {
-                // Also count jump-detected segments
-                const dx = points[i].x - points[i - 1].x;
-                const dy = points[i].y - points[i - 1].y;
-                if (Math.sqrt(dx * dx + dy * dy) > 0.15) count++;
-            }
+    async _parkBlank() {
+        if (this.isSending) return;
+
+        const KEEPALIVE_MS = 500;
+        const now = performance.now();
+        if (this._sentBlank && (now - (this._lastBlankTime || 0)) < KEEPALIVE_MS) {
+            return;
         }
-        return count;
+
+        this.isSending = true;
+        try {
+            const status = await this.device.getStatus();
+            if (status !== 1) { // not ready for a new frame
+                this.isSending = false;
+                return;
+            }
+
+            const blankPoints = [];
+            for (let i = 0; i < 100; i++) {
+                blankPoints.push(HeliosPoint.blank(2048, 2048));
+            }
+            await this.device.sendFrame(blankPoints, this.settings.pps);
+
+            this._sentBlank = true;
+            this._lastBlankTime = now;
+            // Galvo is parked at center; the next real frame prepends blanking
+            // travel from here to its first drawing position.
+            this._lastFrameEndpoint = { x: 2048, y: 2048 };
+            this._lastVirtualStartPoint = { x: 0, y: 0 };
+
+            // Reflect "idle" in the stats so the debug panel doesn't keep showing
+            // the last rendered frame's counts while nothing is being drawn.
+            this.lastFrame = blankPoints;
+            this.stats.pointsPerFrame = blankPoints.length;
+            this.stats.inputPoints = 0;
+            this.framesSentThisSecond++;
+        } catch (error) {
+            console.error('[LaserRenderer] Error sending blank park frame:', error);
+        } finally {
+            this.isSending = false;
+        }
     }
 
     /**

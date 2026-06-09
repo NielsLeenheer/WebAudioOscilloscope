@@ -123,14 +123,15 @@
                 });
             }
         }
-        if (points.length > 0) {
-            laserRenderer.renderTrace({
-                points,
-                speeds: null,
-                basePower: 1.0,
-                velocityDimming: 0
-            });
-        }
+        // Always forward — including empty frames. When the SVG has no on-screen
+        // elements, renderTrace parks a blank frame so the projector clears
+        // instead of looping the last non-empty frame.
+        laserRenderer.renderTrace({
+            points,
+            speeds: null,
+            basePower: 1.0,
+            velocityDimming: 0
+        });
     }
 
     // Calibration mode: continuously send test pattern
