@@ -16,6 +16,7 @@ import clockPath from './clock.txt?raw';
 import cssdayPath from './cssday.txt?raw';
 import asteroidsPath from './asteroids.txt?raw';
 import dinoPath from './dino.txt?raw';
+import thankyouPath from './thankyou.txt?raw';
 
 // Export as array with id, label, path, and complexity
 export const svgExamples = [
@@ -36,4 +37,5 @@ export const svgExamples = [
     { id: 'cssday', label: 'CSS Day', path: cssdayPath.trim(), complex: true },
     { id: 'asteroids', label: 'Asteroids', path: asteroidsPath.trim(), complex: true },
     { id: 'dino', label: 'Dino', path: dinoPath.trim(), complex: true },
+    { id: 'thankyou', label: 'Thank You', path: thankyouPath.trim(), complex: true },
 ];
