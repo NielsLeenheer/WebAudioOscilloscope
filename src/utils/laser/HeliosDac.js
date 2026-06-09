@@ -583,15 +583,34 @@ export class HeliosDevice {
     async close() {
         if (this.closed) return;
 
+        // Best-effort stop: send the stop command once and DON'T wait for a
+        // reply. The Helios doesn't answer stop on the interrupt-IN endpoint, so
+        // a read would hang forever (wedging close + any queued reconnect); and
+        // we deliberately avoid stop()'s 3-retry loop, which would otherwise
+        // keep firing at the half-closed device and log spurious errors. Once
+        // transferOut resolves the command has been transmitted, which is all
+        // we need before closing.
+        this.#running = false;
         try {
-            await this.stop();
-            await new Promise(resolve => setTimeout(resolve, 100));
-            await this.usbDevice.close();
-            this.closed = true;
-            this.#emitStatus('disconnected');
+            const buffer = new Uint8Array(2);
+            buffer[0] = HELIOS_STOP_COMMAND;
+            buffer[1] = 0;
+            await this.usbDevice.transferOut(this.#epIntOut, buffer);
+            // Brief settle so the DAC acts on the stop before the handle closes.
+            await new Promise(resolve => setTimeout(resolve, 50));
         } catch (error) {
-            console.error('Error closing device:', error);
+            // Ignore — stop is best-effort and we're tearing down regardless.
         }
+
+        this.closed = true;
+
+        try {
+            await this.usbDevice.close();
+        } catch (error) {
+            console.error('[Helios] Error closing USB device:', error);
+        }
+
+        this.#emitStatus('disconnected');
     }
 
     // Property getters and setters

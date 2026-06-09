@@ -23,7 +23,13 @@
         audioEngine.stop();
     }
 
-    async function handleLaserClick(event) {
+    // Serializes laser connect/disconnect so they never overlap on the shared
+    // USB device. Without this, a quick reconnect races the previous teardown:
+    // the new connect reopens the device while the old disconnect is still
+    // mid-close, and the late disconnect then nulls the freshly-opened device.
+    let laserOp = Promise.resolve();
+
+    function handleLaserClick(event) {
         // Alt/Option-click forces the WebUSB device picker so the user can switch
         // to a different projector instead of silently reconnecting to the last.
         const forcePicker = !!event?.altKey;
@@ -35,31 +41,40 @@
         }
 
         if (laserConnected) {
-            // Disconnect
+            // Disconnect. Dismiss the dialog immediately so the UI responds to
+            // the click right away; the actual teardown is queued so it runs
+            // after (and never concurrently with) any pending connect.
             console.log('[App] Disconnecting laser...');
-            if (laserRenderer) {
-                await laserRenderer.disconnect();
-            }
             laserConnected = false;
-            console.log('[App] Laser disconnected');
+            const r = laserRenderer;
+            if (r) {
+                laserOp = laserOp.then(() =>
+                    r.disconnect().catch((error) =>
+                        console.error('[App] Error disconnecting laser:', error)
+                    )
+                );
+            }
         } else {
-            // Connect
+            // Connect — queued behind any in-flight disconnect so the previous
+            // close() fully completes before we reopen the same device.
             console.log('[App] Connecting laser...');
             if (!laserRenderer) {
                 console.log('[App] Creating new LaserRenderer');
                 laserRenderer = new LaserRenderer();
             }
-            try {
-                const success = await laserRenderer.connect({ forcePicker });
-                console.log('[App] Connect result:', success);
-                if (success) {
-                    laserConnected = true;
-                    laserRenderer.setEnabled(true);
-                    console.log('[App] Laser connected and enabled');
+            laserOp = laserOp.then(async () => {
+                try {
+                    const success = await laserRenderer.connect({ forcePicker });
+                    console.log('[App] Connect result:', success);
+                    if (success) {
+                        laserConnected = true;
+                        laserRenderer.setEnabled(true);
+                        console.log('[App] Laser connected and enabled');
+                    }
+                } catch (error) {
+                    console.error('[App] Failed to connect laser:', error);
                 }
-            } catch (error) {
-                console.error('[App] Failed to connect laser:', error);
-            }
+            });
         }
     }
 
