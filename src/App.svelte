@@ -23,9 +23,12 @@
         audioEngine.stop();
     }
 
-    async function handleLaserClick() {
-        console.log('[App] Laser button clicked, connected:', laserConnected, 'supported:', laserSupported);
-        
+    async function handleLaserClick(event) {
+        // Alt/Option-click forces the WebUSB device picker so the user can switch
+        // to a different projector instead of silently reconnecting to the last.
+        const forcePicker = !!event?.altKey;
+        console.log('[App] Laser button clicked, connected:', laserConnected, 'supported:', laserSupported, 'forcePicker:', forcePicker);
+
         if (!laserSupported) {
             alert('WebUSB is not supported in this browser');
             return;
@@ -47,7 +50,7 @@
                 laserRenderer = new LaserRenderer();
             }
             try {
-                const success = await laserRenderer.connect();
+                const success = await laserRenderer.connect({ forcePicker });
                 console.log('[App] Connect result:', success);
                 if (success) {
                     laserConnected = true;

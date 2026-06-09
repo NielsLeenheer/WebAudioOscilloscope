@@ -211,40 +211,91 @@ export class LaserRenderer {
     }
 
     /**
-     * Connect to a Helios DAC
-     * Shows browser USB device picker
+     * Connect to a Helios DAC.
+     *
+     * Tries to reconnect silently to a previously-authorized device first (no
+     * picker dialog). Only when no authorized device is found does it fall back
+     * to the browser's USB picker. This makes the connect button "just work" on
+     * repeat use while still letting a first-time user choose a device.
+     *
+     * Pass `{ forcePicker: true }` to always show the picker, skipping the silent
+     * reconnect — used for Alt/Option-click to switch to a different projector.
      */
-    async connect() {
-        console.log('[LaserRenderer] Connecting to Helios DAC...');
+    async connect({ forcePicker = false } = {}) {
+        console.log('[LaserRenderer] Connecting to Helios DAC...', forcePicker ? '(forcing picker)' : '');
+        if (forcePicker) {
+            return this._connectWith(() => connectHeliosDevice());
+        }
+        const existing = await getHeliosDevices().catch(() => []);
+        if (existing.length > 0) {
+            console.log('[LaserRenderer] Found previously-authorized device, reconnecting silently');
+            const ok = await this._connectWith(() => existing[0]);
+            if (ok) return true;
+            // Silent reconnect failed (device unplugged / stale handle) — fall
+            // through to the picker so the user can pick another.
+            console.log('[LaserRenderer] Silent reconnect failed, showing picker');
+        }
+        return this._connectWith(() => connectHeliosDevice());
+    }
+
+    /**
+     * Reconnect silently to a previously-authorized Helios device, without
+     * showing the USB picker. Returns false if none is paired or it fails to
+     * open. Useful for callers that want to attempt a reconnect without ever
+     * prompting the user.
+     */
+    async reconnectSilent() {
+        const devices = await getHeliosDevices().catch(() => []);
+        if (devices.length === 0) return false;
+        return this._connectWith(() => devices[0]);
+    }
+
+    /**
+     * Shared connect path. `acquireDevice` returns a HeliosDevice (or null) —
+     * either from the picker or from the previously-authorized device list.
+     */
+    async _connectWith(acquireDevice) {
         try {
             this.emitStatus('connecting');
-            console.log('[LaserRenderer] Requesting device from browser...');
-            this.device = await connectHeliosDevice();
-            console.log('[LaserRenderer] Device returned:', this.device);
-            
-            if (this.device) {
-                this.device.pps = this.settings.pps;
-                this.device.onStatusChange = (status) => {
-                    console.log('[LaserRenderer] Device status:', status);
-                    if (this.onStatusChange) {
-                        this.onStatusChange(status);
-                    }
-                };
-                
-                console.log('[LaserRenderer] Calling device.connect()...');
-                const result = await this.device.connect();
-                console.log('[LaserRenderer] device.connect() returned:', result);
-                this.emitStatus('connected', {
-                    name: this.device.name,
-                    firmware: this.device.firmwareVersion
-                });
-                return true;
+            this.device = await acquireDevice();
+
+            if (!this.device) {
+                console.log('[LaserRenderer] No device selected');
+                return false;
             }
-            console.log('[LaserRenderer] No device selected');
-            return false;
+
+            // Fresh connection: the USB reset parks the galvo at center and we
+            // have no prior endpoint, so the first frame prepends blanking travel
+            // from center.
+            this._lastFrameEndpoint = { x: 2048, y: 2048 };
+            this._lastVirtualStartPoint = { x: 0, y: 0 };
+            this.device.pps = this.settings.pps;
+            this.device.onStatusChange = (status) => {
+                console.log('[LaserRenderer] Device status:', status);
+                if (this.onStatusChange) {
+                    this.onStatusChange(status);
+                }
+            };
+
+            console.log('[LaserRenderer] Calling device.connect()...');
+            const result = await this.device.connect();
+            console.log('[LaserRenderer] device.connect() returned:', result);
+            if (result !== HELIOS.SUCCESS) {
+                console.warn('[LaserRenderer] Device connect returned non-success:', result);
+                try { await this.device.close(); } catch {}
+                this.device = null;
+                return false;
+            }
+
+            this.emitStatus('connected', {
+                name: this.device.name,
+                firmware: this.device.firmwareVersion
+            });
+            return true;
         } catch (error) {
             console.error('[LaserRenderer] Failed to connect:', error);
             this.emitStatus('error', { error: error.message });
+            this.device = null;
             return false;
         }
     }
